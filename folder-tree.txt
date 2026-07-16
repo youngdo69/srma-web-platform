@@ -1,0 +1,74 @@
+﻿Windows  볼륨에 대한 폴더 경로의 목록입니다.
+볼륨 일련 번호는 9AF6-E817입니다.
+C:.
+│  .gitignore
+│  AGENTS.md
+│  CLAUDE.md
+│  folder-tree.txt
+│  README.md
+│  
+├─harnesses
+│  └─srma-harness
+│      │  pyproject.toml
+│      │  README.md
+│      │  requirements.txt
+│      │  
+│      ├─config
+│      │      .gitkeep
+│      │      
+│      ├─examples
+│      │      .gitkeep
+│      │      
+│      ├─prompts
+│      │      .gitkeep
+│      │      
+│      ├─src
+│      │  ├─agents
+│      │  │      .gitkeep
+│      │  │      
+│      │  └─validators
+│      │          .gitkeep
+│      │          
+│      └─tests
+│              .gitkeep
+│              
+├─scripts
+│      .gitkeep
+│      install-windows.ps1
+│      update-windows.ps1
+│      verify-installation.py
+│      
+├─skills
+│  ├─meta-analysis-r
+│  │      .gitkeep
+│  │      SKILL.md
+│  │      
+│  ├─prisma-screening
+│  │      .gitkeep
+│  │      SKILL.md
+│  │      
+│  └─run-systematic-review-meta-analysis
+│      │  SKILL.md
+│      │  
+│      ├─references
+│      │      .gitkeep
+│      │      
+│      ├─scripts
+│      │      .gitkeep
+│      │      
+│      └─templates
+│              .gitkeep
+│              
+└─templates
+    ├─extraction
+    │      .gitkeep
+    │      
+    ├─manuscript
+    │      .gitkeep
+    │      
+    ├─protocol
+    │      .gitkeep
+    │      
+    └─risk-of-bias
+            .gitkeep
+            
