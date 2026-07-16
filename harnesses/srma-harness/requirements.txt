@@ -1,0 +1,25 @@
+# ==========================================
+# SRMA Agent Toolkit
+# Python Package Requirements
+# ==========================================
+
+numpy>=2.0
+pandas>=2.2
+scipy>=1.14
+statsmodels>=0.14
+openpyxl>=3.1
+PyYAML>=6.0
+requests>=2.32
+biopython>=1.85
+rapidfuzz>=3.10
+tqdm>=4.67
+click>=8.1
+rich>=13.9
+pytest>=8.3
+pytest-cov>=6.0
+python-dotenv>=1.0
+matplotlib>=3.10
+plotly>=6.0
+beautifulsoup4>=4.13
+lxml>=5.3
+pydantic>=2.8
