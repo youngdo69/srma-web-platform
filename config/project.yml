@@ -1,0 +1,161 @@
+# Cardiac Surgery SR-MA Toolkit v2.0
+# Project configuration
+
+project:
+  title: "Effects of SGLT2 Inhibitors in Patients Undergoing Cardiac Surgery"
+  short_name: "SGLT2i_Cardiac_Surgery_SRMA"
+  version: "1.0"
+  status: "protocol_development"
+
+  principal_investigator: "Jason"
+  clinical_field: "Cardiac Surgery"
+
+  protocol_registration:
+    registry: "PROSPERO"
+    registration_number: ""
+    registration_date: ""
+
+research_question:
+  framework: "PICO"
+
+  population:
+    description: "Adults undergoing cardiac surgery"
+    minimum_age: 18
+
+  intervention:
+    description: "Treatment with an SGLT2 inhibitor"
+    drugs:
+      - "dapagliflozin"
+      - "empagliflozin"
+      - "canagliflozin"
+      - "ertugliflozin"
+
+  comparator:
+    description: "No SGLT2 inhibitor, placebo, or standard care"
+
+  outcomes:
+    primary:
+      - "postoperative acute kidney injury"
+      - "operative or short-term mortality"
+
+    secondary:
+      - "major adverse cardiovascular events"
+      - "heart failure"
+      - "postoperative atrial fibrillation"
+      - "renal replacement therapy"
+      - "length of intensive care unit stay"
+      - "length of hospital stay"
+      - "perioperative ketoacidosis"
+      - "hypoglycemia"
+
+eligibility:
+  study_designs:
+    include:
+      - "randomized controlled trial"
+      - "prospective cohort study"
+      - "retrospective cohort study"
+
+    exclude:
+      - "case report"
+      - "case series"
+      - "review"
+      - "editorial"
+      - "conference abstract without sufficient outcome data"
+
+  language_restriction: "none"
+
+  publication_status:
+    include_peer_reviewed_articles: true
+    include_preprints: false
+    include_conference_abstracts: false
+
+  minimum_sample_size: 10
+
+search:
+  databases:
+    - "PubMed/MEDLINE"
+    - "Embase"
+    - "Cochrane CENTRAL"
+
+  additional_sources:
+    - "reference lists"
+    - "ClinicalTrials.gov"
+
+  search_start_date: "inception"
+  search_end_date: ""
+
+screening:
+  reviewers: 2
+  independent_screening: true
+  disagreement_resolution: "discussion or third reviewer"
+
+data_extraction:
+  reviewers: 2
+  independent_extraction: true
+  disagreement_resolution: "consensus"
+
+risk_of_bias:
+  randomized_trials: "RoB 2"
+  nonrandomized_studies: "ROBINS-I"
+
+analysis:
+  software: "R"
+
+  binary_effect_measure: "RR"
+  continuous_effect_measure: "MD"
+  time_to_event_effect_measure: "HR"
+
+  model:
+    primary: "random-effects"
+    common_effect_sensitivity: true
+
+  heterogeneity:
+    tau_squared_estimator: "REML"
+    hartung_knapp_adjustment: true
+    prediction_interval: true
+
+  statistical_significance:
+    alpha: 0.05
+    confidence_interval: 0.95
+
+  zero_event_handling:
+    continuity_correction: 0.5
+    double_zero_studies_primary_analysis: false
+
+  subgroup_analyses:
+    - "type of cardiac surgery"
+    - "specific SGLT2 inhibitor"
+    - "diabetes status"
+    - "heart failure status"
+    - "timing of drug discontinuation"
+    - "randomized versus observational study"
+
+  sensitivity_analyses:
+    - "leave-one-out analysis"
+    - "low-risk-of-bias studies only"
+    - "randomized studies only"
+    - "alternative effect measures"
+    - "alternative tau-squared estimator"
+
+  meta_regression:
+    minimum_number_of_studies: 10
+    candidate_moderators:
+      - "mean age"
+      - "proportion of patients with diabetes"
+      - "proportion of CABG"
+      - "proportion of valve surgery"
+      - "study year"
+
+  publication_bias:
+    minimum_number_of_studies: 10
+    methods:
+      - "funnel plot"
+      - "Egger regression test"
+      - "rank correlation test"
+
+certainty_of_evidence:
+  framework: "GRADE"
+
+reporting:
+  guideline: "PRISMA 2020"
+  target_journal: "International Journal of Surgery"

@@ -1,0 +1,7 @@
+"directory","exists"
+"R",TRUE
+"data/raw",TRUE
+"data/processed",TRUE
+"results/figures",TRUE
+"results/tables",TRUE
+"results/logs",TRUE
