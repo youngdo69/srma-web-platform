@@ -1,0 +1,5 @@
+"check","passed"
+"Source file exists",TRUE
+"Required columns present",TRUE
+"No duplicated column names",TRUE
+"Dataset contains at least one row",FALSE

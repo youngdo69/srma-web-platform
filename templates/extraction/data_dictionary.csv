@@ -1,0 +1,30 @@
+variable,category,description,data_type,example,required
+study_id,identification,Unique study identifier,text,Kim_2025,yes
+first_author,identification,First author surname,text,Kim,yes
+publication_year,identification,Year of publication,integer,2025,yes
+study_design,design,Study design,categorical,retrospective cohort,yes
+total_sample_size,design,Total number of participants,integer,250,yes
+cardiac_surgery_type,clinical,Type of cardiac surgery,text,CABG,yes
+intervention_drug,intervention,SGLT2 inhibitor used,text,empagliflozin,yes
+n_intervention,group_size,Number in intervention group,integer,120,yes
+n_control,group_size,Number in control group,integer,130,yes
+outcome_name,outcome,Standardized outcome name,text,acute kidney injury,yes
+outcome_definition,outcome,Definition used in the study,text,KDIGO criteria,no
+timepoint,outcome,Outcome assessment time,text,in-hospital,yes
+event_intervention,binary_outcome,Events in intervention group,integer,12,conditional
+total_intervention,binary_outcome,Total analyzed in intervention group,integer,120,conditional
+event_control,binary_outcome,Events in control group,integer,22,conditional
+total_control,binary_outcome,Total analyzed in control group,integer,130,conditional
+mean_intervention,continuous_outcome,Mean in intervention group,numeric,5.2,conditional
+sd_intervention,continuous_outcome,Standard deviation in intervention group,numeric,2.1,conditional
+mean_control,continuous_outcome,Mean in control group,numeric,6.4,conditional
+sd_control,continuous_outcome,Standard deviation in control group,numeric,2.5,conditional
+effect_measure,effect_estimate,Reported effect measure,categorical,HR,conditional
+effect_estimate,effect_estimate,Reported point estimate,numeric,0.78,conditional
+lower_ci,effect_estimate,Lower confidence limit,numeric,0.62,conditional
+upper_ci,effect_estimate,Upper confidence limit,numeric,0.98,conditional
+data_source,quality,Source of extracted data,text,Table 2,yes
+risk_of_bias_tool,quality,Risk-of-bias instrument,text,ROBINS-I,yes
+risk_of_bias_judgment,quality,Overall risk-of-bias judgment,categorical,moderate,yes
+extraction_status,workflow,Status of extraction,categorical,pending verification,yes
+notes,workflow,Additional notes,text,Values digitized from figure,no
