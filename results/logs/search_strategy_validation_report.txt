@@ -1,0 +1,88 @@
+Cardiac Surgery SR-MA Toolkit v2.0
+Search Strategy Validation Report
+Generated: 2026-07-30 01:01:26.644461
+
+SUMMARY
+--------------------------------------------------
+# A tibble: 3 × 5
+  database total_checks passed_checks failed_checks overall_pass
+  <chr>           <int>         <int>         <int> <lgl>       
+1 CENTRAL            11            11             0 TRUE        
+2 Embase             11            11             0 TRUE        
+3 PubMed             12            12             0 TRUE        
+
+DETAILED RESULTS
+--------------------------------------------------
+ database          category                check passed
+   PubMed           general       file_not_empty   TRUE
+   PubMed           general       minimum_length   TRUE
+   PubMed           general          parentheses   TRUE
+   PubMed           general    boolean_placement   TRUE
+   PubMed           general     boolean_presence   TRUE
+   PubMed           general      duplicate_lines   TRUE
+   PubMed database_specific        double_quotes   TRUE
+   PubMed database_specific field_title_abstract   TRUE
+   PubMed database_specific             mesh_tag   TRUE
+   PubMed database_specific      no_central_tags   TRUE
+   PubMed database_specific       no_embase_tags   TRUE
+   PubMed database_specific      bracket_balance   TRUE
+   Embase           general       file_not_empty   TRUE
+   Embase           general       minimum_length   TRUE
+   Embase           general          parentheses   TRUE
+   Embase           general    boolean_placement   TRUE
+   Embase           general     boolean_presence   TRUE
+   Embase           general      duplicate_lines   TRUE
+   Embase database_specific        single_quotes   TRUE
+   Embase database_specific          text_fields   TRUE
+   Embase database_specific     emtree_explosion   TRUE
+   Embase database_specific       no_pubmed_tags   TRUE
+   Embase database_specific      no_central_mesh   TRUE
+  CENTRAL           general       file_not_empty   TRUE
+  CENTRAL           general       minimum_length   TRUE
+  CENTRAL           general          parentheses   TRUE
+  CENTRAL           general    boolean_placement   TRUE
+  CENTRAL           general     boolean_presence   TRUE
+  CENTRAL           general      duplicate_lines   TRUE
+  CENTRAL database_specific        double_quotes   TRUE
+  CENTRAL database_specific          text_fields   TRUE
+  CENTRAL database_specific      mesh_descriptor   TRUE
+  CENTRAL database_specific       no_pubmed_tags   TRUE
+  CENTRAL database_specific  no_embase_explosion   TRUE
+                                                                                                 message
+                                                             The search-strategy file must not be empty.
+                                                                          Search length: 706 characters.
+                                                          Opening parentheses: 2; closing parentheses: 2
+                                                                        Boolean placement appears valid.
+                                                                              AND count: 1; OR count: 15
+                                                               No duplicated search lines were detected.
+                                                                                  Double-quote count: 24
+                                                    At least one [Title/Abstract] field tag is required.
+                   No MeSH field tag was detected. This may be acceptable only if intentionally omitted.
+                                                  CENTRAL-style :ti,ab,kw syntax was detected in PubMed.
+                                                           Embase-style syntax may be present in PubMed.
+                                                Opening square brackets: 17; closing square brackets: 17
+                                                             The search-strategy file must not be empty.
+                                                                          Search length: 637 characters.
+                                                          Opening parentheses: 2; closing parentheses: 2
+                                                                        Boolean placement appears valid.
+                                                                              AND count: 1; OR count: 16
+                                                               No duplicated search lines were detected.
+                                                                                  Single-quote count: 36
+                                                   At least one :ti,ab,kw field restriction is required.
+ No exploded Emtree term using '/exp was detected. This may be acceptable only if intentionally omitted.
+                                                        PubMed-style field tags were detected in Embase.
+                                                  CENTRAL MeSH syntax [mh "..."] was detected in Embase.
+                                                             The search-strategy file must not be empty.
+                                                                          Search length: 599 characters.
+                                                          Opening parentheses: 2; closing parentheses: 2
+                                                                        Boolean placement appears valid.
+                                                                              AND count: 1; OR count: 15
+                                                               No duplicated search lines were detected.
+                                                                                  Double-quote count: 24
+                                                   At least one :ti,ab,kw field restriction is required.
+   No CENTRAL MeSH syntax [mh "..."] was detected. This may be acceptable only if intentionally omitted.
+                                                       PubMed-style field tags were detected in CENTRAL.
+                                                            Embase '/exp syntax was detected in CENTRAL.
+
+IMPORTANT
+This report performs local structural checks only. It does not guarantee acceptance by PubMed, Embase, or the Cochrane Library search interface.

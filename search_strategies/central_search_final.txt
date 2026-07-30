@@ -1,0 +1,22 @@
+(
+  [mh "Sodium-Glucose Transporter 2 Inhibitors"]
+  OR "SGLT2 inhibitor":ti,ab,kw
+  OR "sodium glucose cotransporter 2 inhibitor":ti,ab,kw
+  OR "SGLT-2 inhibitor":ti,ab,kw
+  OR dapagliflozin:ti,ab,kw
+  OR empagliflozin:ti,ab,kw
+  OR canagliflozin:ti,ab,kw
+  OR ertugliflozin:ti,ab,kw
+)
+AND
+(
+  [mh "Cardiac Surgical Procedures"]
+  OR "cardiac surgery":ti,ab,kw
+  OR "heart surgery":ti,ab,kw
+  OR "cardiothoracic surgery":ti,ab,kw
+  OR "coronary artery bypass grafting":ti,ab,kw
+  OR CABG:ti,ab,kw
+  OR "valve surgery":ti,ab,kw
+  OR "aortic surgery":ti,ab,kw
+  OR "cardiopulmonary bypass":ti,ab,kw
+)

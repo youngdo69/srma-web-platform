@@ -1,0 +1,31 @@
+PubMed Query Translation
+Tested at: 2026-07-29 22:54:46.149474
+
+ORIGINAL SEARCH
+--------------------------------------------------
+(
+  "Sodium-Glucose Transporter 2 Inhibitors"[Mesh]
+  OR "SGLT2 inhibitor"[Title/Abstract]
+  OR "sodium glucose cotransporter 2 inhibitor"[Title/Abstract]
+  OR "SGLT-2 inhibitor"[Title/Abstract]
+  OR dapagliflozin[Title/Abstract]
+  OR empagliflozin[Title/Abstract]
+  OR canagliflozin[Title/Abstract]
+  OR ertugliflozin[Title/Abstract]
+)
+AND
+(
+  "Cardiac Surgical Procedures"[Mesh]
+  OR "cardiac surgery"[Title/Abstract]
+  OR "heart surgery"[Title/Abstract]
+  OR "cardiothoracic surgery"[Title/Abstract]
+  OR "coronary artery bypass grafting"[Title/Abstract]
+  OR CABG[Title/Abstract]
+  OR "valve surgery"[Title/Abstract]
+  OR "aortic surgery"[Title/Abstract]
+  OR "cardiopulmonary bypass"[Title/Abstract]
+)
+
+PUBMED TRANSLATED QUERY
+--------------------------------------------------
+("Sodium-Glucose Transporter 2 Inhibitors"[MeSH Terms] OR "SGLT2 inhibitor"[Title/Abstract] OR "sodium glucose cotransporter 2 inhibitor"[Title/Abstract] OR "SGLT-2 inhibitor"[Title/Abstract] OR "dapagliflozin"[Title/Abstract] OR "empagliflozin"[Title/Abstract] OR "canagliflozin"[Title/Abstract] OR "ertugliflozin"[Title/Abstract]) AND ("Cardiac Surgical Procedures"[MeSH Terms] OR "cardiac surgery"[Title/Abstract] OR "heart surgery"[Title/Abstract] OR "cardiothoracic surgery"[Title/Abstract] OR "coronary artery bypass grafting"[Title/Abstract] OR "CABG"[Title/Abstract] OR "valve surgery"[Title/Abstract] OR "aortic surgery"[Title/Abstract] OR "cardiopulmonary bypass"[Title/Abstract])

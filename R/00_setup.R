@@ -6,11 +6,14 @@ options(
 )
 
 required_directories <- c(
+  "R",
+  "config",
   "data/raw",
   "data/processed",
   "results/figures",
   "results/tables",
-  "results/logs"
+  "results/logs",
+  "search_strategies"
 )
 
 for (directory in required_directories) {

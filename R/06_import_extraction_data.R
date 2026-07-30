@@ -1,7 +1,7 @@
 # Cardiac Surgery SR-MA Toolkit v2.0
 # Import the working data-extraction file
 
-source_file <- "data/raw/SGLT2i_data_extraction.csv"
+source_file <- "data/raw/hypothetical_SGLT2i_data_extraction.csv"
 
 if (!file.exists(source_file)) {
   stop(

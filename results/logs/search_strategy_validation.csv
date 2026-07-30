@@ -1,0 +1,35 @@
+database,category,check,passed,message
+PubMed,general,file_not_empty,TRUE,The search-strategy file must not be empty.
+PubMed,general,minimum_length,TRUE,Search length: 706 characters.
+PubMed,general,parentheses,TRUE,Opening parentheses: 2; closing parentheses: 2
+PubMed,general,boolean_placement,TRUE,Boolean placement appears valid.
+PubMed,general,boolean_presence,TRUE,AND count: 1; OR count: 15
+PubMed,general,duplicate_lines,TRUE,No duplicated search lines were detected.
+PubMed,database_specific,double_quotes,TRUE,Double-quote count: 24
+PubMed,database_specific,field_title_abstract,TRUE,At least one [Title/Abstract] field tag is required.
+PubMed,database_specific,mesh_tag,TRUE,No MeSH field tag was detected. This may be acceptable only if intentionally omitted.
+PubMed,database_specific,no_central_tags,TRUE,"CENTRAL-style :ti,ab,kw syntax was detected in PubMed."
+PubMed,database_specific,no_embase_tags,TRUE,Embase-style syntax may be present in PubMed.
+PubMed,database_specific,bracket_balance,TRUE,Opening square brackets: 17; closing square brackets: 17
+Embase,general,file_not_empty,TRUE,The search-strategy file must not be empty.
+Embase,general,minimum_length,TRUE,Search length: 637 characters.
+Embase,general,parentheses,TRUE,Opening parentheses: 2; closing parentheses: 2
+Embase,general,boolean_placement,TRUE,Boolean placement appears valid.
+Embase,general,boolean_presence,TRUE,AND count: 1; OR count: 16
+Embase,general,duplicate_lines,TRUE,No duplicated search lines were detected.
+Embase,database_specific,single_quotes,TRUE,Single-quote count: 36
+Embase,database_specific,text_fields,TRUE,"At least one :ti,ab,kw field restriction is required."
+Embase,database_specific,emtree_explosion,TRUE,No exploded Emtree term using '/exp was detected. This may be acceptable only if intentionally omitted.
+Embase,database_specific,no_pubmed_tags,TRUE,PubMed-style field tags were detected in Embase.
+Embase,database_specific,no_central_mesh,TRUE,"CENTRAL MeSH syntax [mh ""...""] was detected in Embase."
+CENTRAL,general,file_not_empty,TRUE,The search-strategy file must not be empty.
+CENTRAL,general,minimum_length,TRUE,Search length: 599 characters.
+CENTRAL,general,parentheses,TRUE,Opening parentheses: 2; closing parentheses: 2
+CENTRAL,general,boolean_placement,TRUE,Boolean placement appears valid.
+CENTRAL,general,boolean_presence,TRUE,AND count: 1; OR count: 15
+CENTRAL,general,duplicate_lines,TRUE,No duplicated search lines were detected.
+CENTRAL,database_specific,double_quotes,TRUE,Double-quote count: 24
+CENTRAL,database_specific,text_fields,TRUE,"At least one :ti,ab,kw field restriction is required."
+CENTRAL,database_specific,mesh_descriptor,TRUE,"No CENTRAL MeSH syntax [mh ""...""] was detected. This may be acceptable only if intentionally omitted."
+CENTRAL,database_specific,no_pubmed_tags,TRUE,PubMed-style field tags were detected in CENTRAL.
+CENTRAL,database_specific,no_embase_explosion,TRUE,Embase '/exp syntax was detected in CENTRAL.
