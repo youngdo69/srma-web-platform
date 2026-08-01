@@ -1,0 +1,36 @@
+Cardiac Surgery SR-MA Toolkit v2.0
+Title and Abstract Screening Workbook Report
+
+Generated at: 2026-07-30 13:17:11
+Input file: data/processed/search/deduplicated_records_for_screening.csv
+Records included in workbook: 186
+Workbook file: results/screening/title_abstract_screening_workbook.xlsx
+
+WORKSHEETS
+--------------------------------------------------
+Instructions
+Reviewer_1
+Reviewer_2
+Conflict_Resolution
+Source_Summary
+Validation_Lists
+
+DECISION OPTIONS
+--------------------------------------------------
+Include
+Exclude
+Unclear
+
+EXCLUSION REASONS
+--------------------------------------------------
+Not cardiac surgery
+No SGLT2 inhibitor exposure
+Wrong population
+Wrong comparator
+Wrong study design
+No relevant clinical outcome
+Animal or laboratory study
+Protocol, editorial, commentary, or review
+Duplicate or secondary publication
+Conference abstract with insufficient information
+Other

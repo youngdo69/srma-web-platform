@@ -1,0 +1,28 @@
+Cardiac Surgery SR-MA Toolkit v2.0
+Search Import, Merge, and Deduplication Report
+
+Completed at: 2026-07-30 12:47:51
+
+DATABASE COUNTS
+--------------------------------------------------
+PubMed: 131
+Embase: 25
+CENTRAL: 53
+Total before deduplication: 209
+Duplicates removed: 23
+Records after deduplication: 186
+
+DEDUPLICATION HIERARCHY
+--------------------------------------------------
+1. Exact normalized title and publication year
+2. Exact normalized DOI
+3. Exact PMID
+4. Unique source record
+
+OUTPUT FILES
+--------------------------------------------------
+data/processed/search/all_database_records_before_deduplication.csv
+data/processed/search/deduplicated_records_for_screening.csv
+data/processed/search/removed_duplicate_records.csv
+data/processed/search/deduplication_map.csv
+data/processed/search/search_and_deduplication_counts.csv

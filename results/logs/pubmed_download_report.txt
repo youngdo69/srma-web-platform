@@ -1,0 +1,15 @@
+Cardiac Surgery SR-MA Toolkit v2.0
+PubMed Detailed Record Download Report
+
+Downloaded at: 2026-07-30 12:30:41
+Search file: search_strategies/pubmed_search.txt
+PubMed search count: 131
+Parsed unique records: 131
+Batch size: 200
+NCBI email supplied: FALSE
+NCBI API key supplied: FALSE
+
+OUTPUT FILES
+--------------------------------------------------
+data/raw/search/pubmed/pubmed_sglt2i_cardiac_surgery.xml
+data/raw/search/pubmed/pubmed_sglt2i_cardiac_surgery.csv
