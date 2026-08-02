@@ -28,3 +28,5 @@
 "glue",TRUE
 "yaml",TRUE
 "jsonlite",TRUE
+"httr2",TRUE
+"dotenv",TRUE

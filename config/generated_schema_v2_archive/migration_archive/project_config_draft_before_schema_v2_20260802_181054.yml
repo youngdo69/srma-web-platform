@@ -1,0 +1,137 @@
+toolkit:
+  name: universal-systematic-review-toolkit
+  version: 0.1.0
+project:
+  id: proj-0001-sglt2-cardsurg
+  slug: sglt2-inhibitors-cardiac-surgery
+  title: Effects of SGLT2 inhibitors in patients undergoing cardiac surgery
+  short_name: SGLT2-CS
+review:
+  type: intervention_effect
+  objective: To evaluate the efficacy and safety of preoperative or perioperative
+    SGLT2 inhibitor exposure in adult patients undergoing cardiac surgery.
+  question: In adults undergoing cardiac surgery, does preoperative or perioperative
+    exposure to SGLT2 inhibitors, compared with no SGLT2 inhibitor exposure, placebo,
+    or standard care, improve postoperative clinical outcomes and safety (e.g., acute
+    kidney injury, mortality, heart failure, major adverse cardiovascular events,
+    euglycemic diabetic ketoacidosis, and length of stay)?
+  framework:
+    name: PICOTS
+    elements:
+      label:
+      - Population
+      - Intervention/Exposure
+      - Comparator
+      - Outcomes
+      - Timing
+      - Setting
+      values:
+      - Adults (≥18 years) undergoing cardiac surgery, including coronary artery bypass
+        grafting (CABG), surgical heart valve repair or replacement, and open thoracic
+        aortic procedures (e.g., aortic root/ascending/arch surgery).
+      - Preoperative or perioperative exposure to sodium-glucose cotransporter-2 (SGLT2)
+        inhibitors (e.g., dapagliflozin, empagliflozin, canagliflozin, ertugliflozin,
+        ipragliflozin, luseogliflozin, tofogliflozin; consideration needed for sotagliflozin).
+      - No SGLT2 inhibitor exposure, placebo, or standard care (including regimens
+        without SGLT2 inhibitors).
+      - - Postoperative acute kidney injury (any standardized definition, e.g., KDIGO/RIFLE/AKIN)
+        - In-hospital or 30-day mortality
+        - Postoperative heart failure or decompensation
+        - Major adverse cardiovascular events (MACE)
+        - Euglycemic diabetic ketoacidosis (DKA)
+        - Length of hospital stay (LOS) and/or ICU stay
+      - Exposure occurring preoperatively or perioperatively in relation to the index
+        cardiac surgery (precise window to be confirmed).
+      - Hospital-based cardiac surgery programs (on-pump or off-pump procedures).
+eligibility:
+  inclusion:
+  - Human adults (≥18 years).
+  - 'Patients undergoing cardiac surgery: CABG, surgical valve repair/replacement,
+    or open thoracic aortic procedures.'
+  - Intervention/exposure includes preoperative or perioperative SGLT2 inhibitor use
+    (any agent in class; dual SGLT1/2 agent sotagliflozin to be decided).
+  - Comparator includes no SGLT2 inhibitor exposure, placebo, standard care, or other
+    non-SGLT2 regimens.
+  - Reports at least one prespecified outcome (AKI, mortality, heart failure, MACE,
+    euglycemic DKA, LOS).
+  - 'Study designs: randomized controlled trials; prospective or retrospective comparative
+    cohort studies.'
+  - No language restrictions.
+  exclusion:
+  - Pediatric populations (<18 years) or non-human studies.
+  - Non-comparative designs (single-arm studies), case series, case reports, narrative
+    reviews, editorials, letters without original comparative data.
+  - Studies not involving surgical cardiac procedures (e.g., purely medical management
+    without surgery).
+  - Studies evaluating only chronic outpatient SGLT2 inhibitor use unrelated to a
+    surgical episode.
+  - Conference abstracts only (unless later approved for inclusion after human decision).
+  - Heart transplantation, durable ventricular assist device (VAD) implantation, or
+    isolated transcatheter cardiac procedures (e.g., TAVR/TAVI, MitraClip) are excluded
+    unless explicitly approved by human decision.
+screening:
+  decisions:
+  - Include / Proceed to full text
+  - Exclude - Not cardiac surgery population/procedure
+  - Exclude - Not an SGLT2 inhibitor exposure
+  - Exclude - Exposure not preoperative/perioperative to surgery
+  - Exclude - No eligible comparator
+  - Exclude - Ineligible study design (non-comparative/case report/series)
+  - Exclude - Not human adults
+  - Exclude - Non-original/secondary source (review/editorial/letter)
+  - Exclude - Conference abstract only
+  - Exclude - Wrong setting/procedure (e.g., transcatheter, transplant, VAD)
+  - Exclude - Animal/in vitro/preclinical
+  - Exclude - Duplicate/superseded record
+  - Exclude - No relevant outcomes reported
+  - Unsure - Seek full text/More information needed
+  exclusion_reasons:
+    code:
+    - POP
+    - PROC
+    - INT
+    - TIME
+    - COMP
+    - DES
+    - NONHUM
+    - AGE
+    - TYPE
+    - CONF
+    - DUP
+    - OUT
+    label:
+    - Not the target population/procedure
+    - Wrong setting/procedure
+    - Not SGLT2 inhibitor exposure
+    - Exposure not perioperative/preoperative
+    - No eligible comparator
+    - Ineligible study design
+    - Not human
+    - Pediatric population
+    - Non-original/secondary source
+    - Conference abstract only
+    - Duplicate/superseded
+    - No relevant outcomes
+    description:
+    - Population is not adults undergoing cardiac surgery (e.g., non-surgical, non-cardiac
+      surgery).
+    - Study focuses on transcatheter cardiac procedures, heart transplantation, or
+      VAD implantation without eligible surgical cohorts.
+    - Intervention/exposure does not include an SGLT2 inhibitor agent or class.
+    - SGLT2 exposure is unrelated to the index surgical episode (e.g., chronic outpatient
+      use only without perioperative relevance).
+    - No non-SGLT2 comparator, placebo, or standard care arm available.
+    - Non-comparative design (single-arm), case series, case report, narrative review,
+      editorial, or letter without original comparative data.
+    - Animal, in vitro, or preclinical research.
+    - Participants are <18 years old or predominantly pediatric.
+    - Review, guideline, commentary, or other non-original research.
+    - Abstract without a corresponding full-text article available.
+    - Duplicate record or superseded by a more complete publication.
+    - Does not report any of the prespecified outcomes.
+paths:
+  raw_data: ./data/raw
+  processed_data: ./data/processed
+  screening_results: ./output/screening_decisions.jsonl
+  logs: ./logs/init.log
+  search_strategies: ./search/strategies

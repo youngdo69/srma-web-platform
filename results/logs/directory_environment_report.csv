@@ -1,7 +1,15 @@
 "directory","exists"
 "R",TRUE
+"R/bootstrap",TRUE
+"R/utils",TRUE
+"config",TRUE
+"config/generated",TRUE
+"config/archive",TRUE
+"prompts",TRUE
 "data/raw",TRUE
 "data/processed",TRUE
 "results/figures",TRUE
 "results/tables",TRUE
 "results/logs",TRUE
+"results/screening",TRUE
+"search_strategies",TRUE

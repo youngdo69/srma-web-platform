@@ -1,0 +1,51 @@
+Universal SR-MA Agent Toolkit
+Agent Title/Abstract Screening Report
+
+Project ID: sglt2i_cardiac_surgery
+Review title: Effects of SGLT2 Inhibitors in Patients Undergoing Cardiac Surgery
+Agent reviewer: Agent Reviewer 1
+Provider: openai
+Model: gpt-5
+Prompt version: 1.0.0
+Generated at: 2026-08-02 15:00:35
+
+SUMMARY
+--------------------------------------------------
+Records in Reviewer_1 sheet: 186
+Valid agent decisions logged: 186
+Failures: 0
+
+DECISIONS
+--------------------------------------------------
+Exclude: 132
+Include: 43
+Unclear: 11
+
+CONFIDENCE
+--------------------------------------------------
+High: 162
+Low: 1
+Moderate: 23
+
+EXCLUSION REASONS
+--------------------------------------------------
+E08 | Protocol, editorial, commentary, or review: 57
+E01 | Not cardiac surgery: 36
+E07 | Animal or laboratory study: 15
+E05 | Wrong study design: 11
+E02 | No SGLT2 inhibitor exposure: 9
+E06 | No relevant clinical outcome: 4
+
+OUTPUT FILES
+--------------------------------------------------
+C:/Users/Jason/Projects/srma-agent-toolkit/results/screening/title_abstract_screening_agent.xlsx
+C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/agent_screening_decisions.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/agent_screening_failures.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/agent_screening_checkpoint.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/agent_screening_report.txt
+
+HUMAN OVERSIGHT
+--------------------------------------------------
+Reviewer 2 remains a human reviewer.
+Conflict resolution and adjudication remain human responsibilities.
+Agent decisions require review under the finalized protocol.

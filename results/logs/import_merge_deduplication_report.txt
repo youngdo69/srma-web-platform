@@ -1,7 +1,11 @@
-Cardiac Surgery SR-MA Toolkit v2.0
+SR-MA Agent Toolkit v2.0
 Search Import, Merge, and Deduplication Report
 
-Completed at: 2026-07-30 12:47:51
+Project ID: sglt2i_cardiac_surgery
+Review title: Effects of SGLT2 Inhibitors in Patients Undergoing Cardiac Surgery
+Configuration file: C:/Users/Jason/Projects/srma-agent-toolkit/config/project_config.yml
+Enabled databases: pubmed, embase, central
+Completed at: 2026-08-02 11:48:45
 
 DATABASE COUNTS
 --------------------------------------------------
@@ -16,13 +20,25 @@ DEDUPLICATION HIERARCHY
 --------------------------------------------------
 1. Exact normalized title and publication year
 2. Exact normalized DOI
-3. Exact PMID
-4. Unique source record
+3. Exact normalized PMID
+4. Unique internal record ID
+
+VALIDATION
+--------------------------------------------------
+Merged-record count valid: TRUE
+Deduplication arithmetic valid: TRUE
+Deduplication-map row count valid: TRUE
+
+INPUT FILES
+--------------------------------------------------
+PubMed: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/pubmed/pubmed_sglt2i_cardiac_surgery.csv
+Embase: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/embase/embase_sglt2i_cardiac_surgery.ris
+CENTRAL: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/central/central_sglt2i_cardiac_surgery.ris
 
 OUTPUT FILES
 --------------------------------------------------
-data/processed/search/all_database_records_before_deduplication.csv
-data/processed/search/deduplicated_records_for_screening.csv
-data/processed/search/removed_duplicate_records.csv
-data/processed/search/deduplication_map.csv
-data/processed/search/search_and_deduplication_counts.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/all_database_records_before_deduplication.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/deduplicated_records_for_screening.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/removed_duplicate_records.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/deduplication_map.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/search_and_deduplication_counts.csv

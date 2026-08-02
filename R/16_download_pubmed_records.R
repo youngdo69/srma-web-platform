@@ -1,5 +1,5 @@
 # ============================================================
-# Cardiac Surgery SR-MA Toolkit v2.0
+# SR-MA Toolkit v2.0
 # R/16_download_pubmed_records.R
 #
 # Purpose
@@ -56,68 +56,90 @@ if (length(missing_packages) > 0) {
   )
 }
 
-
 # ============================================================
-# 2. File paths
+# 2. Load project configuration and paths
 # ============================================================
 
-search_file_candidates <- c(
-  "search_strategies/pubmed_search_final.txt",
-  "search_strategies/pubmed_search.txt"
+source(
+  "R/utils/config_utils.R"
 )
 
-search_file <- search_file_candidates[
-  file.exists(search_file_candidates)
-][1]
+source(
+  "R/utils/path_utils.R"
+)
 
-if (
-  length(search_file) == 0 ||
-  is.na(search_file)
-) {
+config <- load_project_config(
+  quiet = FALSE
+)
+
+paths <- build_project_paths(
+  config,
+  create_directories = TRUE
+)
+
+project_id <- get_project_id(
+  config
+)
+
+project_title <- get_project_title(
+  config
+)
+
+
+# ============================================================
+# 3. Input and output paths
+# ============================================================
+
+search_file_candidates <- file.path(
+  paths$search_strategies_directory,
+  c(
+    "pubmed_search_final.txt",
+    "pubmed_search.txt"
+  )
+)
+
+existing_search_files <- search_file_candidates[
+  file.exists(
+    search_file_candidates
+  )
+]
+
+if (length(existing_search_files) == 0L) {
 
   stop(
     "No PubMed search strategy file was found.\n",
     "Expected one of:\n",
     paste(
-      paste0("- ", search_file_candidates),
+      paste0(
+        "- ",
+        search_file_candidates
+      ),
       collapse = "\n"
     )
   )
 }
 
+search_file <- existing_search_files[1]
+
 output_directory <-
-  "data/raw/search/pubmed"
+  paths$pubmed_directory
 
 xml_output_file <-
-  file.path(
-    output_directory,
-    "pubmed_sglt2i_cardiac_surgery.xml"
-  )
+  paths$pubmed_xml
 
 csv_output_file <-
-  file.path(
-    output_directory,
-    "pubmed_sglt2i_cardiac_surgery.csv"
-  )
+  paths$pubmed_csv
 
 report_output_file <-
-  "results/logs/pubmed_download_report.txt"
+  paths$pubmed_download_report
 
-dir.create(
-  output_directory,
-  recursive = TRUE,
-  showWarnings = FALSE
+assert_file_exists(
+  search_file,
+  "Final PubMed search-strategy file"
 )
-
-dir.create(
-  "results/logs",
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
 
 # ============================================================
-# 3. Read PubMed search strategy
+# 4. Read PubMed search strategy
 # ============================================================
 
 pubmed_search_lines <- readLines(
@@ -143,7 +165,7 @@ if (pubmed_search == "") {
 
 
 # ============================================================
-# 4. Optional NCBI identification
+# 5. Optional NCBI identification
 #
 # These can be stored in .Renviron:
 #
@@ -170,7 +192,7 @@ if (ncbi_api_key != "") {
 
 
 # ============================================================
-# 5. Helper functions
+# 6. Helper functions
 # ============================================================
 
 collapse_nonempty <- function(
@@ -668,7 +690,7 @@ parse_pubmed_article <- function(article) {
 
 
 # ============================================================
-# 6. Run PubMed search
+# 7. Run PubMed search
 # ============================================================
 
 cat("\n")
@@ -676,8 +698,17 @@ cat("====================================================\n")
 cat("PubMed Detailed Record Download\n")
 cat("====================================================\n\n")
 
+cat("Project ID:\n")
+cat(project_id, "\n\n")
+
+cat("Review title:\n")
+cat(project_title, "\n\n")
+
 cat("Search strategy file:\n")
 cat(search_file, "\n\n")
+
+cat("PubMed output directory:\n")
+cat(output_directory, "\n\n")
 
 cat("Searching PubMed...\n")
 
@@ -726,7 +757,7 @@ if (is.null(search_result$web_history)) {
 
 
 # ============================================================
-# 7. Download PubMed XML in batches
+# 8. Download PubMed XML in batches
 # ============================================================
 
 batch_size <- 200L
@@ -794,7 +825,7 @@ for (i in seq_along(batch_starts)) {
 
 
 # ============================================================
-# 8. Combine XML batches
+# 9. Combine XML batches
 # ============================================================
 
 extract_article_xml <- function(xml_text) {
@@ -845,7 +876,7 @@ writeLines(
 
 
 # ============================================================
-# 9. Parse combined PubMed XML
+# 10. Parse combined PubMed XML
 # ============================================================
 
 cat("\nParsing PubMed XML...\n")
@@ -866,7 +897,7 @@ pubmed_records <- purrr::map_dfr(
 
 
 # ============================================================
-# 10. Normalize PubMed fields
+# 11. Normalize PubMed fields
 # ============================================================
 
 pubmed_records <- pubmed_records |>
@@ -904,7 +935,7 @@ pubmed_records <- pubmed_records |>
 
 
 # ============================================================
-# 11. Save PubMed CSV
+# 12. Save PubMed CSV
 # ============================================================
 
 readr::write_csv(
@@ -915,7 +946,7 @@ readr::write_csv(
 
 
 # ============================================================
-# 12. Validate output
+# 13. Validate output
 # ============================================================
 
 parsed_count <- nrow(
@@ -935,12 +966,28 @@ if (parsed_count != record_count) {
 
 
 # ============================================================
-# 13. Save download report
+# 14. Save download report
 # ============================================================
 
 report_lines <- c(
-  "Cardiac Surgery SR-MA Toolkit v2.0",
+  "SR-MA Agent Toolkit v2.0",
   "PubMed Detailed Record Download Report",
+  "",
+  paste0(
+    "Project ID: ",
+    project_id
+  ),
+  paste0(
+    "Review title: ",
+    project_title
+  ),
+  paste0(
+    "Configuration file: ",
+    attr(
+      config,
+      "config_file"
+    )
+  ),
   "",
   paste0(
     "Downloaded at: ",
@@ -988,7 +1035,7 @@ writeLines(
 
 
 # ============================================================
-# 14. Console report
+# 15. Console report
 # ============================================================
 
 cat("\n")
@@ -997,6 +1044,10 @@ cat("PubMed Download Complete\n")
 cat("====================================================\n\n")
 
 cat("PubMed search records:", record_count, "\n")
+cat("Parsed unique records:", parsed_count, "\n\n")
+
+cat("Project:", project_id, "\n")
+cat("Records found:", record_count, "\n")
 cat("Parsed unique records:", parsed_count, "\n\n")
 
 cat("Files saved:\n")

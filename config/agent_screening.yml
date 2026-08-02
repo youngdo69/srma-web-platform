@@ -1,0 +1,44 @@
+agent_screening:
+  enabled: true
+
+  reviewer:
+    role: "Reviewer 1"
+    name: "Agent Reviewer 1"
+    type: "LLM"
+
+  provider:
+    name: "openai"
+    api_key_env: "OPENAI_API_KEY"
+    base_url: "https://api.openai.com/v1"
+    model: "gpt-5"
+
+  prompt:
+    template_file: "prompts/title_abstract_screening_prompt.md"
+    version: "1.0.0"
+
+  processing:
+    start_record: 1
+    max_records: null
+    checkpoint_every: 5
+    resume_from_checkpoint: true
+    overwrite_existing_agent_decisions: false
+    request_pause_seconds: 0.2
+    max_retries: 3
+    timeout_seconds: 120
+
+  decision_policy:
+    unclear_when_insufficient_information: true
+    require_exclusion_reason_for_exclude: true
+    prohibit_exclusion_reason_for_include_or_unclear: true
+    require_rationale: true
+    allowed_confidence:
+      - "High"
+      - "Moderate"
+      - "Low"
+
+  output:
+    workbook_basename: "title_abstract_screening_agent"
+    decisions_basename: "agent_screening_decisions"
+    failures_basename: "agent_screening_failures"
+    checkpoint_basename: "agent_screening_checkpoint"
+    report_basename: "agent_screening_report"

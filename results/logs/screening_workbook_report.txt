@@ -1,10 +1,24 @@
-Cardiac Surgery SR-MA Toolkit v2.0
+SR-MA Agent Toolkit v2.0
 Title and Abstract Screening Workbook Report
 
-Generated at: 2026-07-30 13:17:11
-Input file: data/processed/search/deduplicated_records_for_screening.csv
+Project ID: sglt2i_cardiac_surgery
+Review title: Effects of SGLT2 Inhibitors in Patients Undergoing Cardiac Surgery
+Project short name: SGLT2i_Cardiac_Surgery_SRMA
+Configuration file: C:/Users/Jason/Projects/srma-agent-toolkit/config/project_config.yml
+Generated at: 2026-08-02 12:03:23
+Input file: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/deduplicated_records_for_screening.csv
 Records included in workbook: 186
-Workbook file: results/screening/title_abstract_screening_workbook.xlsx
+Reviewer 1: Reviewer 1
+Reviewer 2: Reviewer 2
+Third reviewer: Third Reviewer
+Workbook file: C:/Users/Jason/Projects/srma-agent-toolkit/results/screening/title_abstract_screening_workbook.xlsx
+
+VALIDATION
+--------------------------------------------------
+Workbook exists: TRUE
+All expected worksheets present: TRUE
+Reviewer_1 row count valid: TRUE
+Reviewer_2 row count valid: TRUE
 
 WORKSHEETS
 --------------------------------------------------
@@ -23,14 +37,26 @@ Unclear
 
 EXCLUSION REASONS
 --------------------------------------------------
-Not cardiac surgery
-No SGLT2 inhibitor exposure
-Wrong population
-Wrong comparator
-Wrong study design
-No relevant clinical outcome
-Animal or laboratory study
-Protocol, editorial, commentary, or review
-Duplicate or secondary publication
-Conference abstract with insufficient information
-Other
+E01: Not cardiac surgery
+E02: No SGLT2 inhibitor exposure
+E03: Wrong population
+E04: Wrong comparator
+E05: Wrong study design
+E06: No relevant clinical outcome
+E07: Animal or laboratory study
+E08: Protocol, editorial, commentary, or review
+E09: Duplicate or secondary publication
+E10: Conference abstract with insufficient information
+E11: Other
+
+FINAL DECISION OPTIONS
+--------------------------------------------------
+Include
+Exclude
+Awaiting full-text clarification
+
+CONFIDENCE OPTIONS
+--------------------------------------------------
+High
+Moderate
+Low

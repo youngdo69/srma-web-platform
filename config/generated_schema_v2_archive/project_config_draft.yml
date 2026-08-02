@@ -1,0 +1,121 @@
+toolkit:
+  name: universal-systematic-review-toolkit
+  version: 1.0.0
+project:
+  id: sglt2-cardiac-surgery-2026-01
+  slug: sglt2-cardiac-surgery
+  title: Effects of SGLT2 inhibitors in patients undergoing cardiac surgery
+  short_name: SGLT2i-cardiac-sx
+review:
+  type: intervention_effect
+  objective: To evaluate the efficacy and safety of preoperative or perioperative
+    SGLT2 inhibitor exposure in adult patients undergoing cardiac surgery.
+  question: Among adults undergoing cardiac surgery, does preoperative or perioperative
+    exposure to SGLT2 inhibitors, compared with no SGLT2 inhibitor, placebo, or standard
+    care, improve postoperative outcomes and safety?
+  framework:
+    name: PICO
+    elements:
+      label:
+      - Population
+      - Intervention/Exposure
+      - Comparator
+      - Outcomes
+      - Study design
+      values:
+      - Adults (>=18 years) undergoing cardiac surgery (e.g., coronary artery bypass
+        grafting, valve surgery, aortic surgery)
+      - Preoperative or perioperative exposure to SGLT2 inhibitors (e.g., empagliflozin,
+        dapagliflozin, canagliflozin, ertugliflozin, sotagliflozin, bexagliflozin)
+      - No SGLT2 inhibitor use, placebo, or standard care
+      - - Postoperative acute kidney injury
+        - In-hospital mortality
+        - Postoperative heart failure
+        - Major adverse cardiovascular events
+        - Euglycemic diabetic ketoacidosis
+        - Length of hospital stay
+      - - Randomized controlled trials
+        - Prospective comparative cohort studies
+        - Retrospective comparative cohort studies
+eligibility:
+  inclusion:
+  - Human participants (adults, >=18 years)
+  - Patients undergoing cardiac surgery (e.g., CABG, valve, aortic)
+  - Preoperative or perioperative exposure to an SGLT2 inhibitor
+  - Comparator includes no SGLT2 inhibitor use, placebo, or standard care
+  - Reports at least one prespecified outcome of interest
+  - Randomized controlled trials or comparative cohort studies
+  exclusion:
+  - Non-human studies
+  - Pediatric populations (<18 years)
+  - Non-surgical or exclusively medical management populations
+  - Not focused on SGLT2 inhibitor exposure or lacks identifiable exposure group
+  - Irrelevant to perioperative (pre/intra/postoperative hospitalization) context
+screening:
+  decisions:
+  - Include
+  - Exclude
+  - Unclear
+  decision_rules:
+    include:
+    - Adult human population undergoing cardiac surgery and exposed to an SGLT2 inhibitor
+      in the preoperative or perioperative period
+    - Comparator group present (no SGLT2 inhibitor, placebo, or standard care)
+    - Study design appears to be RCT or comparative cohort
+    exclude:
+    - Clearly non-human or pediatric study
+    - Not a surgical population or not cardiac surgery
+    - Intervention is not an SGLT2 inhibitor (e.g., GLP-1 RA only, DPP-4 inhibitor
+      only)
+    - 'Publication type: editorial, commentary, letter without original data, protocol/registration
+      only'
+    - Animal or in vitro study
+    - Duplicate or superseded record
+    unclear:
+    - Transcatheter procedures, heart transplantation, or ventricular assist device
+      implantation are mentioned (requires decision)
+    - Conference abstract without clear indication of a corresponding full-text publication
+      (requires decision)
+    - Comparative case-control study design (requires decision)
+    - Non-comparative observational designs or case series (requires decision)
+    - Insufficient information in title/abstract to determine exposure timing or presence
+      of comparator
+  exclusion_reasons:
+    code:
+    - non_human
+    - pediatric_population
+    - not_cardiac_surgery
+    - wrong_intervention
+    - no_comparator
+    - not_perioperative_context
+    - publication_type_non_research
+    - animal_in_vitro
+    - duplicate
+    label:
+    - Non-human study
+    - Pediatric population
+    - Not a cardiac surgery population
+    - Wrong intervention/exposure
+    - No comparator group
+    - Not perioperative context
+    - Non-research publication type
+    - Animal/in vitro
+    - Duplicate or superseded
+    description:
+    - Study conducted in animals or in vitro.
+    - Participants are <18 years old or pediatric surgical population.
+    - Population does not undergo cardiac surgery.
+    - Does not involve SGLT2 inhibitor exposure.
+    - No eligible comparator (no SGLT2i, placebo, or standard care) is present.
+    - Exposure is not in the preoperative or perioperative timeframe relevant to the
+      index surgery.
+    - Editorial, commentary, letter without data, or protocol only.
+    - Non-clinical experimental study.
+    - Record duplicates another included study or is superseded by a more complete
+      report.
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  screening_results: outputs/screening_results.csv
+  logs: logs/init.log
+  search_strategies: search/strategies
