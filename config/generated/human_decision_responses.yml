@@ -1,74 +1,31 @@
 human_decision_responses:
-- decision_id: D1_TRANSCATHETER_INCLUDED
-  question: Should transcatheter cardiac procedures (e.g., TAVR/TAVI, TMVR, MitraClip,
-    other percutaneous structural heart procedures) be considered eligible as “cardiac
-    surgery”?
-  recommended_option: Exclude
-  recommendation_rationale: Transcatheter procedures are not open surgical operations
-    and typically have different perioperative risks and care pathways; excluding
-    them preserves a homogeneous surgical population.
-  suggested_options:
-  - Include
-  - Exclude
-  selected_option: Exclude
-  approval_status: pending
-  reviewer_note: ''
-- decision_id: D2_HEART_TRANSPLANT_INCLUDED
-  question: Should heart transplantation be included as an eligible cardiac surgery?
-  recommended_option: Exclude
-  recommendation_rationale: Heart transplantation substantially differs from routine
-    cardiac surgery with distinct risks and pathways; excluding improves clinical
-    homogeneity.
-  suggested_options:
-  - Include
-  - Exclude
-  selected_option: Exclude
-  approval_status: pending
-  reviewer_note: ''
-- decision_id: D3_VAD_INCLUDED
-  question: Should ventricular assist device (VAD) implantation (e.g., LVAD/RVAD/BiVAD)
-    be included as an eligible cardiac surgery?
-  recommended_option: Exclude
-  recommendation_rationale: VAD implantation represents a specialized population with
-    different risk profiles; excluding maintains focus on routine cardiac surgeries
-    (CABG/valve/aortic).
-  suggested_options:
-  - Include
-  - Exclude
-  selected_option: Exclude
-  approval_status: pending
-  reviewer_note: ''
-- decision_id: D4_CONFERENCE_ABSTRACTS
-  question: Should conference abstracts without full-text articles be eligible?
-  recommended_option: Exclude
-  recommendation_rationale: Abstract-only records often lack sufficient methodological
-    and outcome details for reliable synthesis; excluding prioritizes data quality.
-  suggested_options:
-  - Include
-  - Exclude
-  selected_option: Exclude
-  approval_status: pending
-  reviewer_note: ''
-- decision_id: D5_NON_COMPARATIVE_STUDIES
-  question: Should non-comparative study designs (e.g., single-arm cohorts, before–after
-    without concurrent control) be eligible?
-  recommended_option: Exclude
-  recommendation_rationale: The review targets intervention effects; restricting to
-    RCTs and comparative cohorts maintains internal validity and analytic consistency.
-  suggested_options:
-  - Include
-  - Exclude
-  selected_option: Exclude
-  approval_status: pending
-  reviewer_note: ''
-- decision_id: D6_CASE_SERIES
-  question: Should case series or case reports be eligible?
-  recommended_option: Exclude
-  recommendation_rationale: To maintain focus on comparative effects with stronger
-    internal validity, exclude case series/reports.
-  suggested_options:
-  - Include
-  - Exclude
-  selected_option: Exclude
-  approval_status: pending
-  reviewer_note: ''
+- decision_id: HD1_transcatheter_procedures
+  selected_option: Exclude transcatheter cardiac procedures.
+  status: approved
+  approved_at: 2026-08-03 20:09:09
+  approval_source: approve_all_recommended
+- decision_id: HD2_heart_transplantation
+  selected_option: Exclude heart transplantation.
+  status: approved
+  approved_at: 2026-08-03 20:09:09
+  approval_source: approve_all_recommended
+- decision_id: HD3_vad_implantation
+  selected_option: Exclude VAD implantation.
+  status: approved
+  approved_at: 2026-08-03 20:09:09
+  approval_source: approve_all_recommended
+- decision_id: HD4_conference_abstracts
+  selected_option: Exclude conference abstracts without full articles.
+  status: approved
+  approved_at: 2026-08-03 20:09:09
+  approval_source: approve_all_recommended
+- decision_id: HD5_noncomparative_and_case_series
+  selected_option: Exclude non-comparative designs and case series.
+  status: approved
+  approved_at: 2026-08-03 20:09:09
+  approval_source: approve_all_recommended
+- decision_id: HD6_sotagliflozin_scope
+  selected_option: Exclude sotagliflozin (dual SGLT1/2 inhibitor).
+  status: approved
+  approved_at: 2026-08-03 20:09:09
+  approval_source: approve_all_recommended

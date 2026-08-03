@@ -1,176 +1,439 @@
+# ============================================================
 # Universal SR-MA Agent Toolkit
-# Human-decision normalization and patch utilities
+# R/utils/human_decision_patch_utils.R
+#
+# Shared helpers for Human Decision normalization, patch planning,
+# nested-list operations, response persistence, backups, and audits.
+# ============================================================
 
-`%||%` <- function(x, y) if (is.null(x) || length(x) == 0L) y else x
-
-as_character_vector <- function(x) {
-  if (is.null(x) || length(x) == 0L) return(character(0))
-  out <- trimws(as.character(unlist(x, recursive = TRUE, use.names = FALSE)))
-  out[nzchar(out)]
+`%||%` <- function(x, y) {
+  if (is.null(x) || length(x) == 0L || all(is.na(x))) y else x
 }
 
-normalize_record_array <- function(x, fields, object_name) {
+hd_as_character_vector <- function(x) {
+  if (is.null(x)) return(character(0))
+  as.character(unlist(x, recursive = TRUE, use.names = FALSE))
+}
+
+hd_decode_json_value <- function(value_json) {
+  if (is.null(value_json) || length(value_json) == 0L) {
+    return(NULL)
+  }
+
+  value_json <- as.character(value_json[[1]])
+
+  if (!nzchar(value_json)) {
+    return(NULL)
+  }
+
+  jsonlite::fromJSON(
+    value_json,
+    simplifyVector = FALSE
+  )
+}
+
+normalize_hd_operation_records <- function(x) {
   if (is.null(x) || length(x) == 0L) return(list())
 
   if (is.data.frame(x)) {
-    missing <- setdiff(fields, names(x))
-    if (length(missing)) stop(object_name, " is missing: ", paste(missing, collapse=", "))
     return(lapply(seq_len(nrow(x)), function(i) {
-      out <- lapply(fields, function(f) x[[f]][[i]])
-      names(out) <- fields
-      out
-    }))
-  }
-
-  if (is.list(x) && !is.null(names(x)) && all(fields %in% names(x))) {
-    lens <- vapply(fields, function(f) length(x[[f]]), integer(1))
-    n <- max(lens)
-    bad <- lens[!(lens %in% c(1L, n))]
-    if (length(bad)) {
-      stop(object_name, " has incompatible lengths: ",
-           paste(paste0(names(lens), "=", lens), collapse=", "))
-    }
-    return(lapply(seq_len(n), function(i) {
-      out <- lapply(fields, function(f) {
-        v <- x[[f]]
-        if (length(v) == 1L) v else v[[i]]
+      row <- as.list(x[i, , drop = FALSE])
+      lapply(row, function(v) {
+        if (is.list(v) && length(v) == 1L) v[[1]] else v
       })
-      names(out) <- fields
-      out
     }))
   }
 
-  if (is.list(x)) {
-    return(lapply(seq_along(x), function(i) {
-      item <- x[[i]]
-      if (is.data.frame(item)) item <- as.list(item[1,,drop=FALSE])
-      if (!is.list(item)) stop(object_name, " record ", i, " is not an object.")
-      missing <- setdiff(fields, names(item))
-      if (length(missing)) stop(object_name, " record ", i, " is missing: ",
-                                paste(missing, collapse=", "))
-      item[fields]
+  if (!is.list(x)) {
+    stop("HD operations must be a list or data frame.")
+  }
+
+  # Column-oriented list produced by YAML/data-frame conversions.
+  if (!is.null(names(x)) &&
+      all(c("target", "path", "operation") %in% names(x)) &&
+      length(x$target) > 1L) {
+    n <- length(x$target)
+    return(lapply(seq_len(n), function(i) {
+      list(
+        target = as.character(x$target[[i]] %||% ""),
+        path = hd_as_character_vector(x$path[[i]] %||% character(0)),
+        operation = as.character(x$operation[[i]] %||% ""),
+        value_json = as.character(x$value_json[[i]] %||% ""),
+        match_key = as.character(x$match_key[[i]] %||% ""),
+        match_value_json = as.character(
+          x$match_value_json[[i]] %||% ""
+        ),
+        rationale = as.character(x$rationale[[i]] %||% "")
+      )
     }))
   }
 
-  stop(object_name, " has unsupported class: ", paste(class(x), collapse=", "))
+  lapply(x, function(item) {
+    if (is.data.frame(item)) {
+      item <- as.list(item[1, , drop = FALSE])
+    }
+
+    list(
+      target = as.character(item$target %||% ""),
+      path = hd_as_character_vector(item$path %||% character(0)),
+      operation = as.character(item$operation %||% ""),
+      value_json = as.character(item$value_json %||% ""),
+      match_key = as.character(item$match_key %||% ""),
+      match_value_json = as.character(
+        item$match_value_json %||% ""
+      ),
+      rationale = as.character(item$rationale %||% "")
+    )
+  })
 }
 
-normalize_patch_operations <- function(x) {
+normalize_hd_option_patch_records <- function(x) {
   if (is.null(x) || length(x) == 0L) return(list())
-  ops <- normalize_record_array(
-    x,
-    c("target","path","operation","value_json","match_key","match_value_json","rationale"),
-    "patch operations"
-  )
-  lapply(ops, function(op) list(
-    target = as_character_vector(op$target)[[1]],
-    path = as_character_vector(op$path),
-    operation = as_character_vector(op$operation)[[1]],
-    value_json = paste(as_character_vector(op$value_json), collapse=""),
-    match_key = paste(as_character_vector(op$match_key), collapse=""),
-    match_value_json = paste(as_character_vector(op$match_value_json), collapse=""),
-    rationale = paste(as_character_vector(op$rationale), collapse=" ")
-  ))
-}
 
-normalize_option_patches <- function(x) {
-  patches <- normalize_record_array(x, c("option","operations"), "option_patches")
-  lapply(patches, function(p) list(
-    option = as_character_vector(p$option)[[1]],
-    operations = normalize_patch_operations(p$operations)
-  ))
-}
-
-normalize_human_decisions_v3 <- function(x) {
-  decisions <- normalize_record_array(
-    x,
-    c("decision_id","question","why_it_matters","suggested_options",
-      "recommended_option","recommendation_rationale","affected_components","option_patches"),
-    "human_decisions_required"
-  )
-  lapply(decisions, function(d) list(
-    decision_id = as_character_vector(d$decision_id)[[1]],
-    question = paste(as_character_vector(d$question), collapse=" "),
-    why_it_matters = paste(as_character_vector(d$why_it_matters), collapse=" "),
-    suggested_options = as_character_vector(d$suggested_options),
-    recommended_option = as_character_vector(d$recommended_option)[[1]],
-    recommendation_rationale = paste(as_character_vector(d$recommendation_rationale), collapse=" "),
-    affected_components = as_character_vector(d$affected_components),
-    option_patches = normalize_option_patches(d$option_patches)
-  ))
-}
-
-parse_json_value <- function(text) {
-  text <- paste(as_character_vector(text), collapse="")
-  if (!nzchar(text)) stop("Required JSON patch value is empty.")
-  tryCatch(
-    jsonlite::fromJSON(text, simplifyVector=FALSE),
-    error=function(e) stop("Invalid patch JSON: ", text, "\n", conditionMessage(e))
-  )
-}
-
-get_nested <- function(x, path) {
-  cur <- x
-  for (key in path) {
-    if (!is.list(cur) || is.null(cur[[key]])) return(NULL)
-    cur <- cur[[key]]
+  if (is.data.frame(x)) {
+    return(lapply(seq_len(nrow(x)), function(i) {
+      list(
+        option = as.character(x$option[[i]] %||% ""),
+        operations = normalize_hd_operation_records(
+          x$operations[[i]] %||% list()
+        )
+      )
+    }))
   }
-  cur
+
+  if (!is.list(x)) {
+    stop("option_patches must be a list or data frame.")
+  }
+
+  # Column-oriented list.
+  if (!is.null(names(x)) &&
+      all(c("option", "operations") %in% names(x)) &&
+      length(x$option) > 1L) {
+    return(lapply(seq_along(x$option), function(i) {
+      list(
+        option = as.character(x$option[[i]] %||% ""),
+        operations = normalize_hd_operation_records(
+          x$operations[[i]] %||% list()
+        )
+      )
+    }))
+  }
+
+  lapply(x, function(item) {
+    if (is.data.frame(item)) {
+      item <- as.list(item[1, , drop = FALSE])
+    }
+
+    list(
+      option = as.character(item$option %||% ""),
+      operations = normalize_hd_operation_records(
+        item$operations %||% list()
+      )
+    )
+  })
 }
 
-set_nested <- function(x, path, value) {
-  if (!length(path)) return(value)
-  if (!is.list(x)) x <- list()
+normalize_hd_records <- function(x) {
+  if (is.null(x) || length(x) == 0L) return(list())
+
+  if (is.data.frame(x)) {
+    return(lapply(seq_len(nrow(x)), function(i) {
+      list(
+        decision_id = as.character(x$decision_id[[i]] %||% ""),
+        question = as.character(x$question[[i]] %||% ""),
+        why_it_matters = as.character(x$why_it_matters[[i]] %||% ""),
+        suggested_options = hd_as_character_vector(
+          x$suggested_options[[i]] %||% character(0)
+        ),
+        recommended_option = as.character(
+          x$recommended_option[[i]] %||% ""
+        ),
+        recommendation_rationale = as.character(
+          x$recommendation_rationale[[i]] %||% ""
+        ),
+        affected_components = hd_as_character_vector(
+          x$affected_components[[i]] %||% character(0)
+        ),
+        option_patches = normalize_hd_option_patch_records(
+          x$option_patches[[i]] %||% list()
+        )
+      )
+    }))
+  }
+
+  if (!is.list(x)) {
+    stop("human_decisions_required must be a list or data frame.")
+  }
+
+  lapply(x, function(item) {
+    if (is.data.frame(item)) {
+      item <- as.list(item[1, , drop = FALSE])
+    }
+
+    list(
+      decision_id = as.character(item$decision_id %||% ""),
+      question = as.character(item$question %||% ""),
+      why_it_matters = as.character(item$why_it_matters %||% ""),
+      suggested_options = hd_as_character_vector(
+        item$suggested_options %||% character(0)
+      ),
+      recommended_option = as.character(
+        item$recommended_option %||% ""
+      ),
+      recommendation_rationale = as.character(
+        item$recommendation_rationale %||% ""
+      ),
+      affected_components = hd_as_character_vector(
+        item$affected_components %||% character(0)
+      ),
+      option_patches = normalize_hd_option_patch_records(
+        item$option_patches %||% list()
+      )
+    )
+  })
+}
+
+normalize_hd_response_records <- function(x) {
+  if (is.null(x) || length(x) == 0L) return(list())
+
+  if (is.data.frame(x)) {
+    return(lapply(seq_len(nrow(x)), function(i) {
+      list(
+        decision_id = as.character(x$decision_id[[i]] %||% ""),
+        selected_option = as.character(
+          x$selected_option[[i]] %||% ""
+        ),
+        status = as.character(x$status[[i]] %||% "pending"),
+        approved_at = as.character(x$approved_at[[i]] %||% ""),
+        approval_source = as.character(
+          x$approval_source[[i]] %||% ""
+        )
+      )
+    }))
+  }
+
+  # A single response object rather than list-of-records.
+  if (!is.null(names(x)) && "decision_id" %in% names(x)) {
+    x <- list(x)
+  }
+
+  lapply(x, function(item) {
+    if (is.data.frame(item)) {
+      item <- as.list(item[1, , drop = FALSE])
+    }
+
+    list(
+      decision_id = as.character(item$decision_id %||% ""),
+      selected_option = as.character(
+        item$selected_option %||% ""
+      ),
+      status = as.character(item$status %||% "pending"),
+      approved_at = as.character(item$approved_at %||% ""),
+      approval_source = as.character(
+        item$approval_source %||% ""
+      )
+    )
+  })
+}
+
+hd_find_response <- function(responses, decision_id) {
+  idx <- which(vapply(
+    responses,
+    function(x) identical(x$decision_id, decision_id),
+    logical(1)
+  ))
+
+  if (length(idx) == 0L) return(NULL)
+  responses[[idx[[1]]]]
+}
+
+hd_upsert_response <- function(responses, response) {
+  idx <- which(vapply(
+    responses,
+    function(x) identical(x$decision_id, response$decision_id),
+    logical(1)
+  ))
+
+  if (length(idx) == 0L) {
+    return(c(responses, list(response)))
+  }
+
+  responses[[idx[[1]]]] <- response
+  responses
+}
+
+save_human_decision_responses <- function(
+    responses,
+    output_file
+) {
+  dir.create(
+    dirname(output_file),
+    recursive = TRUE,
+    showWarnings = FALSE
+  )
+
+  yaml::write_yaml(
+    list(
+      human_decision_responses = responses
+    ),
+    output_file
+  )
+
+  invisible(output_file)
+}
+
+hd_get_nested <- function(x, path) {
+  if (length(path) == 0L) return(x)
+
+  current <- x
+
+  for (key in path) {
+    if (!is.list(current) || is.null(current[[key]])) {
+      return(NULL)
+    }
+    current <- current[[key]]
+  }
+
+  current
+}
+
+hd_set_nested <- function(x, path, value) {
+  if (length(path) == 0L) return(value)
+
   key <- path[[1]]
-  x[[key]] <- set_nested(x[[key]] %||% list(), path[-1], value)
+
+  if (is.null(x) || !is.list(x)) {
+    x <- list()
+  }
+
+  if (length(path) == 1L) {
+    x[[key]] <- value
+    return(x)
+  }
+
+  x[[key]] <- hd_set_nested(
+    x[[key]],
+    path[-1],
+    value
+  )
+
   x
 }
 
-json_key <- function(x) jsonlite::toJSON(x, auto_unbox=TRUE, null="null")
-
-append_unique <- function(current, value) {
-  items <- if (is.null(current)) list() else if (is.list(current)) current else as.list(current)
-  additions <- if (is.list(value) && is.null(names(value))) value else list(value)
-  all <- c(items, additions)
-  all[!duplicated(vapply(all, json_key, character(1)))]
-}
-
-remove_value <- function(current, value) {
-  if (is.null(current)) return(current)
-  items <- if (is.list(current)) current else as.list(current)
-  target <- json_key(value)
-  items[vapply(items, function(i) json_key(i) != target, logical(1))]
-}
-
-remove_record_by_key <- function(current, key, value) {
-  if (is.null(current)) return(current)
-  items <- if (is.list(current)) current else as.list(current)
-  items[vapply(items, function(i) {
-    !is.list(i) || is.null(i[[key]]) || !identical(i[[key]], value)
-  }, logical(1))]
-}
-
-apply_patch_operation <- function(object, op) {
-  allowed_targets <- c("project_config","search_terms")
-  allowed_ops <- c("set","append_unique","remove_value","append_record","remove_record_by_key")
-  if (!(op$target %in% allowed_targets)) stop("Unsupported target: ", op$target)
-  if (!(op$operation %in% allowed_ops)) stop("Unsupported operation: ", op$operation)
-  if (!length(op$path)) stop("Patch path must not be empty.")
-
-  current <- get_nested(object, op$path)
-
-  if (op$operation == "set")
-    return(set_nested(object, op$path, parse_json_value(op$value_json)))
-
-  if (op$operation %in% c("append_unique","append_record"))
-    return(set_nested(object, op$path, append_unique(current, parse_json_value(op$value_json))))
-
-  if (op$operation == "remove_value")
-    return(set_nested(object, op$path, remove_value(current, parse_json_value(op$value_json))))
-
-  if (!nzchar(op$match_key)) stop("match_key is required.")
-  set_nested(
-    object, op$path,
-    remove_record_by_key(current, op$match_key, parse_json_value(op$match_value_json))
+hd_values_equal <- function(a, b) {
+  identical(
+    jsonlite::toJSON(a, auto_unbox = TRUE, null = "null"),
+    jsonlite::toJSON(b, auto_unbox = TRUE, null = "null")
   )
+}
+
+create_human_decision_backup <- function(
+    files,
+    backup_directory
+) {
+  timestamp <- format(
+    Sys.time(),
+    "%Y%m%d_%H%M%S"
+  )
+
+  run_dir <- file.path(
+    backup_directory,
+    paste0("hd_finalization_", timestamp)
+  )
+
+  dir.create(
+    run_dir,
+    recursive = TRUE,
+    showWarnings = FALSE
+  )
+
+  records <- lapply(files, function(file) {
+    existed <- file.exists(file)
+    backup_file <- file.path(run_dir, basename(file))
+
+    if (existed) {
+      copied <- file.copy(
+        file,
+        backup_file,
+        overwrite = TRUE
+      )
+
+      if (!isTRUE(copied)) {
+        stop("Failed to back up: ", file)
+      }
+    }
+
+    list(
+      original = file,
+      backup = if (existed) backup_file else "",
+      existed = existed
+    )
+  })
+
+  list(
+    created_at = format(
+      Sys.time(),
+      "%Y-%m-%d %H:%M:%S"
+    ),
+    backup_directory = run_dir,
+    files = records
+  )
+}
+
+new_human_decision_audit_context <- function(
+    decisions,
+    responses,
+    backup_manifest
+) {
+  list(
+    workflow = "human_decision_finalization",
+    status = "started",
+    started_at = format(
+      Sys.time(),
+      "%Y-%m-%d %H:%M:%S"
+    ),
+    decision_count = length(decisions),
+    decisions = lapply(decisions, function(decision) {
+      response <- hd_find_response(
+        responses,
+        decision$decision_id
+      )
+
+      list(
+        decision_id = decision$decision_id,
+        recommended_option = decision$recommended_option,
+        selected_option = response$selected_option %||% "",
+        status = response$status %||% ""
+      )
+    }),
+    backup_manifest = backup_manifest
+  )
+}
+
+write_human_decision_audit_log <- function(
+    audit_context,
+    audit_directory
+) {
+  dir.create(
+    audit_directory,
+    recursive = TRUE,
+    showWarnings = FALSE
+  )
+
+  stamp <- format(
+    Sys.time(),
+    "%Y%m%d_%H%M%S"
+  )
+
+  output_file <- file.path(
+    audit_directory,
+    paste0("human_decision_audit_", stamp, ".yml")
+  )
+
+  yaml::write_yaml(
+    audit_context,
+    output_file
+  )
+
+  output_file
 }

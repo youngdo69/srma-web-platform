@@ -1,66 +1,62 @@
 toolkit:
-  name: Universal Systematic Review Toolkit
-  version: 1.0.0
+  name: universal-systematic-review-initializer
+  version: '2026-08-03'
 project:
-  id: proj_sglt2_cardiac_surgery_001
+  id: sglt2_card_surg_2026_08_03
   slug: sglt2-cardiac-surgery
   title: Effects of SGLT2 inhibitors in patients undergoing cardiac surgery
-  short_name: SGLT2i in cardiac surgery
+  short_name: SGLT2-CS
 review:
   type: intervention_effect
   objective: To evaluate the efficacy and safety of preoperative or perioperative
     SGLT2 inhibitor exposure in adult patients undergoing cardiac surgery.
-  question: Among adults undergoing cardiac surgery, does preoperative or perioperative
-    exposure to SGLT2 inhibitors, compared with no SGLT2 inhibitor (placebo or standard
-    care), affect clinical efficacy and safety outcomes?
+  question: In adults undergoing cardiac surgery, does preoperative or perioperative
+    exposure to SGLT2 inhibitors, compared with no SGLT2 inhibitor use, placebo, or
+    standard care, affect postoperative outcomes (e.g., acute kidney injury, mortality,
+    heart failure, MACE, euglycemic DKA, length of stay)?
   framework:
     name: PICO
     elements:
     - label: Population
       values:
-      - Adults (≥18 years) undergoing cardiac surgery
-      - Coronary artery bypass grafting (CABG)
-      - Cardiac valve surgery (repair or replacement)
-      - Open aortic surgery (e.g., ascending aorta, aortic root/arch)
-      - Combined cardiac surgical procedures
-    - label: Intervention
+      - Adults (≥18 years) undergoing cardiac surgery (e.g., CABG, heart valve surgery,
+        open aortic surgery). Clarifications pending for transcatheter procedures,
+        heart transplantation, and VAD implantation.
+    - label: Intervention/Exposure
       values:
-      - Preoperative SGLT2 inhibitor use
-      - Perioperative SGLT2 inhibitor exposure
-      - 'Individual agents: empagliflozin, dapagliflozin, canagliflozin, ertugliflozin,
-        sotagliflozin'
+      - Preoperative or perioperative exposure to SGLT2 inhibitors (e.g., empagliflozin,
+        dapagliflozin, canagliflozin, ertugliflozin, ipragliflozin, luseogliflozin,
+        tofogliflozin, bexagliflozin). Clarification pending for dual SGLT1/2 inhibitor
+        (sotagliflozin).
     - label: Comparator
       values:
-      - No SGLT2 inhibitor use
-      - Placebo
-      - Standard care/usual care
+      - No SGLT2 inhibitor use, placebo, or standard care.
     - label: Outcomes
       values:
-      - Postoperative acute kidney injury (AKI)
-      - In-hospital mortality
-      - Postoperative heart failure or decompensation
-      - Major adverse cardiovascular events (MACE)
-      - Euglycemic diabetic ketoacidosis (euDKA)
-      - Length of hospital stay
+      - Postoperative acute kidney injury; in-hospital or 30-day mortality; postoperative
+        heart failure; major adverse cardiovascular events (MACE); euglycemic diabetic
+        ketoacidosis; length of hospital stay; other clinically relevant postoperative
+        outcomes as reported.
+    - label: Study design
+      values:
+      - Randomized controlled trials; prospective or retrospective comparative cohort
+        studies. Decisions pending regarding inclusion of non-comparative designs/case
+        series and conference abstracts.
 eligibility:
   inclusion:
-  - Human adults (≥18 years)
-  - Undergoing cardiac surgery (open surgical procedures including CABG, valve surgery,
-    open aortic surgery, or combined procedures)
-  - 'Exposure: preoperative or perioperative SGLT2 inhibitor use (any agent in class)'
-  - 'Comparative study design: randomized controlled trials or comparative cohort
-    studies (prospective or retrospective)'
-  - 'Comparator: placebo, standard care/usual care, or no SGLT2 inhibitor'
-  - No language or date restrictions
+  - Human studies involving adults (≥18 years).
+  - Patients undergoing cardiac surgery (e.g., CABG, valve surgery, open aortic procedures).
+  - 'Exposure: preoperative or perioperative SGLT2 inhibitor use.'
+  - 'Comparative study designs: randomized controlled trials or comparative cohort
+    studies (prospective or retrospective).'
+  - Reports at least one postoperative clinical outcome relevant to efficacy or safety.
   exclusion:
-  - Non-human studies
-  - Pediatric populations (<18 years)
-  - Non-cardiac surgery
-  - Wrong intervention (not SGLT2 inhibitor or timing unrelated to pre/perioperative
-    period)
-  - No comparator group
-  - Non-original research (e.g., editorials, narrative reviews)
-  - Duplicate or superseded reports
+  - Non-human studies.
+  - Pediatric populations (<18 years).
+  - Non-cardiac surgical procedures or non-surgical settings.
+  - No SGLT2 inhibitor exposure evaluated.
+  - Non-original research (e.g., narrative reviews, systematic reviews, editorials,
+    letters without original comparative data).
 screening:
   decisions:
   - Include
@@ -68,50 +64,39 @@ screening:
   - Unclear
   decision_rules:
     include:
-    - Adults undergoing open cardiac surgical procedures with preoperative or perioperative
-      SGLT2 inhibitor exposure
-    - 'Comparative designs: randomized controlled trials or comparative cohort studies
-      with an appropriate control (placebo/standard care/no SGLT2 inhibitor)'
-    - Reports presenting extractable outcome data relevant to efficacy or safety
+    - Meets population (adult cardiac surgery) AND evaluates pre/perioperative SGLT2
+      inhibitor exposure vs an eligible comparator AND uses a comparative design (RCT
+      or comparative cohort).
     exclude:
-    - Non-human or pediatric studies
-    - Non-cardiac surgery populations
-    - Wrong intervention (not an SGLT2 inhibitor or wrong timing)
-    - No comparator group
-    - Non-original research (reviews, editorials), or duplicates
+    - Not human or pediatric population.
+    - Not a cardiac surgical population or not in a surgical context.
+    - Does not evaluate SGLT2 inhibitors as an exposure/intervention.
+    - Non-original research (review, editorial, commentary) without primary comparative
+      data.
     unclear:
-    - Insufficient detail on surgical approach or timing of exposure
-    - Ambiguous study design or comparator; seek full text or author clarification
+    - Insufficient detail in title/abstract to verify surgical population or exposure
+      timing; retrieve full text.
+    - Comparative design cannot be determined from title/abstract; retrieve full text.
   exclusion_reasons:
-  - code: NON_HUMAN
-    label: Non-human study
-    description: Study conducted in animals, in vitro, or otherwise not involving
-      human participants.
-  - code: PEDIATRIC
-    label: Pediatric population
-    description: Majority of participants are younger than 18 years or pediatric cardiac
-      surgery.
-  - code: WRONG_POPULATION_NONCARDIAC_SURGERY
-    label: 'Wrong population: non-cardiac surgery'
-    description: Participants did not undergo cardiac surgery.
-  - code: WRONG_INTERVENTION_NOT_SGLT2I
-    label: 'Wrong intervention: not SGLT2 inhibitor'
-    description: Intervention is not an SGLT2 inhibitor or exposure not in pre/perioperative
-      window.
-  - code: NO_COMPARATOR
-    label: No comparator group
-    description: Study lacks a comparator arm (placebo/standard care/no SGLT2 inhibitor).
-  - code: NOT_ORIGINAL_RESEARCH
-    label: Not original research
-    description: Publication is a review, editorial, commentary, letter without primary
-      comparative data.
-  - code: DUPLICATE
-    label: Duplicate or superseded
-    description: Duplicate publication or interim analysis superseded by a more complete
-      report.
+  - code: POP-NONCARD
+    label: 'Population: Not cardiac surgical'
+    description: Study does not involve patients undergoing cardiac surgery.
+  - code: POP-PED
+    label: 'Population: Pediatric'
+    description: Study population is predominantly or exclusively <18 years old.
+  - code: INT-NOSGLT2
+    label: 'Intervention: No SGLT2 inhibitor'
+    description: No SGLT2 inhibitor exposure/intervention assessed.
+  - code: TYPE-NONORIG
+    label: 'Publication type: Non-original research'
+    description: Review, editorial, letter, or commentary without original comparative
+      data.
+  - code: SET-NONHUMAN
+    label: Not a human study
+    description: Animal or laboratory study.
 paths:
-  raw_data: data/raw/
-  processed_data: data/processed/
-  screening_results: outputs/screening/
-  logs: logs/
-  search_strategies: search/strategies/
+  raw_data: projects/sglt2-cardiac-surgery/data/raw
+  processed_data: projects/sglt2-cardiac-surgery/data/processed
+  screening_results: projects/sglt2-cardiac-surgery/screening/results
+  logs: projects/sglt2-cardiac-surgery/logs
+  search_strategies: projects/sglt2-cardiac-surgery/search_strategies

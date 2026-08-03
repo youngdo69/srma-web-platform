@@ -1,0 +1,545 @@
+human_decisions_required:
+- decision_id: D1_TRANSCATHETER_INCLUDED
+  question: Should transcatheter cardiac procedures (e.g., TAVR/TAVI, TMVR, MitraClip,
+    other percutaneous structural heart procedures) be considered eligible as “cardiac
+    surgery”?
+  why_it_matters: Including transcatheter procedures could introduce heterogeneous,
+    non-surgical perioperative pathways and confound safety/efficacy estimates specific
+    to open cardiac surgery.
+  suggested_options:
+  - Include
+  - Exclude
+  recommended_option: Exclude
+  recommendation_rationale: Transcatheter procedures are not open surgical operations
+    and typically have different perioperative risks and care pathways; excluding
+    them preserves a homogeneous surgical population.
+  affected_components:
+  - project_config.eligibility
+  - project_config.screening.decision_rules
+  - project_config.screening.exclusion_reasons
+  option_patches:
+  - option: Include
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - inclusion
+      operation: append_unique
+      value_json: '"Transcatheter cardiac procedures (e.g., TAVR/TAVI, TMVR, MitraClip)
+        are eligible."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Explicitly allow transcatheter procedures as part of the eligible
+        population.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - include
+      operation: append_unique
+      value_json: '"Transcatheter cardiac procedures are eligible as cardiac surgery."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Create an operational screening rule to include these procedures.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: remove_value
+      value_json: '"Transcatheter cardiac procedures (e.g., TAVR/TAVI, TMVR) are not
+        eligible (not open cardiac surgery)."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Remove any prior rule excluding transcatheter procedures if present.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: remove_record_by_key
+      value_json: ''
+      match_key: code
+      match_value_json: '"NOT_CARDIAC_SURGERY_TRANSCATHETER"'
+      rationale: Ensure no exclusion reason remains that would contradict inclusion
+        of transcatheter procedures.
+  - option: Exclude
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: append_unique
+      value_json: '"Transcatheter cardiac procedures (e.g., TAVR/TAVI, TMVR, MitraClip)"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Record explicit exclusion of transcatheter procedures.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: append_unique
+      value_json: '"Transcatheter cardiac procedures (e.g., TAVR/TAVI, TMVR) are not
+        eligible (not open cardiac surgery)."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize exclusion during screening.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: append_record
+      value_json: '{"code":"NOT_CARDIAC_SURGERY_TRANSCATHETER","label":"Not cardiac
+        surgery: transcatheter procedure","description":"Study limited to transcatheter/percutaneous
+        cardiac interventions (e.g., TAVR/TAVI, TMVR, MitraClip) without open surgery."}'
+      match_key: ''
+      match_value_json: ''
+      rationale: Provide a standardized exclusion code for transcatheter-only studies.
+- decision_id: D2_HEART_TRANSPLANT_INCLUDED
+  question: Should heart transplantation be included as an eligible cardiac surgery?
+  why_it_matters: Heart transplant recipients have unique perioperative and immunologic
+    profiles that could alter safety/efficacy of SGLT2 inhibitors, potentially biasing
+    pooled estimates for standard cardiac surgeries.
+  suggested_options:
+  - Include
+  - Exclude
+  recommended_option: Exclude
+  recommendation_rationale: Heart transplantation substantially differs from routine
+    cardiac surgery with distinct risks and pathways; excluding improves clinical
+    homogeneity.
+  affected_components:
+  - project_config.eligibility
+  - project_config.screening.decision_rules
+  - project_config.screening.exclusion_reasons
+  option_patches:
+  - option: Include
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - inclusion
+      operation: append_unique
+      value_json: '"Heart transplantation is eligible."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Explicitly include heart transplantation in the eligible population.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - include
+      operation: append_unique
+      value_json: '"Include heart transplantation as an eligible cardiac surgery."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize inclusion during screening.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: remove_record_by_key
+      value_json: ''
+      match_key: code
+      match_value_json: '"HEART_TRANSPLANT"'
+      rationale: Remove any conflicting exclusion reason.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: remove_value
+      value_json: '"Heart transplantation is not eligible."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Remove conflicting exclusion rule if present.
+  - option: Exclude
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: append_unique
+      value_json: '"Heart transplantation"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Record explicit exclusion of heart transplantation.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: append_unique
+      value_json: '"Heart transplantation is not eligible."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize exclusion during screening.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: append_record
+      value_json: '{"code":"HEART_TRANSPLANT","label":"Heart transplantation","description":"Study
+        population limited to heart transplant recipients or transplant procedures."}'
+      match_key: ''
+      match_value_json: ''
+      rationale: Provide a standardized exclusion code for heart transplantation.
+- decision_id: D3_VAD_INCLUDED
+  question: Should ventricular assist device (VAD) implantation (e.g., LVAD/RVAD/BiVAD)
+    be included as an eligible cardiac surgery?
+  why_it_matters: VAD implantation carries distinct perioperative management and outcomes
+    compared with routine cardiac surgery, potentially impacting generalizability
+    and effect estimates.
+  suggested_options:
+  - Include
+  - Exclude
+  recommended_option: Exclude
+  recommendation_rationale: VAD implantation represents a specialized population with
+    different risk profiles; excluding maintains focus on routine cardiac surgeries
+    (CABG/valve/aortic).
+  affected_components:
+  - project_config.eligibility
+  - project_config.screening.decision_rules
+  - project_config.screening.exclusion_reasons
+  option_patches:
+  - option: Include
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - inclusion
+      operation: append_unique
+      value_json: '"Ventricular assist device (VAD) implantation is eligible."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Explicitly include VAD implantation procedures.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - include
+      operation: append_unique
+      value_json: '"Include VAD implantation procedures (e.g., LVAD/RVAD/BiVAD)."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize inclusion during screening.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: remove_record_by_key
+      value_json: ''
+      match_key: code
+      match_value_json: '"VAD_IMPLANT"'
+      rationale: Remove any conflicting exclusion reason.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: remove_value
+      value_json: '"VAD implantation procedures are not eligible."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Remove conflicting exclusion rule if present.
+  - option: Exclude
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: append_unique
+      value_json: '"Ventricular assist device (VAD) implantation (LVAD/RVAD/BiVAD)"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Record explicit exclusion of VAD procedures.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: append_unique
+      value_json: '"VAD implantation procedures are not eligible."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize exclusion during screening.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: append_record
+      value_json: '{"code":"VAD_IMPLANT","label":"Ventricular assist device implantation","description":"Study
+        focused on implantation of LVAD/RVAD/BiVAD rather than routine cardiac surgery
+        (CABG/valve/aortic)."}'
+      match_key: ''
+      match_value_json: ''
+      rationale: Provide a standardized exclusion code for VAD implantation.
+- decision_id: D4_CONFERENCE_ABSTRACTS
+  question: Should conference abstracts without full-text articles be eligible?
+  why_it_matters: Including abstracts-only may introduce incomplete data and higher
+    risk of bias; excluding them may omit timely evidence. Decision affects study
+    yield and data completeness.
+  suggested_options:
+  - Include
+  - Exclude
+  recommended_option: Exclude
+  recommendation_rationale: Abstract-only records often lack sufficient methodological
+    and outcome details for reliable synthesis; excluding prioritizes data quality.
+  affected_components:
+  - project_config.eligibility
+  - project_config.screening.decision_rules
+  - project_config.screening.exclusion_reasons
+  option_patches:
+  - option: Include
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - inclusion
+      operation: append_unique
+      value_json: '"Conference abstracts eligible if they report comparative data
+        relevant to outcomes of interest."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Allow abstracts that provide usable comparative data.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - include
+      operation: append_unique
+      value_json: '"Include conference abstracts when they contain sufficient comparative
+        data for extraction."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize inclusion criteria for abstracts.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: remove_record_by_key
+      value_json: ''
+      match_key: code
+      match_value_json: '"ABSTRACT_ONLY"'
+      rationale: Remove exclusion code that would conflict with inclusion of abstracts.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: remove_value
+      value_json: '"Exclude conference abstracts lacking full text or sufficient data."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Remove conflicting exclusion rule if present.
+  - option: Exclude
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: append_unique
+      value_json: '"Abstract-only reports (no full text)"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Record exclusion of abstracts-only publications.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: append_unique
+      value_json: '"Exclude conference abstracts lacking full text or sufficient data."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize abstract exclusion during screening.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: append_record
+      value_json: '{"code":"ABSTRACT_ONLY","label":"Abstract-only record","description":"Conference
+        abstract without full-text publication or with insufficient data for extraction."}'
+      match_key: ''
+      match_value_json: ''
+      rationale: Provide a standardized exclusion code for abstracts-only.
+- decision_id: D5_NON_COMPARATIVE_STUDIES
+  question: Should non-comparative study designs (e.g., single-arm cohorts, before–after
+    without concurrent control) be eligible?
+  why_it_matters: Including non-comparative designs can bias effect estimates for
+    intervention efficacy/safety and complicate meta-analysis of comparative effects.
+  suggested_options:
+  - Include
+  - Exclude
+  recommended_option: Exclude
+  recommendation_rationale: The review targets intervention effects; restricting to
+    RCTs and comparative cohorts maintains internal validity and analytic consistency.
+  affected_components:
+  - project_config.eligibility
+  - project_config.screening.decision_rules
+  - project_config.screening.exclusion_reasons
+  option_patches:
+  - option: Include
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - inclusion
+      operation: append_unique
+      value_json: '"Allow non-comparative designs (e.g., single-arm cohorts, before–after
+        without concurrent control) if data are informative for safety or feasibility."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Explicitly expand eligibility to include non-comparative designs.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - include
+      operation: append_unique
+      value_json: '"Include non-comparative designs when relevant to safety/feasibility
+        endpoints."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize inclusion of non-comparative designs.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: remove_record_by_key
+      value_json: ''
+      match_key: code
+      match_value_json: '"NON_COMPARATIVE"'
+      rationale: Remove exclusion code that would contradict inclusion.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: remove_value
+      value_json: '"Exclude non-comparative designs (single-arm cohorts, case series,
+        before–after without concurrent control)."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Remove conflicting exclusion rule if present.
+  - option: Exclude
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: append_unique
+      value_json: '"Non-comparative designs (e.g., single-arm cohorts, before–after
+        without concurrent control)"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Record explicit exclusion of non-comparative designs.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: append_unique
+      value_json: '"Exclude non-comparative designs (single-arm cohorts, case series,
+        before–after without concurrent control)."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize exclusion during screening.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: append_record
+      value_json: '{"code":"NON_COMPARATIVE","label":"Non-comparative study design","description":"Study
+        lacks a concurrent comparison group (e.g., single-arm cohort, before–after
+        without control)."}'
+      match_key: ''
+      match_value_json: ''
+      rationale: Provide standardized exclusion code for non-comparative designs.
+- decision_id: D6_CASE_SERIES
+  question: Should case series or case reports be eligible?
+  why_it_matters: Case series/reports lack comparators and can overestimate effects;
+    inclusion would affect bias, synthesis approach, and study selection volume.
+  suggested_options:
+  - Include
+  - Exclude
+  recommended_option: Exclude
+  recommendation_rationale: To maintain focus on comparative effects with stronger
+    internal validity, exclude case series/reports.
+  affected_components:
+  - project_config.eligibility
+  - project_config.screening.decision_rules
+  - project_config.screening.exclusion_reasons
+  option_patches:
+  - option: Include
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - inclusion
+      operation: append_unique
+      value_json: '"Include case series or case reports if they provide perioperative
+        safety signals relevant to SGLT2 inhibitors."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Allow inclusion for hypothesis-generating safety data.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - include
+      operation: append_unique
+      value_json: '"Include case series/reports providing relevant perioperative safety
+        data."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize inclusion of case series/reports.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: remove_record_by_key
+      value_json: ''
+      match_key: code
+      match_value_json: '"CASE_SERIES"'
+      rationale: Remove exclusion code that would contradict inclusion.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: remove_value
+      value_json: '"Exclude case series or case reports."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Remove conflicting exclusion rule if present.
+  - option: Exclude
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: append_unique
+      value_json: '"Case series or case reports"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Record explicit exclusion of case series/reports.
+    - target: project_config
+      path:
+      - screening
+      - decision_rules
+      - exclude
+      operation: append_unique
+      value_json: '"Exclude case series or case reports."'
+      match_key: ''
+      match_value_json: ''
+      rationale: Operationalize exclusion during screening.
+    - target: project_config
+      path:
+      - screening
+      - exclusion_reasons
+      operation: append_record
+      value_json: '{"code":"CASE_SERIES","label":"Case series or case report","description":"Publication
+        is a case series or single case report without a comparator group."}'
+      match_key: ''
+      match_value_json: ''
+      rationale: Provide standardized exclusion code for case series/reports.

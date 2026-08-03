@@ -1,76 +1,78 @@
 project:
-  id: proj_sglt2_cardiac_surgery_001
+  id: sglt2_card_surg_2026_08_03
   title: Effects of SGLT2 inhibitors in patients undergoing cardiac surgery
-  short_name: SGLT2i in cardiac surgery
+  short_name: SGLT2-CS
 search:
   concepts:
-  - concept_id: POPULATION_CARDIAC_SURGERY
-    label: Cardiac surgery population
+  - concept_id: C1_POP
+    label: Cardiac surgery population (adults)
     role: Population
     required: yes
     free_text_terms:
     - cardiac surgery
-    - cardiac surgical procedure*
-    - open heart surger*
-    - heart surger*
+    - heart surgery
+    - open heart surgery
+    - cardiothoracic surgery
     - coronary artery bypass
+    - coronary artery bypass graft
     - coronary bypass
-    - bypass graft*
     - CABG
-    - valve surger*
-    - valvular surger*
+    - off-pump coronary bypass
+    - OPCAB
+    - valve surgery
+    - heart valve surgery
     - valve replacement
-    - valve repair
-    - aortic surger*
-    - aortic root
-    - ascending aorta
-    - aortic arch
-    - Bentall
-    - cardiopulmonary bypass
-    - on-pump
-    - off-pump
-    - sternotomy
+    - aortic surgery
+    - thoracic aorta surgery
+    - ascending aorta surgery
+    - aortic root replacement
+    - Bentall procedure
     abbreviations:
     - CABG
-    - CPB
+    - OPCAB
     spelling_variants:
-    - valve/valvular
-    - surger/surgery/surgical
+    - coronary by-pass
+    - aorta surgery
     controlled_vocabulary:
       pubmed_mesh_candidates:
       - Cardiac Surgical Procedures
       - Coronary Artery Bypass
       - Heart Valve Prosthesis Implantation
-      - Cardiopulmonary Bypass
+      - Heart Valve Diseases/surgery
+      - Aorta/surgery
+      - Aortic Aneurysm, Thoracic/surgery
       embase_emtree_candidates:
-      - heart surgery
+      - cardiac surgery
       - coronary artery bypass grafting
       - heart valve replacement
-      - aortic surgery
-      - cardiopulmonary bypass
-  - concept_id: INTERVENTION_SGLT2I
-    label: SGLT2 inhibitors
-    role: Intervention
+      - open heart surgery
+      - aorta surgery
+      - thoracic aorta surgery
+  - concept_id: C2_SGLT2I
+    label: SGLT2 inhibitors (drug class and agents)
+    role: Intervention/Exposure
     required: yes
     free_text_terms:
-    - sodium-glucose cotransporter 2 inhibitor*
-    - sodium glucose cotransporter 2 inhibitor*
-    - SGLT2 inhibitor*
+    - SGLT2 inhibitor
+    - SGLT-2 inhibitor
+    - SGLT2i
+    - sodium-glucose cotransporter 2 inhibitor
+    - sodium-glucose co-transporter 2 inhibitor
+    - gliflozin
     - empagliflozin
     - dapagliflozin
     - canagliflozin
     - ertugliflozin
-    - sotagliflozin
+    - ipragliflozin
+    - luseogliflozin
+    - tofogliflozin
+    - bexagliflozin
     abbreviations:
     - SGLT2i
     - SGLT-2i
     spelling_variants:
-    - sodium-glucose/sodium glucose
-    - empagliflozin/empagliflozin*
-    - dapagliflozin/dapagliflozin*
-    - canagliflozin/canagliflozin*
-    - ertugliflozin/ertugliflozin*
-    - sotagliflozin/sotagliflozin*
+    - sodium glucose cotransporter 2 inhibitor
+    - sodium-glucose co transporter 2 inhibitor
     controlled_vocabulary:
       pubmed_mesh_candidates:
       - Sodium-Glucose Transporter 2 Inhibitors
@@ -78,94 +80,25 @@ search:
       - Dapagliflozin
       - Canagliflozin
       - Ertugliflozin
-      - Sotagliflozin
+      - Ipragliflozin
+      - Luseogliflozin
+      - Tofogliflozin
+      - Bexagliflozin
       embase_emtree_candidates:
       - sodium glucose cotransporter 2 inhibitor
       - empagliflozin
       - dapagliflozin
       - canagliflozin
       - ertugliflozin
-      - sotagliflozin
-  - concept_id: COMPARATOR_CONTROL
-    label: Comparator/control
-    role: Comparator
-    required: no
-    free_text_terms:
-    - placebo
-    - standard care
-    - usual care
-    - no treatment
-    - control group
-    abbreviations: []
-    spelling_variants:
-    - standard care/standard-of-care/usual care/usual-care
-    controlled_vocabulary:
-      pubmed_mesh_candidates:
-      - Placebos
-      - Control Groups
-      embase_emtree_candidates:
-      - placebo
-      - control group
-      - standard care
-  - concept_id: OUTCOMES_EFFICACY_SAFETY
-    label: Outcomes (not required for primary search)
-    role: Outcomes
-    required: no
-    free_text_terms:
-    - acute kidney injury
-    - AKI
-    - KDIGO
-    - renal failure
-    - kidney injury
-    - in-hospital mortality
-    - hospital mortality
-    - death
-    - heart failure
-    - cardiac failure
-    - decompensation
-    - major adverse cardiovascular events
-    - MACE
-    - myocardial infarction
-    - stroke
-    - revascularization
-    - euglycemic diabetic ketoacidosis
-    - euDKA
-    - diabetic ketoacidosis
-    - length of stay
-    - LOS
-    abbreviations:
-    - AKI
-    - MACE
-    - euDKA
-    - LOS
-    - MI
-    spelling_variants:
-    - euglycemic/euglycaemic
-    - revascularization/revascularisation
-    controlled_vocabulary:
-      pubmed_mesh_candidates:
-      - Acute Kidney Injury
-      - Mortality, Hospital
-      - Heart Failure
-      - Myocardial Infarction
-      - Stroke
-      - Diabetic Ketoacidosis
-      - Length of Stay
-      embase_emtree_candidates:
-      - acute kidney injury
-      - hospital mortality
-      - heart failure
-      - myocardial infarction
-      - stroke
-      - diabetic ketoacidosis
-      - length of stay
+      - ipragliflozin
+      - luseogliflozin
+      - tofogliflozin
+      - bexagliflozin
   combination:
     operator_between_concepts: AND
-    notes: Combine Population AND Intervention for primary search. Do not require
-      Comparator or Outcomes in the primary query; use outcome terms only for sensitivity
-      analyses.
-  outcome_terms_policy: Exclude outcome terms from primary database searches; reserve
-    for sensitivity or targeted follow-up.
+    notes: No study design or outcome filters are applied at the search stage to maximize
+      sensitivity.
+  outcome_terms_policy: do_not_filter
 validation:
   known_relevant_ids: []
   controlled_vocabulary_requires_verification: yes

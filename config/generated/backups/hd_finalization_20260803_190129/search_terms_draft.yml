@@ -1,0 +1,171 @@
+project:
+  id: proj_sglt2_cardiac_surgery_001
+  title: Effects of SGLT2 inhibitors in patients undergoing cardiac surgery
+  short_name: SGLT2i in cardiac surgery
+search:
+  concepts:
+  - concept_id: POPULATION_CARDIAC_SURGERY
+    label: Cardiac surgery population
+    role: Population
+    required: yes
+    free_text_terms:
+    - cardiac surgery
+    - cardiac surgical procedure*
+    - open heart surger*
+    - heart surger*
+    - coronary artery bypass
+    - coronary bypass
+    - bypass graft*
+    - CABG
+    - valve surger*
+    - valvular surger*
+    - valve replacement
+    - valve repair
+    - aortic surger*
+    - aortic root
+    - ascending aorta
+    - aortic arch
+    - Bentall
+    - cardiopulmonary bypass
+    - on-pump
+    - off-pump
+    - sternotomy
+    abbreviations:
+    - CABG
+    - CPB
+    spelling_variants:
+    - valve/valvular
+    - surger/surgery/surgical
+    controlled_vocabulary:
+      pubmed_mesh_candidates:
+      - Cardiac Surgical Procedures
+      - Coronary Artery Bypass
+      - Heart Valve Prosthesis Implantation
+      - Cardiopulmonary Bypass
+      embase_emtree_candidates:
+      - heart surgery
+      - coronary artery bypass grafting
+      - heart valve replacement
+      - aortic surgery
+      - cardiopulmonary bypass
+  - concept_id: INTERVENTION_SGLT2I
+    label: SGLT2 inhibitors
+    role: Intervention
+    required: yes
+    free_text_terms:
+    - sodium-glucose cotransporter 2 inhibitor*
+    - sodium glucose cotransporter 2 inhibitor*
+    - SGLT2 inhibitor*
+    - empagliflozin
+    - dapagliflozin
+    - canagliflozin
+    - ertugliflozin
+    - sotagliflozin
+    abbreviations:
+    - SGLT2i
+    - SGLT-2i
+    spelling_variants:
+    - sodium-glucose/sodium glucose
+    - empagliflozin/empagliflozin*
+    - dapagliflozin/dapagliflozin*
+    - canagliflozin/canagliflozin*
+    - ertugliflozin/ertugliflozin*
+    - sotagliflozin/sotagliflozin*
+    controlled_vocabulary:
+      pubmed_mesh_candidates:
+      - Sodium-Glucose Transporter 2 Inhibitors
+      - Empagliflozin
+      - Dapagliflozin
+      - Canagliflozin
+      - Ertugliflozin
+      - Sotagliflozin
+      embase_emtree_candidates:
+      - sodium glucose cotransporter 2 inhibitor
+      - empagliflozin
+      - dapagliflozin
+      - canagliflozin
+      - ertugliflozin
+      - sotagliflozin
+  - concept_id: COMPARATOR_CONTROL
+    label: Comparator/control
+    role: Comparator
+    required: no
+    free_text_terms:
+    - placebo
+    - standard care
+    - usual care
+    - no treatment
+    - control group
+    abbreviations: []
+    spelling_variants:
+    - standard care/standard-of-care/usual care/usual-care
+    controlled_vocabulary:
+      pubmed_mesh_candidates:
+      - Placebos
+      - Control Groups
+      embase_emtree_candidates:
+      - placebo
+      - control group
+      - standard care
+  - concept_id: OUTCOMES_EFFICACY_SAFETY
+    label: Outcomes (not required for primary search)
+    role: Outcomes
+    required: no
+    free_text_terms:
+    - acute kidney injury
+    - AKI
+    - KDIGO
+    - renal failure
+    - kidney injury
+    - in-hospital mortality
+    - hospital mortality
+    - death
+    - heart failure
+    - cardiac failure
+    - decompensation
+    - major adverse cardiovascular events
+    - MACE
+    - myocardial infarction
+    - stroke
+    - revascularization
+    - euglycemic diabetic ketoacidosis
+    - euDKA
+    - diabetic ketoacidosis
+    - length of stay
+    - LOS
+    abbreviations:
+    - AKI
+    - MACE
+    - euDKA
+    - LOS
+    - MI
+    spelling_variants:
+    - euglycemic/euglycaemic
+    - revascularization/revascularisation
+    controlled_vocabulary:
+      pubmed_mesh_candidates:
+      - Acute Kidney Injury
+      - Mortality, Hospital
+      - Heart Failure
+      - Myocardial Infarction
+      - Stroke
+      - Diabetic Ketoacidosis
+      - Length of Stay
+      embase_emtree_candidates:
+      - acute kidney injury
+      - hospital mortality
+      - heart failure
+      - myocardial infarction
+      - stroke
+      - diabetic ketoacidosis
+      - length of stay
+  combination:
+    operator_between_concepts: AND
+    notes: Combine Population AND Intervention for primary search. Do not require
+      Comparator or Outcomes in the primary query; use outcome terms only for sensitivity
+      analyses.
+  outcome_terms_policy: Exclude outcome terms from primary database searches; reserve
+    for sensitivity or targeted follow-up.
+validation:
+  known_relevant_ids: []
+  controlled_vocabulary_requires_verification: yes

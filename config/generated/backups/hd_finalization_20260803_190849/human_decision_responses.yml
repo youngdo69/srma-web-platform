@@ -1,0 +1,31 @@
+human_decision_responses:
+- decision_id: D1_TRANSCATHETER_INCLUDED
+  selected_option: Exclude
+  status: approved
+  approved_at: 2026-08-03 19:08:37
+  approval_source: approve_all_recommended
+- decision_id: D2_HEART_TRANSPLANT_INCLUDED
+  selected_option: Exclude
+  status: approved
+  approved_at: 2026-08-03 19:08:37
+  approval_source: approve_all_recommended
+- decision_id: D3_VAD_INCLUDED
+  selected_option: Exclude
+  status: approved
+  approved_at: 2026-08-03 19:08:37
+  approval_source: approve_all_recommended
+- decision_id: D4_CONFERENCE_ABSTRACTS
+  selected_option: Exclude
+  status: approved
+  approved_at: 2026-08-03 19:08:37
+  approval_source: approve_all_recommended
+- decision_id: D5_NON_COMPARATIVE_STUDIES
+  selected_option: Exclude
+  status: approved
+  approved_at: 2026-08-03 19:08:37
+  approval_source: approve_all_recommended
+- decision_id: D6_CASE_SERIES
+  selected_option: Exclude
+  status: approved
+  approved_at: 2026-08-03 19:08:37
+  approval_source: approve_all_recommended

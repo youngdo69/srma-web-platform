@@ -1,0 +1,126 @@
+toolkit:
+  name: universal-systematic-review-initializer
+  version: '2026-08-03'
+project:
+  id: sglt2_card_surg_2026_08_03
+  slug: sglt2-cardiac-surgery
+  title: Effects of SGLT2 inhibitors in patients undergoing cardiac surgery
+  short_name: SGLT2-CS
+review:
+  type: intervention_effect
+  objective: To evaluate the efficacy and safety of preoperative or perioperative
+    SGLT2 inhibitor exposure in adult patients undergoing cardiac surgery.
+  question: In adults undergoing cardiac surgery, does preoperative or perioperative
+    exposure to SGLT2 inhibitors, compared with no SGLT2 inhibitor use, placebo, or
+    standard care, affect postoperative outcomes (e.g., acute kidney injury, mortality,
+    heart failure, MACE, euglycemic DKA, length of stay)?
+  framework:
+    name: PICO
+    elements:
+    - label: Population
+      values: Adults (≥18 years) undergoing cardiac surgery (e.g., CABG, heart valve
+        surgery, open aortic surgery). Clarifications pending for transcatheter procedures,
+        heart transplantation, and VAD implantation.
+    - label: Intervention/Exposure
+      values: Preoperative or perioperative exposure to SGLT2 inhibitors (e.g., empagliflozin,
+        dapagliflozin, canagliflozin, ertugliflozin, ipragliflozin, luseogliflozin,
+        tofogliflozin, bexagliflozin). Clarification pending for dual SGLT1/2 inhibitor
+        (sotagliflozin).
+    - label: Comparator
+      values: No SGLT2 inhibitor use, placebo, or standard care.
+    - label: Outcomes
+      values: Postoperative acute kidney injury; in-hospital or 30-day mortality;
+        postoperative heart failure; major adverse cardiovascular events (MACE); euglycemic
+        diabetic ketoacidosis; length of hospital stay; other clinically relevant
+        postoperative outcomes as reported.
+    - label: Study design
+      values: Randomized controlled trials; prospective or retrospective comparative
+        cohort studies. Decisions pending regarding inclusion of non-comparative designs/case
+        series and conference abstracts.
+eligibility:
+  inclusion:
+  - Human studies involving adults (≥18 years).
+  - Patients undergoing cardiac surgery (e.g., CABG, valve surgery, open aortic procedures).
+  - 'Exposure: preoperative or perioperative SGLT2 inhibitor use.'
+  - 'Comparative study designs: randomized controlled trials or comparative cohort
+    studies (prospective or retrospective).'
+  - Reports at least one postoperative clinical outcome relevant to efficacy or safety.
+  exclusion:
+  - Non-human studies.
+  - Pediatric populations (<18 years).
+  - Non-cardiac surgical procedures or non-surgical settings.
+  - No SGLT2 inhibitor exposure evaluated.
+  - Non-original research (e.g., narrative reviews, systematic reviews, editorials,
+    letters without original comparative data).
+  - Transcatheter cardiac procedures (e.g., TAVR/TAVI, TMVR, MitraClip) are excluded.
+  - Heart transplantation is excluded.
+  - Ventricular assist device implantation (e.g., LVAD/RVAD) is excluded.
+  - Conference abstracts without a corresponding full peer-reviewed article are excluded.
+  - Non-comparative designs (single-arm studies, case series) are excluded.
+  - Dual SGLT1/2 inhibitor sotagliflozin is excluded from the intervention scope.
+screening:
+  decisions:
+  - Include
+  - Exclude
+  - Unclear
+  decision_rules:
+    include: Meets population (adult cardiac surgery) AND evaluates pre/perioperative
+      SGLT2 inhibitor exposure vs an eligible comparator AND uses a comparative design
+      (RCT or comparative cohort).
+    exclude:
+    - Not human or pediatric population.
+    - Not a cardiac surgical population or not in a surgical context.
+    - Does not evaluate SGLT2 inhibitors as an exposure/intervention.
+    - Non-original research (review, editorial, commentary) without primary comparative
+      data.
+    - 'Population: transcatheter cardiac procedure (e.g., TAVR/TAVI, TMVR, MitraClip)
+      — Exclude.'
+    - 'Population: heart transplantation — Exclude.'
+    - 'Population: ventricular assist device (LVAD/RVAD) implantation — Exclude.'
+    - 'Publication type: conference abstract only — Exclude.'
+    - 'Study design: non-comparative (single-arm, case series) — Exclude.'
+    unclear:
+    - Insufficient detail in title/abstract to verify surgical population or exposure
+      timing; retrieve full text.
+    - Comparative design cannot be determined from title/abstract; retrieve full text.
+  exclusion_reasons:
+  - code: POP-NONCARD
+    label: 'Population: Not cardiac surgical'
+    description: Study does not involve patients undergoing cardiac surgery.
+  - code: POP-PED
+    label: 'Population: Pediatric'
+    description: Study population is predominantly or exclusively <18 years old.
+  - code: INT-NOSGLT2
+    label: 'Intervention: No SGLT2 inhibitor'
+    description: No SGLT2 inhibitor exposure/intervention assessed.
+  - code: TYPE-NONORIG
+    label: 'Publication type: Non-original research'
+    description: Review, editorial, letter, or commentary without original comparative
+      data.
+  - code: SET-NONHUMAN
+    label: Not a human study
+    description: Animal or laboratory study.
+  - code: POP-TRANSCATH
+    label: 'Population: Transcatheter cardiac procedure'
+    description: Study exclusively evaluates transcatheter cardiac procedures (e.g.,
+      TAVR/TAVI, TMVR, MitraClip).
+  - code: POP-TRANSPLANT
+    label: 'Population: Heart transplantation'
+    description: Study population is limited to heart transplant recipients.
+  - code: POP-VAD
+    label: 'Population: VAD implantation'
+    description: Study population is limited to patients undergoing ventricular assist
+      device implantation (e.g., LVAD or RVAD).
+  - code: PUB-ABSTRACT
+    label: 'Publication type: Conference abstract only'
+    description: Record is a conference abstract with no corresponding full peer-reviewed
+      article.
+  - code: DES-NONCOMP
+    label: 'Study design: Non-comparative/case series'
+    description: Single-arm studies or case series without a comparator group.
+paths:
+  raw_data: projects/sglt2-cardiac-surgery/data/raw
+  processed_data: projects/sglt2-cardiac-surgery/data/processed
+  screening_results: projects/sglt2-cardiac-surgery/screening/results
+  logs: projects/sglt2-cardiac-surgery/logs
+  search_strategies: projects/sglt2-cardiac-surgery/search_strategies

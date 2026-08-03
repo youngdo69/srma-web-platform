@@ -1,44 +1,104 @@
 project:
-  title: Effects of SGLT2 Inhibitors in Patients Undergoing Cardiac Surgery
-  short_name: SGLT2i_Cardiac_Surgery_SRM
-  created_at: 2026-07-28 22:06:43.170248
-intervention:
-  class_terms:
-  - SGLT2 inhibitor
-  - sodium glucose cotransporter 2 inhibitor
-  - SGLT-2 inhibitor
-  drug_terms:
-  - dapagliflozin
-  - empagliflozin
-  - canagliflozin
-  - ertugliflozin
-procedure:
-  general_terms:
-  - cardiac surgery
-  - heart surgery
-  - cardiothoracic surgery
-  specific_terms:
-  - coronary artery bypass grafting
-  - CABG
-  - valve surgery
-  - aortic surgery
-  - cardiopulmonary bypass
-optional:
-  use_perioperative_terms: no
-  perioperative_terms: []
-  outcome_terms:
-  - acute kidney injuryacute kidney injury
-  - mortality
-  - heart failure
-  - ketoacidosis
-controlled_vocabulary:
-  pubmed:
-    intervention_mesh: Sodium-Glucose Transporter 2 Inhibitors
-    procedure_mesh: Cardiac Surgical Procedures
-  embase:
-    intervention_emtree: sodium glucose cotransporter 2 inhibitor
-    procedure_emtree:
+  id: sglt2_card_surg_2026_08_03
+  title: Effects of SGLT2 inhibitors in patients undergoing cardiac surgery
+  short_name: SGLT2-CS
+search:
+  concepts:
+  - concept_id: C1_POP
+    label: Cardiac surgery population (adults)
+    role: Population
+    required: yes
+    free_text_terms:
+    - cardiac surgery
     - heart surgery
-    - coronary artery bypass grafting
+    - open heart surgery
+    - cardiothoracic surgery
+    - coronary artery bypass
+    - coronary artery bypass graft
+    - coronary bypass
+    - CABG
+    - off-pump coronary bypass
+    - OPCAB
+    - valve surgery
+    - heart valve surgery
+    - valve replacement
+    - aortic surgery
+    - thoracic aorta surgery
+    - ascending aorta surgery
+    - aortic root replacement
+    - Bentall procedure
+    abbreviations:
+    - CABG
+    - OPCAB
+    spelling_variants:
+    - coronary by-pass
+    - aorta surgery
+    controlled_vocabulary:
+      pubmed_mesh_candidates:
+      - Cardiac Surgical Procedures
+      - Coronary Artery Bypass
+      - Heart Valve Prosthesis Implantation
+      - Heart Valve Diseases/surgery
+      - Aorta/surgery
+      - Aortic Aneurysm, Thoracic/surgery
+      embase_emtree_candidates:
+      - cardiac surgery
+      - coronary artery bypass grafting
+      - heart valve replacement
+      - open heart surgery
+      - aorta surgery
+      - thoracic aorta surgery
+  - concept_id: C2_SGLT2I
+    label: SGLT2 inhibitors (drug class and agents)
+    role: Intervention/Exposure
+    required: yes
+    free_text_terms:
+    - SGLT2 inhibitor
+    - SGLT-2 inhibitor
+    - SGLT2i
+    - sodium-glucose cotransporter 2 inhibitor
+    - sodium-glucose co-transporter 2 inhibitor
+    - gliflozin
+    - empagliflozin
+    - dapagliflozin
+    - canagliflozin
+    - ertugliflozin
+    - ipragliflozin
+    - luseogliflozin
+    - tofogliflozin
+    - bexagliflozin
+    abbreviations:
+    - SGLT2i
+    - SGLT-2i
+    spelling_variants:
+    - sodium glucose cotransporter 2 inhibitor
+    - sodium-glucose co transporter 2 inhibitor
+    controlled_vocabulary:
+      pubmed_mesh_candidates:
+      - Sodium-Glucose Transporter 2 Inhibitors
+      - Empagliflozin
+      - Dapagliflozin
+      - Canagliflozin
+      - Ertugliflozin
+      - Ipragliflozin
+      - Luseogliflozin
+      - Tofogliflozin
+      - Bexagliflozin
+      embase_emtree_candidates:
+      - sodium glucose cotransporter 2 inhibitor
+      - empagliflozin
+      - dapagliflozin
+      - canagliflozin
+      - ertugliflozin
+      - ipragliflozin
+      - luseogliflozin
+      - tofogliflozin
+      - bexagliflozin
+  combination:
+    operator_between_concepts: AND
+    notes: No study design or outcome filters are applied at the search stage to maximize
+      sensitivity.
+  outcome_terms_policy: do_not_filter
 validation:
   known_relevant_ids: []
+  controlled_vocabulary_requires_verification: yes

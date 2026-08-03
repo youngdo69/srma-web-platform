@@ -1,0 +1,45 @@
+workflow: human_decision_finalization
+status: failed
+started_at: 2026-08-03 19:01:29
+decision_count: 6
+decisions:
+- decision_id: D1_TRANSCATHETER_INCLUDED
+  recommended_option: Exclude
+  selected_option: Exclude
+  status: approved
+- decision_id: D2_HEART_TRANSPLANT_INCLUDED
+  recommended_option: Exclude
+  selected_option: Exclude
+  status: approved
+- decision_id: D3_VAD_INCLUDED
+  recommended_option: Exclude
+  selected_option: Exclude
+  status: approved
+- decision_id: D4_CONFERENCE_ABSTRACTS
+  recommended_option: Exclude
+  selected_option: Exclude
+  status: approved
+- decision_id: D5_NON_COMPARATIVE_STUDIES
+  recommended_option: Exclude
+  selected_option: Exclude
+  status: approved
+- decision_id: D6_CASE_SERIES
+  recommended_option: Exclude
+  selected_option: Exclude
+  status: approved
+backup_manifest:
+  created_at: 2026-08-03 19:01:29
+  backup_directory: config/generated/backups/hd_finalization_20260803_190129
+  files:
+  - original: config/generated/project_config_draft.yml
+    backup: config/generated/backups/hd_finalization_20260803_190129/project_config_draft.yml
+    existed: yes
+  - original: config/generated/search_terms_draft.yml
+    backup: config/generated/backups/hd_finalization_20260803_190129/search_terms_draft.yml
+    existed: yes
+  - original: config/generated/human_decision_responses.yml
+    backup: config/generated/backups/hd_finalization_20260803_190129/human_decision_responses.yml
+    existed: yes
+completed_at: 2026-08-03 19:01:30
+error_message: 'Activation blocked: unresolved human decisions remain in config/generated/initialization_decisions_required.yml.
+  Resolve them and replace the list with human_decisions_required: []'
