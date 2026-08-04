@@ -441,7 +441,34 @@ build_project_paths <- function(
 
 
   # ----------------------------------------------------------
-  # 4.2 PubMed input/output files
+  # 4.2 Search-strategy files
+  # ----------------------------------------------------------
+  # These filenames preserve the existing R/11-R/12 contract.
+  # Only the parent directory is controlled by project_config.yml.
+
+  paths$pubmed_search <- file.path(
+    paths$search_strategies_directory,
+    "pubmed_search.txt"
+  )
+
+  paths$embase_search <- file.path(
+    paths$search_strategies_directory,
+    "embase_search.txt"
+  )
+
+  paths$central_search <- file.path(
+    paths$search_strategies_directory,
+    "central_search.txt"
+  )
+
+  paths$search_strategy_summary <- file.path(
+    paths$search_strategies_directory,
+    "search_strategy_summary.csv"
+  )
+
+
+  # ----------------------------------------------------------
+  # 4.3 PubMed input/output files
   # ----------------------------------------------------------
 
   paths$pubmed_xml <- file_path_with_extension(
@@ -466,7 +493,7 @@ build_project_paths <- function(
 
 
   # ----------------------------------------------------------
-  # 4.3 Embase and CENTRAL files
+  # 4.4 Embase and CENTRAL files
   # ----------------------------------------------------------
 
   paths$embase_ris <- file_path_with_extension(
@@ -483,7 +510,7 @@ build_project_paths <- function(
 
 
   # ----------------------------------------------------------
-  # 4.4 R/17 merge and deduplication outputs
+  # 4.5 R/17 merge and deduplication outputs
   # ----------------------------------------------------------
 
   paths$merged_records_csv <- file_path_with_extension(
@@ -527,7 +554,7 @@ build_project_paths <- function(
 
 
   # ----------------------------------------------------------
-  # 4.5 R/18 screening workbook outputs
+  # 4.6 R/18 screening workbook outputs
   # ----------------------------------------------------------
 
   paths$screening_workbook <- file_path_with_extension(
@@ -550,7 +577,7 @@ build_project_paths <- function(
 
 
   # ----------------------------------------------------------
-  # 4.6 Create required directories
+  # 4.7 Create required directories
   # ----------------------------------------------------------
 
   if (isTRUE(create_directories)) {
@@ -591,7 +618,7 @@ build_project_paths <- function(
 
 
   # ----------------------------------------------------------
-  # 4.7 Normalize directory paths after creation
+  # 4.8 Normalize directory paths after creation
   # ----------------------------------------------------------
 
   directory_names <- c(
@@ -625,7 +652,7 @@ build_project_paths <- function(
 
 
   # ----------------------------------------------------------
-  # 4.8 Normalize file paths without requiring existence
+  # 4.9 Normalize file paths without requiring existence
   # ----------------------------------------------------------
 
   file_names <- setdiff(

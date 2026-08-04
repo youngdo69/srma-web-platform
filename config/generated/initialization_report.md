@@ -1,147 +1,103 @@
 # Project Initialization Report
 
-- Generated: 2026-08-03 19:29:30
+- Generated: 2026-08-04 23:54:54
 - Model: gpt-5-2025-08-07
 - Prompt version: 1.0.0
 
 ## Summary
 
-Initialized a conservative, reviewable protocol for assessing the effects of pre/perioperative SGLT2 inhibitor exposure in adult patients undergoing cardiac surgery. Search concepts target cardiac surgery populations and SGLT2 inhibitors without outcome or design filters to maximize sensitivity. Key unresolved scope issues are surfaced as explicit human decisions with deterministic patches to eligibility, screening rules, exclusion reasons, and search terms where applicable.
+Initialized a PICOS-framed systematic review and meta-analysis on SGLT2 inhibitor exposure in adult cardiac surgery, with conservative eligibility (open surgical procedures; comparative designs; peer-reviewed full texts), comprehensive search databases, and concept-based, outcome-agnostic search terms. Material scope decisions regarding transcatheter procedures, heart transplantation, VAD implantation, and conference abstracts are flagged for human confirmation with deterministic patches.
 
 ## Assumptions
 
-- Adult is defined as age ≥18 years.
-- Comparative designs (RCTs and comparative cohorts) are the primary focus.
-- Language and date are unrestricted unless decided otherwise later.
-- Perioperative exposure includes preoperative and immediate postoperative periods as defined by study authors.
+- Adults (≥18 years) only; pediatric studies are excluded.
+- Cardiac surgery refers to open surgical procedures (CABG, valve, aortic) by default.
+- Preoperative/perioperative exposure window includes pre-admission or chronic outpatient use carried into the preoperative period and exposure during the index hospitalization up to surgery and immediate postoperative period.
+- Comparative study designs are required (RCTs and comparative cohorts); non-comparative studies and case series are excluded without separate decision.
+- Language has no restrictions; studies in any language are eligible if otherwise includable.
+- Peer-reviewed full texts included; preprints excluded by default due to uncertain peer-review status.
+- Conference abstracts are excluded by default but surfaced for decision.
+- Dual SGLT1/2 inhibitors (e.g., sotagliflozin) are not considered SGLT2 inhibitors and would be excluded unless SGLT2-specific effects are separable.
+- Outcome terms are not included in the search strategy to preserve sensitivity; outcomes will be applied at screening and extraction.
 
 ## Warnings
 
-- Do not apply outcome or study design filters during searching to avoid missing relevant studies.
-- Controlled vocabulary candidates require librarian verification prior to execution.
-- Unresolved decisions (transcatheter procedures, heart transplantation, VAD implantation, conference abstracts, non-comparative designs, sotagliflozin scope) must be finalized before full-text screening and data extraction.
+- Candidate controlled-vocabulary terms require librarian verification and possible refinement before finalizing database-specific strategies.
+- The term mapping for aortic procedures may need adjustment (e.g., specific MeSH/Emtree headings for aortic root or arch surgery).
+- Exposure timing (preoperative vs perioperative) is often poorly indexed and may rely on full-text assessment during screening.
+- If scope decisions (transcatheter, transplant, VAD, abstracts) change, apply the provided patches before generating search strategies and screening workbooks.
 
 ## Human decisions required
 
-### HD1_transcatheter_procedures
+### D01_transcatheter_scope
 
-**Question:** Should studies of transcatheter cardiac procedures (e.g., TAVR/TAVI, TMVR, MitraClip) be eligible?
+**Question:** Should transcatheter-only cardiac procedures (e.g., TAVR/TAVI, MitraClip, PCI) be included as eligible populations?
 
-**Why it matters:** Including transcatheter procedures may introduce clinical heterogeneity distinct from open cardiac surgery and affect applicability and effect estimates.
+**Why it matters:** Including transcatheter procedures broadens the population beyond open cardiac surgery and may change risk profiles and perioperative management, affecting applicability and heterogeneity.
 
-**Recommended option:** Exclude transcatheter cardiac procedures.
+**Recommended option:** exclude_transcatheter_only
 
-**Recommendation rationale:** The topic focuses on surgical (open) procedures; transcatheter interventions differ in perioperative course and risks. Excluding them preserves clinical homogeneity.
+**Recommendation rationale:** The review is targeted to open surgical cardiac procedures; transcatheter interventions are procedurally and perioperatively distinct.
 
 **Suggested options:**
-- Exclude transcatheter cardiac procedures.
-- Include transcatheter cardiac procedures.
-- Include only when mixed with open cardiac surgery and data for open surgery are separable.
+- exclude_transcatheter_only
+- include_transcatheter_only
 
 **Affected components:**
 - project_config.eligibility
-- project_config.screening.decision_rules
-- project_config.screening.exclusion_reasons
+- project_config.screening
 
-### HD2_heart_transplantation
+### D02_heart_transplant_scope
 
-**Question:** Should studies of heart transplantation be eligible?
+**Question:** Should heart transplantation procedures be included as eligible cardiac surgery?
 
-**Why it matters:** Heart transplantation patients have distinct perioperative management and risks that may not generalize to typical cardiac surgical cohorts.
+**Why it matters:** Heart transplantation patients have unique perioperative and immunosuppressive considerations that may affect safety and efficacy outcomes.
 
-**Recommended option:** Exclude heart transplantation.
+**Recommended option:** exclude_heart_transplant
 
-**Recommendation rationale:** Transplant surgery differs markedly in patient selection, immunosuppression, and outcomes; excluding improves homogeneity.
+**Recommendation rationale:** Maintains a more homogeneous surgical population aligned with typical cardiac surgery cohorts (CABG/valve/aortic).
 
 **Suggested options:**
-- Exclude heart transplantation.
-- Include heart transplantation.
-- Include only when mixed with other cardiac surgeries and data for non-transplant surgeries are separable.
+- exclude_heart_transplant
+- include_heart_transplant
 
 **Affected components:**
 - project_config.eligibility
-- project_config.screening.decision_rules
-- project_config.screening.exclusion_reasons
 
-### HD3_vad_implantation
+### D03_vad_scope
 
-**Question:** Should studies of ventricular assist device (VAD) implantation (e.g., LVAD/RVAD) be eligible?
+**Question:** Should ventricular assist device (VAD) implantation procedures be included as eligible cardiac surgery?
 
-**Why it matters:** VAD implantation involves unique perioperative management and outcomes distinct from routine cardiac surgery, potentially biasing effect estimates.
+**Why it matters:** VAD implantation has distinct perioperative risks and patient characteristics that may alter intervention effects and safety outcomes.
 
-**Recommended option:** Exclude VAD implantation.
+**Recommended option:** exclude_vad
 
-**Recommendation rationale:** To maintain a clinically coherent population focused on conventional cardiac surgery.
+**Recommendation rationale:** Preserves homogeneity with conventional open cardiac surgeries (CABG/valve/aortic).
 
 **Suggested options:**
-- Exclude VAD implantation.
-- Include VAD implantation.
-- Include only when mixed with other cardiac surgeries and data for non-VAD surgeries are separable.
+- exclude_vad
+- include_vad
 
 **Affected components:**
 - project_config.eligibility
-- project_config.screening.decision_rules
-- project_config.screening.exclusion_reasons
 
-### HD4_conference_abstracts
+### D04_conference_abstracts
 
-**Question:** Should conference abstracts without full peer-reviewed articles be included?
+**Question:** Should conference abstracts without full-text articles be included?
 
-**Why it matters:** Abstracts may lack methodological detail and full outcome data, affecting risk of bias assessment and synthesis.
+**Why it matters:** Including abstracts can increase recall but may introduce incomplete data and risk of bias; exclusion may omit recent evidence.
 
-**Recommended option:** Exclude conference abstracts without full articles.
+**Recommended option:** exclude_conference_abstracts
 
-**Recommendation rationale:** Excluding abstracts improves data completeness and reduces bias risk in effect estimates.
+**Recommendation rationale:** Conservative default prioritizes data completeness and quality.
 
 **Suggested options:**
-- Exclude conference abstracts without full articles.
-- Include conference abstracts if they report comparative data relevant to the review.
-- Retain conference abstracts during screening but require full article for inclusion; exclude if no full text is available.
+- exclude_conference_abstracts
+- include_conference_abstracts
 
 **Affected components:**
-- project_config.eligibility
-- project_config.screening.decision_rules
-- project_config.screening.exclusion_reasons
-
-### HD5_noncomparative_and_case_series
-
-**Question:** Should non-comparative studies (single-arm, case series) be eligible?
-
-**Why it matters:** Including non-comparative designs may bias effect estimates but could provide safety signals; the choice affects synthesis and risk of bias.
-
-**Recommended option:** Exclude non-comparative designs and case series.
-
-**Recommendation rationale:** The review is focused on comparative effectiveness; excluding non-comparative designs maintains internal validity.
-
-**Suggested options:**
-- Exclude non-comparative designs and case series.
-- Include non-comparative designs for safety outcomes only (no effect estimates vs comparator).
-- Include non-comparative designs if they provide pre-post within-subject comparisons relevant to outcomes.
-
-**Affected components:**
-- project_config.eligibility
-- project_config.screening.decision_rules
-- project_config.screening.exclusion_reasons
-
-### HD6_sotagliflozin_scope
-
-**Question:** Should the dual SGLT1/2 inhibitor sotagliflozin be considered within scope?
-
-**Why it matters:** Sotagliflozin has dual SGLT1/2 activity and may differ mechanistically and in safety profile from pure SGLT2 inhibitors, affecting applicability and heterogeneity.
-
-**Recommended option:** Exclude sotagliflozin (dual SGLT1/2 inhibitor).
-
-**Recommendation rationale:** Maintains a mechanistically coherent exposure group focused on pure SGLT2 inhibitors; sotagliflozin can be considered later if justified.
-
-**Suggested options:**
-- Exclude sotagliflozin (dual SGLT1/2 inhibitor).
-- Include sotagliflozin under the SGLT2 inhibitor umbrella.
-- Include sotagliflozin only if data are reported separately from pure SGLT2 inhibitor agents.
-
-**Affected components:**
-- project_config.eligibility
-- project_config.screening.decision_rules
-- search_terms.search.concepts[C2_SGLT2I]
+- project_config.eligibility.publication_status
+- project_config.screening
 
 
 ## Draft files

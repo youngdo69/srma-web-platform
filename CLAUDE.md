@@ -2,8 +2,6 @@
 
 This is a systematic-review and meta-analysis automation project.
 
-
-
 ## Mandatory Startup Procedure
 
 At the beginning of every coding session or project task:
@@ -37,8 +35,6 @@ For clinical or methodological decisions, distinguish:
 - statistical assumption,
 - unresolved uncertainty.
 
-
-
 ## Definition of Done
 
 When a task changes project progress, completion requires updating
@@ -56,8 +52,6 @@ The update must accurately record:
 Do not report completion without updating the status file.
 Do not mark failed or unvalidated work as completed.
 
-
-
 ## Mandatory Project Context
 
 Read `PROJECT_ROADMAP.md` before modifying this repository.
@@ -74,3 +68,18 @@ The current strategy is:
 6. Complete the one-command universal pipeline last.
 
 Do not prematurely redesign the entire project as a universal framework unless explicitly instructed.
+
+
+## Universal SR-MA Toolkit — File Unity Instruction
+
+Before editing or generating any project code or configuration:
+
+* Inspect the existing target file and all materially related upstream and downstream files.
+* Ask the user to attach missing existing files instead of guessing their contents.
+* Preserve unity across R scripts, utilities, YAML schemas, paths, filenames, outputs, and workflow stages.
+* Prefer modifying the shared source of truth over adding local rescue logic.
+* Do not duplicate normalization, path discovery, schema migration, or validation across scripts.
+* State the expected impact of each change on related files.
+* Confirm that artifact producers and consumers use the same contract.
+* Avoid replacing stable existing structures unless a coordinated migration plan exists.
+* Treat isolated fallback patches as temporary and unacceptable for the final toolkit architecture.

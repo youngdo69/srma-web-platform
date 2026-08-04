@@ -1,35 +1,50 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["project_config", "search_terms", "human_decisions_required", "report"],
+  "required": [
+    "project_config",
+    "search_terms",
+    "human_decisions_required",
+    "report"
+  ],
   "properties": {
     "project_config": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["toolkit", "project", "review", "eligibility", "screening", "paths"],
+      "required": [
+        "schema_version",
+        "project",
+        "research_question",
+        "eligibility",
+        "search",
+        "screening",
+        "data_extraction",
+        "risk_of_bias",
+        "certainty_of_evidence",
+        "reporting",
+        "naming",
+        "paths"
+      ],
       "properties": {
-        "toolkit": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["name", "version"],
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "version": {
-              "type": "string"
-            }
-          }
+        "schema_version": {
+          "type": "string"
         },
         "project": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["id", "slug", "title", "short_name"],
+          "required": [
+            "project_id",
+            "title",
+            "short_name",
+            "output_prefix",
+            "version",
+            "status",
+            "principal_investigator",
+            "clinical_field",
+            "protocol_registration"
+          ],
           "properties": {
-            "id": {
-              "type": "string"
-            },
-            "slug": {
+            "project_id": {
               "type": "string"
             },
             "title": {
@@ -37,47 +52,159 @@
             },
             "short_name": {
               "type": "string"
+            },
+            "output_prefix": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "principal_investigator": {
+              "type": "string"
+            },
+            "clinical_field": {
+              "type": "string"
+            },
+            "protocol_registration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "registry",
+                "registration_number",
+                "registration_date"
+              ],
+              "properties": {
+                "registry": {
+                  "type": "string"
+                },
+                "registration_number": {
+                  "type": "string"
+                },
+                "registration_date": {
+                  "type": "string"
+                }
+              }
             }
           }
         },
-        "review": {
+        "research_question": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["type", "objective", "question", "framework"],
+          "required": [
+            "framework",
+            "question",
+            "population",
+            "intervention",
+            "comparator",
+            "outcomes",
+            "framework_elements"
+          ],
           "properties": {
-            "type": {
-              "type": "string"
-            },
-            "objective": {
+            "framework": {
               "type": "string"
             },
             "question": {
               "type": "string"
             },
-            "framework": {
+            "population": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["name", "elements"],
+              "required": [
+                "description",
+                "values"
+              ],
               "properties": {
-                "name": {
+                "description": {
                   "type": "string"
                 },
-                "elements": {
+                "values": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": ["label", "values"],
-                    "properties": {
-                      "label": {
-                        "type": "string"
-                      },
-                      "values": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      }
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "intervention": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "description",
+                "values"
+              ],
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "comparator": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "description",
+                "values"
+              ],
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "outcomes": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "primary",
+                "secondary"
+              ],
+              "properties": {
+                "primary": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "secondary": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "framework_elements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "label",
+                  "values"
+                ],
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "values": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
                     }
                   }
                 }
@@ -88,7 +215,14 @@
         "eligibility": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["inclusion", "exclusion"],
+          "required": [
+            "inclusion",
+            "exclusion",
+            "study_designs",
+            "language_restriction",
+            "publication_status",
+            "minimum_sample_size"
+          ],
           "properties": {
             "inclusion": {
               "type": "array",
@@ -101,27 +235,189 @@
               "items": {
                 "type": "string"
               }
+            },
+            "study_designs": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "include",
+                "exclude"
+              ],
+              "properties": {
+                "include": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "exclude": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "language_restriction": {
+              "type": "string"
+            },
+            "publication_status": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "include_peer_reviewed_articles",
+                "include_preprints",
+                "include_conference_abstracts"
+              ],
+              "properties": {
+                "include_peer_reviewed_articles": {
+                  "type": "boolean"
+                },
+                "include_preprints": {
+                  "type": "boolean"
+                },
+                "include_conference_abstracts": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "minimum_sample_size": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "search": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "terms_file",
+            "databases",
+            "additional_sources",
+            "search_start_date",
+            "search_end_date"
+          ],
+          "properties": {
+            "terms_file": {
+              "type": "string"
+            },
+            "databases": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pubmed",
+                "embase",
+                "central"
+              ],
+              "properties": {
+                "pubmed": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "enabled",
+                    "display_name"
+                  ],
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "display_name": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "embase": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "enabled",
+                    "display_name"
+                  ],
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "display_name": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "central": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "enabled",
+                    "display_name"
+                  ],
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "display_name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "additional_sources": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "search_start_date": {
+              "type": "string"
+            },
+            "search_end_date": {
+              "type": "string"
             }
           }
         },
         "screening": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["decisions", "decision_rules", "exclusion_reasons"],
+          "required": [
+            "number_of_reviewers",
+            "independent_screening",
+            "disagreement_resolution",
+            "decisions",
+            "decision_rules",
+            "exclusion_reasons",
+            "reviewers"
+          ],
           "properties": {
+            "number_of_reviewers": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "independent_screening": {
+              "type": "boolean"
+            },
+            "disagreement_resolution": {
+              "type": "string"
+            },
             "decisions": {
               "type": "array",
               "minItems": 3,
               "maxItems": 3,
               "items": {
                 "type": "string",
-                "enum": ["Include", "Exclude", "Unclear"]
+                "enum": [
+                  "Include",
+                  "Exclude",
+                  "Unclear"
+                ]
               }
             },
             "decision_rules": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["include", "exclude", "unclear"],
+              "required": [
+                "include",
+                "exclude",
+                "unclear"
+              ],
               "properties": {
                 "include": {
                   "type": "array",
@@ -148,7 +444,11 @@
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["code", "label", "description"],
+                "required": [
+                  "code",
+                  "label",
+                  "description"
+                ],
                 "properties": {
                   "code": {
                     "type": "string"
@@ -161,27 +461,237 @@
                   }
                 }
               }
+            },
+            "reviewers": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reviewer_1",
+                "reviewer_2",
+                "third_reviewer"
+              ],
+              "properties": {
+                "reviewer_1": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "initials"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "initials": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "reviewer_2": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "initials"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "initials": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "third_reviewer": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "initials"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "initials": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "data_extraction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reviewers",
+            "independent_extraction",
+            "disagreement_resolution"
+          ],
+          "properties": {
+            "reviewers": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "independent_extraction": {
+              "type": "boolean"
+            },
+            "disagreement_resolution": {
+              "type": "string"
+            }
+          }
+        },
+        "risk_of_bias": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "randomized_trials",
+            "nonrandomized_studies"
+          ],
+          "properties": {
+            "randomized_trials": {
+              "type": "string"
+            },
+            "nonrandomized_studies": {
+              "type": "string"
+            }
+          }
+        },
+        "certainty_of_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "framework"
+          ],
+          "properties": {
+            "framework": {
+              "type": "string"
+            }
+          }
+        },
+        "reporting": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "guideline",
+            "target_journal"
+          ],
+          "properties": {
+            "guideline": {
+              "type": "string"
+            },
+            "target_journal": {
+              "type": "string"
+            }
+          }
+        },
+        "naming": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pubmed_basename",
+            "embase_basename",
+            "central_basename",
+            "merged_records_basename",
+            "deduplicated_records_basename",
+            "removed_duplicates_basename",
+            "deduplication_map_basename",
+            "prisma_counts_basename",
+            "screening_workbook_basename",
+            "completed_screening_workbook_basename"
+          ],
+          "properties": {
+            "pubmed_basename": {
+              "type": "string"
+            },
+            "embase_basename": {
+              "type": "string"
+            },
+            "central_basename": {
+              "type": "string"
+            },
+            "merged_records_basename": {
+              "type": "string"
+            },
+            "deduplicated_records_basename": {
+              "type": "string"
+            },
+            "removed_duplicates_basename": {
+              "type": "string"
+            },
+            "deduplication_map_basename": {
+              "type": "string"
+            },
+            "prisma_counts_basename": {
+              "type": "string"
+            },
+            "screening_workbook_basename": {
+              "type": "string"
+            },
+            "completed_screening_workbook_basename": {
+              "type": "string"
             }
           }
         },
         "paths": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["raw_data", "processed_data", "screening_results", "logs", "search_strategies"],
+          "required": [
+            "search_terms_file",
+            "search_strategies_directory",
+            "raw_search_directory",
+            "pubmed_directory",
+            "embase_directory",
+            "central_directory",
+            "processed_search_directory",
+            "processed_screening_directory",
+            "screening_results_directory",
+            "logs_directory",
+            "figures_directory",
+            "tables_directory",
+            "manuscript_directory"
+          ],
           "properties": {
-            "raw_data": {
+            "search_terms_file": {
               "type": "string"
             },
-            "processed_data": {
+            "search_strategies_directory": {
               "type": "string"
             },
-            "screening_results": {
+            "raw_search_directory": {
               "type": "string"
             },
-            "logs": {
+            "pubmed_directory": {
               "type": "string"
             },
-            "search_strategies": {
+            "embase_directory": {
+              "type": "string"
+            },
+            "central_directory": {
+              "type": "string"
+            },
+            "processed_search_directory": {
+              "type": "string"
+            },
+            "processed_screening_directory": {
+              "type": "string"
+            },
+            "screening_results_directory": {
+              "type": "string"
+            },
+            "logs_directory": {
+              "type": "string"
+            },
+            "figures_directory": {
+              "type": "string"
+            },
+            "tables_directory": {
+              "type": "string"
+            },
+            "manuscript_directory": {
               "type": "string"
             }
           }
@@ -191,12 +701,20 @@
     "search_terms": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["project", "search", "validation"],
+      "required": [
+        "project",
+        "search",
+        "validation"
+      ],
       "properties": {
         "project": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["id", "title", "short_name"],
+          "required": [
+            "id",
+            "title",
+            "short_name"
+          ],
           "properties": {
             "id": {
               "type": "string"
@@ -212,14 +730,28 @@
         "search": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["concepts", "combination", "outcome_terms_policy"],
+          "required": [
+            "concepts",
+            "combination",
+            "outcome_terms_policy"
+          ],
           "properties": {
             "concepts": {
               "type": "array",
+              "minItems": 2,
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["concept_id", "label", "role", "required", "free_text_terms", "abbreviations", "spelling_variants", "controlled_vocabulary"],
+                "required": [
+                  "concept_id",
+                  "label",
+                  "role",
+                  "required",
+                  "free_text_terms",
+                  "abbreviations",
+                  "spelling_variants",
+                  "controlled_vocabulary"
+                ],
                 "properties": {
                   "concept_id": {
                     "type": "string"
@@ -254,7 +786,10 @@
                   "controlled_vocabulary": {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["pubmed_mesh_candidates", "embase_emtree_candidates"],
+                    "required": [
+                      "pubmed_mesh_candidates",
+                      "embase_emtree_candidates"
+                    ],
                     "properties": {
                       "pubmed_mesh_candidates": {
                         "type": "array",
@@ -276,10 +811,16 @@
             "combination": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["operator_between_concepts", "notes"],
+              "required": [
+                "operator_between_concepts",
+                "notes"
+              ],
               "properties": {
                 "operator_between_concepts": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "AND"
+                  ]
                 },
                 "notes": {
                   "type": "string"
@@ -294,7 +835,10 @@
         "validation": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["known_relevant_ids", "controlled_vocabulary_requires_verification"],
+          "required": [
+            "known_relevant_ids",
+            "controlled_vocabulary_requires_verification"
+          ],
           "properties": {
             "known_relevant_ids": {
               "type": "array",
@@ -314,7 +858,16 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["decision_id", "question", "why_it_matters", "suggested_options", "recommended_option", "recommendation_rationale", "affected_components", "option_patches"],
+        "required": [
+          "decision_id",
+          "question",
+          "why_it_matters",
+          "suggested_options",
+          "recommended_option",
+          "recommendation_rationale",
+          "affected_components",
+          "option_patches"
+        ],
         "properties": {
           "decision_id": {
             "type": "string"
@@ -348,7 +901,10 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["option", "operations"],
+              "required": [
+                "option",
+                "operations"
+              ],
               "properties": {
                 "option": {
                   "type": "string"
@@ -358,11 +914,22 @@
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["target", "path", "operation", "value_json", "match_key", "match_value_json", "rationale"],
+                    "required": [
+                      "target",
+                      "path",
+                      "operation",
+                      "value_json",
+                      "match_key",
+                      "match_value_json",
+                      "rationale"
+                    ],
                     "properties": {
                       "target": {
                         "type": "string",
-                        "enum": ["project_config", "search_terms"]
+                        "enum": [
+                          "project_config",
+                          "search_terms"
+                        ]
                       },
                       "path": {
                         "type": "array",
@@ -372,7 +939,13 @@
                       },
                       "operation": {
                         "type": "string",
-                        "enum": ["set", "append_unique", "remove_value", "append_record", "remove_record_by_key"]
+                        "enum": [
+                          "set",
+                          "append_unique",
+                          "remove_value",
+                          "append_record",
+                          "remove_record_by_key"
+                        ]
                       },
                       "value_json": {
                         "type": "string"
@@ -398,7 +971,11 @@
     "report": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["summary", "assumptions", "warnings"],
+      "required": [
+        "summary",
+        "assumptions",
+        "warnings"
+      ],
       "properties": {
         "summary": {
           "type": "string"

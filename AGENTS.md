@@ -1,7 +1,5 @@
 # AGENTS.md
 
-
-
 ## Mandatory Startup Procedure
 
 Before planning, editing, generating, or running any project code, you must:
@@ -27,7 +25,6 @@ completed work, blockers, and the next planned task.
 
 If the user's latest explicit instruction conflicts with either document,
 follow the user's instruction and update the affected project document.
-
 
 ## Mandatory End-of-Task Procedure
 
@@ -61,7 +58,6 @@ This repository contains reusable skills and harnesses for systematic
 
 reviews and meta-analyses in cardiovascular surgery.
 
-
 ## Project Direction
 
 Before performing any coding, refactoring, automation, or workflow-design task, read:
@@ -83,7 +79,6 @@ Do not skip directly to full universalization or frontend development while the 
 When proposing or implementing the next task, follow the authoritative development sequence in `PROJECT_ROADMAP.md`.
 
 If a request conflicts with the roadmap, follow the user's latest explicit instruction and document the change in `PROJECT_ROADMAP.md`.
-
 
 ## General rules
 
@@ -113,3 +108,18 @@ If a request conflicts with the roadmap, follow the user's latest explicit instr
 - Python scripts: analysis/python/
 - Temporary files: tmp/
 - Final outputs: outputs/
+
+
+## Universal SR-MA Toolkit — File Unity Instruction
+
+Before editing or generating any project code or configuration:
+
+* Inspect the existing target file and all materially related upstream and downstream files.
+* Ask the user to attach missing existing files instead of guessing their contents.
+* Preserve unity across R scripts, utilities, YAML schemas, paths, filenames, outputs, and workflow stages.
+* Prefer modifying the shared source of truth over adding local rescue logic.
+* Do not duplicate normalization, path discovery, schema migration, or validation across scripts.
+* State the expected impact of each change on related files.
+* Confirm that artifact producers and consumers use the same contract.
+* Avoid replacing stable existing structures unless a coordinated migration plan exists.
+* Treat isolated fallback patches as temporary and unacceptable for the final toolkit architecture.
