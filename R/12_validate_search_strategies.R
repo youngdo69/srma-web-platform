@@ -1,28 +1,100 @@
-# Cardiac Surgery SR-MA Toolkit v2.0
-# Validate generated PubMed, Embase, and CENTRAL search strategies
+# ============================================================
+# Universal SR-MA Agent Toolkit
+# R/12_validate_search_strategies.R
 #
-# IMPORTANT:
-# This script performs structural and syntax-pattern checks only.
-# Final validity must still be confirmed by running each query
-# in the corresponding database interface.
+# Purpose
+# ------------------------------------------------------------
+# 1. Load the active canonical project configuration
+# 2. Resolve search-strategy and log paths through path_utils.R
+# 3. Validate only databases enabled in project_config.yml
+# 4. Preserve the established structural and syntax checks
+#
+# IMPORTANT
+# ------------------------------------------------------------
+# This script performs local structural and syntax-pattern
+# checks only. Final validity must still be confirmed by
+# running each query in the corresponding database interface.
+# ============================================================
+
 
 # ---------------------------------------------------------
-# File paths
+# Load canonical project configuration and paths
 # ---------------------------------------------------------
 
-strategy_files <- c(
-  PubMed = "search_strategies/pubmed_search.txt",
-  Embase = "search_strategies/embase_search.txt",
-  CENTRAL = "search_strategies/central_search.txt"
+source("R/utils/config_utils.R")
+source("R/utils/path_utils.R")
+
+config <- load_project_config(
+  "config/project_config.yml",
+  validate = TRUE,
+  quiet = TRUE
 )
 
-output_csv <- "results/logs/search_strategy_validation.csv"
-output_txt <- "results/logs/search_strategy_validation_report.txt"
+paths <- build_project_paths(
+  config = config,
+  create_directories = TRUE,
+  validate = TRUE
+)
 
-dir.create(
-  "results/logs",
-  recursive = TRUE,
-  showWarnings = FALSE
+enabled_databases <- get_enabled_databases(
+  config,
+  validate = FALSE
+)
+
+database_display_names <- c(
+  pubmed = "PubMed",
+  embase = "Embase",
+  central = "CENTRAL"
+)
+
+canonical_strategy_files <- c(
+  pubmed = paths$pubmed_search,
+  embase = paths$embase_search,
+  central = paths$central_search
+)
+
+supported_enabled_databases <- intersect(
+  enabled_databases,
+  names(canonical_strategy_files)
+)
+
+if (length(supported_enabled_databases) == 0L) {
+  stop(
+    "No supported databases are enabled in project_config.yml.\n",
+    "Supported databases: pubmed, embase, central"
+  )
+}
+
+unsupported_enabled_databases <- setdiff(
+  enabled_databases,
+  names(canonical_strategy_files)
+)
+
+if (length(unsupported_enabled_databases) > 0L) {
+  warning(
+    "Enabled databases without an R/12 validator were skipped: ",
+    paste(unsupported_enabled_databases, collapse = ", ")
+  )
+}
+
+strategy_files <- canonical_strategy_files[
+  supported_enabled_databases
+]
+
+names(strategy_files) <- unname(
+  database_display_names[
+    supported_enabled_databases
+  ]
+)
+
+output_csv <- file.path(
+  paths$logs_directory,
+  "search_strategy_validation.csv"
+)
+
+output_txt <- file.path(
+  paths$logs_directory,
+  "search_strategy_validation_report.txt"
 )
 
 # ---------------------------------------------------------
@@ -598,6 +670,25 @@ validate_strategy <- function(
 }
 
 # ---------------------------------------------------------
+# Display canonical inputs
+# ---------------------------------------------------------
+
+cat("\n")
+cat("Canonical search-strategy inputs\n")
+cat("--------------------------------\n")
+
+for (database in names(strategy_files)) {
+  cat(
+    database,
+    ": ",
+    strategy_files[[database]],
+    "\n",
+    sep = ""
+  )
+}
+
+
+# ---------------------------------------------------------
 # Run validation
 # ---------------------------------------------------------
 
@@ -641,7 +732,7 @@ readr::write_csv(
 )
 
 report_lines <- c(
-  "Cardiac Surgery SR-MA Toolkit v2.0",
+  "Universal SR-MA Agent Toolkit",
   "Search Strategy Validation Report",
   paste0("Generated: ", Sys.time()),
   "",
@@ -728,6 +819,10 @@ if (nrow(failed_results) == 0) {
     "\n"
   )
 
+  cat(
+    "\nPASS: R/12 canonical-path validation completed successfully.\n"
+  )
+
 } else {
 
   cat(
@@ -736,6 +831,12 @@ if (nrow(failed_results) == 0) {
     "\n2. Correct the corresponding search strategy.",
     "\n3. Run this validation script again.",
     "\n"
+  )
+
+  stop(
+    "R/12 canonical-path validation failed: ",
+    nrow(failed_results),
+    " check(s) did not pass."
   )
 }
 

@@ -1,0 +1,32 @@
+resolved_human_decisions:
+- decision_id: D01_transcatheter_scope
+  question: Should transcatheter-only cardiac procedures (e.g., TAVR/TAVI, MitraClip,
+    PCI) be included as eligible populations?
+  recommended_option: exclude_transcatheter_only
+  selected_option: exclude_transcatheter_only
+  status: approved
+  approved_at: 2026-08-05 22:47:38
+  approval_source: interactive_review
+- decision_id: D02_heart_transplant_scope
+  question: Should heart transplantation procedures be included as eligible cardiac
+    surgery?
+  recommended_option: exclude_heart_transplant
+  selected_option: exclude_heart_transplant
+  status: approved
+  approved_at: 2026-08-05 22:47:39
+  approval_source: interactive_review
+- decision_id: D03_vad_scope
+  question: Should ventricular assist device (VAD) implantation procedures be included
+    as eligible cardiac surgery?
+  recommended_option: exclude_vad
+  selected_option: exclude_vad
+  status: approved
+  approved_at: 2026-08-05 22:47:40
+  approval_source: interactive_review
+- decision_id: D04_conference_abstracts
+  question: Should conference abstracts without full-text articles be included?
+  recommended_option: exclude_conference_abstracts
+  selected_option: exclude_conference_abstracts
+  status: approved
+  approved_at: 2026-08-05 22:47:42
+  approval_source: interactive_review

@@ -1,0 +1,247 @@
+schema_version: '1.0'
+project:
+  project_id: sglt2_inhibitors_cardiac_surgery
+  title: 'Efficacy and safety of preoperative or perioperative SGLT2 inhibitors in
+    adult cardiac surgery: a systematic review and meta-analysis'
+  short_name: sglt2i_card_surg
+  output_prefix: sglt2_inhibitors_cardiac_surgery
+  version: '1.0'
+  status: protocol_and_search_development
+  principal_investigator: ''
+  clinical_field: cardiothoracic surgery
+  protocol_registration:
+    registry: ''
+    registration_number: ''
+    registration_date: ''
+research_question:
+  framework: PICOS
+  question: In adult patients undergoing cardiac surgery, does preoperative or perioperative
+    exposure to SGLT2 inhibitors, compared with no SGLT2 inhibitor use, placebo, or
+    standard care, improve efficacy and safety outcomes?
+  population:
+    description: Adults undergoing open cardiac surgical procedures
+    values:
+    - Cardiac surgery (open procedures)
+    - Coronary artery bypass grafting
+    - Cardiac valve surgery
+    - Aortic surgery
+  intervention:
+    description: Preoperative or perioperative exposure to SGLT2 inhibitors
+    values:
+    - Dapagliflozin
+    - Empagliflozin
+    - Canagliflozin
+    - Ertugliflozin
+    - Ipragliflozin
+  comparator:
+    description: No SGLT2 inhibitor use, placebo, or standard care
+    values:
+    - No SGLT2 inhibitor
+    - Placebo
+    - Standard care
+  outcomes:
+    primary:
+    - Postoperative acute kidney injury
+    - In-hospital mortality
+    secondary:
+    - Postoperative heart failure
+    - Major adverse cardiovascular events
+    - Euglycemic diabetic ketoacidosis
+    - Length of hospital stay
+  framework_elements:
+  - label: Population
+    values:
+    - Adults undergoing open cardiac surgery (e.g., CABG, valve, aortic surgery)
+  - label: Intervention/Exposure
+    values:
+    - Preoperative or perioperative SGLT2 inhibitor exposure
+  - label: Comparator
+    values:
+    - No SGLT2 inhibitor, placebo, or standard care
+  - label: Outcomes
+    values:
+    - Acute kidney injury
+    - Mortality
+    - Heart failure
+    - Major adverse cardiovascular events
+    - Euglycemic diabetic ketoacidosis
+    - Length of stay
+  - label: Study designs
+    values:
+    - Randomized controlled trials
+    - Prospective comparative cohort studies
+    - Retrospective comparative cohort studies
+eligibility:
+  inclusion:
+  - Human adults (≥18 years)
+  - Patients undergoing open cardiac surgery (e.g., CABG, valve, aortic procedures)
+  - Preoperative or perioperative exposure to SGLT2 inhibitors
+  - Comparator group present (no SGLT2 inhibitor, placebo, or standard care)
+  - Reports at least one prespecified efficacy or safety outcome
+  exclusion:
+  - Non-human studies
+  - Pediatric populations
+  - Transcatheter-only cardiac procedures (e.g., TAVR/TAVI, MitraClip, PCI)
+  - Heart transplantation surgery
+  - Ventricular assist device implantation
+  - Non-comparative designs (e.g., single-arm studies, case reports, case series)
+  - Non-original research (e.g., reviews, editorials, letters without primary data)
+  - Insufficient data for outcome extraction
+  study_designs:
+    include:
+    - Randomized controlled trials
+    - Prospective comparative cohort studies
+    - Retrospective comparative cohort studies
+    exclude:
+    - Non-comparative observational studies
+    - Case reports
+    - Case series
+    - Cross-sectional studies without a comparator
+    - Narrative reviews
+    - Systematic reviews
+    - Editorials, letters without primary data
+  language_restriction: no_restriction
+  publication_status:
+    include_peer_reviewed_articles: yes
+    include_preprints: no
+    include_conference_abstracts: no
+  minimum_sample_size: 0
+search:
+  terms_file: config/search_terms.yml
+  databases:
+    pubmed:
+      enabled: yes
+      display_name: PubMed/MEDLINE
+    embase:
+      enabled: yes
+      display_name: Embase
+    central:
+      enabled: yes
+      display_name: Cochrane CENTRAL
+  additional_sources:
+  - Backward and forward citation chasing of included studies
+  - ClinicalTrials.gov
+  - WHO International Clinical Trials Registry Platform (ICTRP)
+  search_start_date: inception
+  search_end_date: ''
+screening:
+  number_of_reviewers: 2
+  independent_screening: yes
+  disagreement_resolution: third_reviewer
+  decisions:
+  - Include
+  - Exclude
+  - Unclear
+  decision_rules:
+    include:
+    - Comparative study of adult patients undergoing open cardiac surgery with preoperative
+      or perioperative SGLT2 inhibitor exposure versus no SGLT2 inhibitor, placebo,
+      or standard care
+    - Reports at least one prespecified outcome
+    exclude:
+    - Wrong population (not cardiac surgery or not adults)
+    - Wrong intervention/exposure (no SGLT2 inhibitor exposure)
+    - Wrong comparator (no comparative group)
+    - Ineligible study design (e.g., non-comparative, case report/series)
+    - Conference abstract only (unless policy is changed to include)
+    - Not original research
+    unclear:
+    - Population or exposure uncertain from title/abstract
+    - Comparator not clearly described
+    - Outcomes or timing unclear
+  exclusion_reasons:
+  - code: E01
+    label: Not human adult population
+    description: Study includes non-human subjects or pediatric population (<18 years).
+  - code: E02
+    label: Not a cardiac surgical population
+    description: Population does not undergo open cardiac surgery (e.g., general cardiology
+      patients).
+  - code: E03
+    label: Ineligible intervention/exposure
+    description: No exposure to SGLT2 inhibitors or exposure limited to other agents
+      only.
+  - code: E04
+    label: Ineligible comparator
+    description: No comparative group (e.g., placebo, standard care, or no SGLT2 inhibitor)
+      reported.
+  - code: E05
+    label: Ineligible study design
+    description: Non-comparative design (e.g., single-arm study, case report, case
+      series) or cross-sectional without comparator.
+  - code: E06
+    label: Conference abstract only
+    description: Conference abstract without corresponding full-text article.
+  - code: E07
+    label: Not original research
+    description: Review, editorial, commentary, or letter without primary data.
+  - code: E08
+    label: Insufficient outcome data
+    description: Does not report extractable data for prespecified outcomes.
+  - code: E09
+    label: Transcatheter-only procedure
+    description: Study limited to transcatheter procedures (e.g., TAVR/TAVI, PCI,
+      MitraClip).
+  - code: E10
+    label: Heart transplantation population
+    description: Population limited to heart transplant recipients or procedures.
+  - code: E11
+    label: Ventricular assist device population
+    description: Population limited to VAD implantation or management.
+  - code: E12
+    label: Duplicate
+    description: Duplicate record or overlapping dataset already included.
+  - code: E13
+    label: Outside perioperative window
+    description: Exposure or outcomes unrelated to the preoperative or perioperative
+      period of cardiac surgery.
+  - code: E14
+    label: Full text not available
+    description: Full text unavailable after reasonable effort.
+  reviewers:
+    reviewer_1:
+      name: ''
+      initials: ''
+    reviewer_2:
+      name: ''
+      initials: ''
+    third_reviewer:
+      name: ''
+      initials: ''
+data_extraction:
+  reviewers: 2
+  independent_extraction: yes
+  disagreement_resolution: third_reviewer
+risk_of_bias:
+  randomized_trials: Cochrane RoB 2
+  nonrandomized_studies: ROBINS-I
+certainty_of_evidence:
+  framework: GRADE
+reporting:
+  guideline: PRISMA 2020
+  target_journal: ''
+naming:
+  pubmed_basename: pubmed_sglt2_inhibitors_cardiac_surgery
+  embase_basename: embase_sglt2_inhibitors_cardiac_surgery
+  central_basename: central_sglt2_inhibitors_cardiac_surgery
+  merged_records_basename: all_database_records_before_deduplication
+  deduplicated_records_basename: deduplicated_records_for_screening
+  removed_duplicates_basename: removed_duplicate_records
+  deduplication_map_basename: deduplication_map
+  prisma_counts_basename: search_and_deduplication_counts
+  screening_workbook_basename: title_abstract_screening_workbook
+  completed_screening_workbook_basename: title_abstract_screening_completed
+paths:
+  search_terms_file: config/search_terms.yml
+  search_strategies_directory: search_strategies
+  raw_search_directory: data/raw/search
+  pubmed_directory: data/raw/search/pubmed
+  embase_directory: data/raw/search/embase
+  central_directory: data/raw/search/central
+  processed_search_directory: data/processed/search
+  processed_screening_directory: data/processed/screening
+  screening_results_directory: results/screening
+  logs_directory: results/logs
+  figures_directory: results/figures
+  tables_directory: results/tables
+  manuscript_directory: results/manuscript

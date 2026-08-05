@@ -1,0 +1,179 @@
+human_decisions_required:
+- decision_id: D01_transcatheter_scope
+  question: Should transcatheter-only cardiac procedures (e.g., TAVR/TAVI, MitraClip,
+    PCI) be included as eligible populations?
+  why_it_matters: Including transcatheter procedures broadens the population beyond
+    open cardiac surgery and may change risk profiles and perioperative management,
+    affecting applicability and heterogeneity.
+  suggested_options:
+  - exclude_transcatheter_only
+  - include_transcatheter_only
+  recommended_option: exclude_transcatheter_only
+  recommendation_rationale: The review is targeted to open surgical cardiac procedures;
+    transcatheter interventions are procedurally and perioperatively distinct.
+  affected_components:
+  - project_config.eligibility
+  - project_config.screening
+  option_patches:
+  - option: exclude_transcatheter_only
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: append_unique
+      value_json: '"Transcatheter-only cardiac procedures (e.g., TAVR/TAVI, MitraClip,
+        PCI)"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Ensure explicit exclusion remains in scope definition.
+  - option: include_transcatheter_only
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: remove_value
+      value_json: '"Transcatheter-only cardiac procedures (e.g., TAVR/TAVI, MitraClip,
+        PCI)"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Remove exclusion to allow transcatheter populations.
+    - target: project_config
+      path:
+      - eligibility
+      - inclusion
+      operation: append_unique
+      value_json: '"Transcatheter cardiac procedures (e.g., TAVR/TAVI, MitraClip,
+        PCI) are eligible"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Clarify broadened population in inclusion criteria.
+- decision_id: D02_heart_transplant_scope
+  question: Should heart transplantation procedures be included as eligible cardiac
+    surgery?
+  why_it_matters: Heart transplantation patients have unique perioperative and immunosuppressive
+    considerations that may affect safety and efficacy outcomes.
+  suggested_options:
+  - exclude_heart_transplant
+  - include_heart_transplant
+  recommended_option: exclude_heart_transplant
+  recommendation_rationale: Maintains a more homogeneous surgical population aligned
+    with typical cardiac surgery cohorts (CABG/valve/aortic).
+  affected_components:
+  - project_config.eligibility
+  option_patches:
+  - option: exclude_heart_transplant
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: append_unique
+      value_json: '"Heart transplantation surgery"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Keep transplant procedures outside current scope.
+  - option: include_heart_transplant
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: remove_value
+      value_json: '"Heart transplantation surgery"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Permit inclusion of transplant cohorts.
+    - target: project_config
+      path:
+      - eligibility
+      - inclusion
+      operation: append_unique
+      value_json: '"Heart transplantation procedures are eligible"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Record scope expansion explicitly.
+- decision_id: D03_vad_scope
+  question: Should ventricular assist device (VAD) implantation procedures be included
+    as eligible cardiac surgery?
+  why_it_matters: VAD implantation has distinct perioperative risks and patient characteristics
+    that may alter intervention effects and safety outcomes.
+  suggested_options:
+  - exclude_vad
+  - include_vad
+  recommended_option: exclude_vad
+  recommendation_rationale: Preserves homogeneity with conventional open cardiac surgeries
+    (CABG/valve/aortic).
+  affected_components:
+  - project_config.eligibility
+  option_patches:
+  - option: exclude_vad
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: append_unique
+      value_json: '"Ventricular assist device implantation"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Keep VAD procedures outside current scope.
+  - option: include_vad
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - exclusion
+      operation: remove_value
+      value_json: '"Ventricular assist device implantation"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Permit inclusion of VAD implantation cohorts.
+    - target: project_config
+      path:
+      - eligibility
+      - inclusion
+      operation: append_unique
+      value_json: '"Ventricular assist device implantation procedures are eligible"'
+      match_key: ''
+      match_value_json: ''
+      rationale: Record scope expansion explicitly.
+- decision_id: D04_conference_abstracts
+  question: Should conference abstracts without full-text articles be included?
+  why_it_matters: Including abstracts can increase recall but may introduce incomplete
+    data and risk of bias; exclusion may omit recent evidence.
+  suggested_options:
+  - exclude_conference_abstracts
+  - include_conference_abstracts
+  recommended_option: exclude_conference_abstracts
+  recommendation_rationale: Conservative default prioritizes data completeness and
+    quality.
+  affected_components:
+  - project_config.eligibility.publication_status
+  - project_config.screening
+  option_patches:
+  - option: exclude_conference_abstracts
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - publication_status
+      - include_conference_abstracts
+      operation: set
+      value_json: 'false'
+      match_key: ''
+      match_value_json: ''
+      rationale: Maintain exclusion of abstracts for data quality.
+  - option: include_conference_abstracts
+    operations:
+    - target: project_config
+      path:
+      - eligibility
+      - publication_status
+      - include_conference_abstracts
+      operation: set
+      value_json: 'true'
+      match_key: ''
+      match_value_json: ''
+      rationale: Permit inclusion of abstracts to maximize recall.

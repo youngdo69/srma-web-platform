@@ -1,0 +1,3 @@
+concept_id,concept_label,concept_role,required,free_text_term_count,pubmed_mesh_count,embase_emtree_count
+population,Adult patients undergoing open cardiac surgery,population,TRUE,16,4,4
+intervention,"SGLT2 inhibitors (gliflozins), preoperative or perioperative exposure",intervention,TRUE,14,5,5

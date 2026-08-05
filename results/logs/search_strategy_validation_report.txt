@@ -1,6 +1,6 @@
-Cardiac Surgery SR-MA Toolkit v2.0
+Universal SR-MA Agent Toolkit
 Search Strategy Validation Report
-Generated: 2026-07-30 01:01:26.644461
+Generated: 2026-08-05 23:17:45.88842
 
 SUMMARY
 --------------------------------------------------
@@ -50,35 +50,35 @@ DETAILED RESULTS
   CENTRAL database_specific  no_embase_explosion   TRUE
                                                                                                  message
                                                              The search-strategy file must not be empty.
-                                                                          Search length: 706 characters.
+                                                                         Search length: 1583 characters.
                                                           Opening parentheses: 2; closing parentheses: 2
                                                                         Boolean placement appears valid.
-                                                                              AND count: 1; OR count: 15
+                                                                              AND count: 1; OR count: 37
                                                                No duplicated search lines were detected.
-                                                                                  Double-quote count: 24
+                                                                                  Double-quote count: 60
                                                     At least one [Title/Abstract] field tag is required.
                    No MeSH field tag was detected. This may be acceptable only if intentionally omitted.
                                                   CENTRAL-style :ti,ab,kw syntax was detected in PubMed.
                                                            Embase-style syntax may be present in PubMed.
-                                                Opening square brackets: 17; closing square brackets: 17
+                                                Opening square brackets: 39; closing square brackets: 39
                                                              The search-strategy file must not be empty.
-                                                                          Search length: 637 characters.
+                                                                         Search length: 1342 characters.
                                                           Opening parentheses: 2; closing parentheses: 2
                                                                         Boolean placement appears valid.
-                                                                              AND count: 1; OR count: 16
+                                                                              AND count: 1; OR count: 37
                                                                No duplicated search lines were detected.
-                                                                                  Single-quote count: 36
+                                                                                  Single-quote count: 78
                                                    At least one :ti,ab,kw field restriction is required.
  No exploded Emtree term using '/exp was detected. This may be acceptable only if intentionally omitted.
                                                         PubMed-style field tags were detected in Embase.
                                                   CENTRAL MeSH syntax [mh "..."] was detected in Embase.
                                                              The search-strategy file must not be empty.
-                                                                          Search length: 599 characters.
+                                                                         Search length: 1364 characters.
                                                           Opening parentheses: 2; closing parentheses: 2
                                                                         Boolean placement appears valid.
-                                                                              AND count: 1; OR count: 15
+                                                                              AND count: 1; OR count: 37
                                                                No duplicated search lines were detected.
-                                                                                  Double-quote count: 24
+                                                                                  Double-quote count: 60
                                                    At least one :ti,ab,kw field restriction is required.
    No CENTRAL MeSH syntax [mh "..."] was detected. This may be acceptable only if intentionally omitted.
                                                        PubMed-style field tags were detected in CENTRAL.

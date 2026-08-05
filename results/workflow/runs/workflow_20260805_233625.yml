@@ -1,0 +1,26 @@
+run_id: workflow_20260805_233625
+workflow: universal_srma_initialization_to_search
+runner_version: 1.0.0
+started_at: 2026-08-05 23:36:25
+completed_at: 2026-08-05 23:36:25
+status: failed
+resume_requested: yes
+from_step: ''
+steps:
+  initialization_validation:
+    status: skipped
+    reason: RECOVERED — valid artifacts found
+    validation:
+      passed: yes
+      message: Initialization validation reports zero errors.
+      summary_file: results/logs/project_initialization_validation_summary.csv
+  human_decision_review:
+    status: skipped
+    reason: RECOVERED — valid artifacts found
+    validation:
+      passed: yes
+      message: No unresolved Human Decisions remain.
+  human_decision_finalization:
+    status: failed
+    error: No Human Decisions were found.
+error: No Human Decisions were found.

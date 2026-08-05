@@ -1,4 +1,4 @@
-database,output_file,intervention_term_count,procedure_term_count,perioperative_concept_used,generated_at
-PubMed,search_strategies/pubmed_search.txt,7,8,FALSE,2026-07-30 00:43:48.901646
-Embase,search_strategies/embase_search.txt,7,8,FALSE,2026-07-30 00:43:48.901646
-CENTRAL,search_strategies/central_search.txt,7,8,FALSE,2026-07-30 00:43:48.901646
+database,output_file,schema_type,concept_count,generated_at
+PubMed,C:/Users/Jason/Projects/srma-agent-toolkit/search_strategies/pubmed_search.txt,concept_based,2,2026-08-05 22:51:49.727746
+Embase,C:/Users/Jason/Projects/srma-agent-toolkit/search_strategies/embase_search.txt,concept_based,2,2026-08-05 22:51:49.727746
+CENTRAL,C:/Users/Jason/Projects/srma-agent-toolkit/search_strategies/central_search.txt,concept_based,2,2026-08-05 22:51:49.727746

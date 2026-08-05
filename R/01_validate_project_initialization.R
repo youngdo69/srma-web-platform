@@ -41,6 +41,13 @@ first_scalar_character <- function(x, default = "") {
   if (length(values) == 0L) default else values[[1]]
 }
 
+is_nonempty_scalar_character <- function(x) {
+  is.character(x) &&
+    length(x) == 1L &&
+    !is.na(x) &&
+    nzchar(trimws(x))
+}
+
 first_scalar_logical <- function(x, default = FALSE) {
   if (is.null(x) || length(x) == 0L) {
     return(default)
@@ -552,12 +559,24 @@ decisions_document <- yaml::read_yaml(decisions_file)
 errors <- character(0)
 warnings <- character(0)
 
+# ------------------------------------------------------------
+# Validate canonical project-config contract
+# ------------------------------------------------------------
+# This validator must match the active configuration contract
+# consumed by config_utils.R, path_utils.R, and R/11-R/20.
+
 required_project_sections <- c(
-  "toolkit",
+  "schema_version",
   "project",
-  "review",
+  "research_question",
   "eligibility",
+  "search",
   "screening",
+  "data_extraction",
+  "risk_of_bias",
+  "certainty_of_evidence",
+  "reporting",
+  "naming",
   "paths"
 )
 
@@ -570,8 +589,330 @@ if (length(missing_project_sections) > 0L) {
   errors <- c(
     errors,
     paste(
-      "Missing project sections:",
+      "Missing canonical project sections:",
       paste(missing_project_sections, collapse = ", ")
+    )
+  )
+}
+
+
+# ------------------------------------------------------------
+# Validate project metadata required downstream
+# ------------------------------------------------------------
+
+required_project_fields <- c(
+  "project_id",
+  "title",
+  "short_name",
+  "output_prefix",
+  "version"
+)
+
+missing_project_fields <- required_project_fields[
+  !vapply(
+    required_project_fields,
+    function(field_name) {
+      is_nonempty_scalar_character(
+        project_config$project[[field_name]]
+      )
+    },
+    logical(1)
+  )
+]
+
+if (length(missing_project_fields) > 0L) {
+  errors <- c(
+    errors,
+    paste(
+      "Missing or empty project fields:",
+      paste(
+        paste0("project.", missing_project_fields),
+        collapse = ", "
+      )
+    )
+  )
+}
+
+filename_safe_pattern <- "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+
+for (field_name in c("project_id", "output_prefix")) {
+  field_value <- project_config$project[[field_name]]
+
+  if (
+    is_nonempty_scalar_character(field_value) &&
+    !grepl(filename_safe_pattern, field_value)
+  ) {
+    errors <- c(
+      errors,
+      paste0(
+        "project.",
+        field_name,
+        " contains unsupported filename characters: ",
+        field_value
+      )
+    )
+  }
+}
+
+
+# ------------------------------------------------------------
+# Validate research-question compatibility fields
+# ------------------------------------------------------------
+
+required_research_question_fields <- c(
+  "framework",
+  "question",
+  "population",
+  "intervention",
+  "comparator",
+  "outcomes",
+  "framework_elements"
+)
+
+missing_research_question_fields <-
+  required_research_question_fields[
+    vapply(
+      required_research_question_fields,
+      function(field_name) {
+        is.null(
+          project_config$research_question[[field_name]]
+        )
+      },
+      logical(1)
+    )
+  ]
+
+if (length(missing_research_question_fields) > 0L) {
+  errors <- c(
+    errors,
+    paste(
+      "Missing research-question fields:",
+      paste(
+        paste0(
+          "research_question.",
+          missing_research_question_fields
+        ),
+        collapse = ", "
+      )
+    )
+  )
+}
+
+
+# ------------------------------------------------------------
+# Validate configured databases
+# ------------------------------------------------------------
+
+database_config <- project_config$search$databases
+
+if (is.null(database_config) || length(database_config) == 0L) {
+  errors <- c(
+    errors,
+    "No database configuration was found at search.databases."
+  )
+} else {
+  enabled_database_names <- names(database_config)[
+    vapply(
+      database_config,
+      function(database) {
+        if (is.logical(database)) {
+          return(isTRUE(database))
+        }
+
+        if (is.list(database)) {
+          return(isTRUE(database$enabled))
+        }
+
+        FALSE
+      },
+      logical(1)
+    )
+  ]
+
+  if (length(enabled_database_names) == 0L) {
+    errors <- c(
+      errors,
+      "At least one database must be enabled at search.databases."
+    )
+  }
+}
+
+
+# ------------------------------------------------------------
+# Validate naming contract used by path_utils.R
+# ------------------------------------------------------------
+
+required_naming_fields <- c(
+  "pubmed_basename",
+  "embase_basename",
+  "central_basename",
+  "merged_records_basename",
+  "deduplicated_records_basename",
+  "removed_duplicates_basename",
+  "deduplication_map_basename",
+  "prisma_counts_basename",
+  "screening_workbook_basename",
+  "completed_screening_workbook_basename"
+)
+
+missing_naming_fields <- required_naming_fields[
+  !vapply(
+    required_naming_fields,
+    function(field_name) {
+      is_nonempty_scalar_character(
+        project_config$naming[[field_name]]
+      )
+    },
+    logical(1)
+  )
+]
+
+if (length(missing_naming_fields) > 0L) {
+  errors <- c(
+    errors,
+    paste(
+      "Missing or empty naming fields:",
+      paste(
+        paste0("naming.", missing_naming_fields),
+        collapse = ", "
+      )
+    )
+  )
+}
+
+
+# ------------------------------------------------------------
+# Validate path contract used by path_utils.R
+# ------------------------------------------------------------
+
+required_path_fields <- c(
+  "search_terms_file",
+  "search_strategies_directory",
+  "raw_search_directory",
+  "pubmed_directory",
+  "embase_directory",
+  "central_directory",
+  "processed_search_directory",
+  "processed_screening_directory",
+  "screening_results_directory",
+  "logs_directory"
+)
+
+missing_path_fields <- required_path_fields[
+  !vapply(
+    required_path_fields,
+    function(field_name) {
+      is_nonempty_scalar_character(
+        project_config$paths[[field_name]]
+      )
+    },
+    logical(1)
+  )
+]
+
+if (length(missing_path_fields) > 0L) {
+  errors <- c(
+    errors,
+    paste(
+      "Missing or empty path fields:",
+      paste(
+        paste0("paths.", missing_path_fields),
+        collapse = ", "
+      )
+    )
+  )
+}
+
+
+# ------------------------------------------------------------
+# Validate cross-file project identity and search-term path
+# ------------------------------------------------------------
+
+project_id <- first_scalar_character(
+  project_config$project$project_id
+)
+
+search_project_id <- first_scalar_character(
+  search_terms$project$id
+)
+
+if (
+  nzchar(project_id) &&
+  nzchar(search_project_id) &&
+  !identical(project_id, search_project_id)
+) {
+  errors <- c(
+    errors,
+    paste0(
+      "Project ID mismatch between project_config and search_terms: ",
+      project_id,
+      " vs ",
+      search_project_id
+    )
+  )
+}
+
+project_title <- first_scalar_character(
+  project_config$project$title
+)
+
+search_project_title <- first_scalar_character(
+  search_terms$project$title
+)
+
+if (
+  nzchar(project_title) &&
+  nzchar(search_project_title) &&
+  !identical(project_title, search_project_title)
+) {
+  errors <- c(
+    errors,
+    "Project title mismatch between project_config and search_terms."
+  )
+}
+
+project_short_name <- first_scalar_character(
+  project_config$project$short_name
+)
+
+search_short_name <- first_scalar_character(
+  search_terms$project$short_name
+)
+
+if (
+  nzchar(project_short_name) &&
+  nzchar(search_short_name) &&
+  !identical(project_short_name, search_short_name)
+) {
+  errors <- c(
+    errors,
+    "Project short name mismatch between project_config and search_terms."
+  )
+}
+
+configured_search_terms_file <- first_scalar_character(
+  project_config$paths$search_terms_file
+)
+
+declared_search_terms_file <- first_scalar_character(
+  project_config$search$terms_file
+)
+
+if (
+  nzchar(configured_search_terms_file) &&
+  nzchar(declared_search_terms_file) &&
+  !identical(
+    configured_search_terms_file,
+    declared_search_terms_file
+  )
+) {
+  errors <- c(
+    errors,
+    paste0(
+      "Search-terms path mismatch: paths.search_terms_file = ",
+      configured_search_terms_file,
+      "; search.terms_file = ",
+      declared_search_terms_file
     )
   )
 }
@@ -904,27 +1245,47 @@ normalized_snapshot <- list(
   human_decisions_required = human_decisions
 )
 
+validation_logs_directory <- first_scalar_character(
+  project_config$paths$logs_directory,
+  default = "results/logs"
+)
+
 dir.create(
-  "results/logs",
+  validation_logs_directory,
   recursive = TRUE,
   showWarnings = FALSE
 )
 
+validation_report_file <- file.path(
+  validation_logs_directory,
+  "project_initialization_validation.csv"
+)
+
+validation_summary_file <- file.path(
+  validation_logs_directory,
+  "project_initialization_validation_summary.csv"
+)
+
+normalized_snapshot_file <- file.path(
+  validation_logs_directory,
+  "project_initialization_normalized_snapshot.json"
+)
+
 utils::write.csv(
   report,
-  "results/logs/project_initialization_validation.csv",
+  validation_report_file,
   row.names = FALSE
 )
 
 utils::write.csv(
   summary_report,
-  "results/logs/project_initialization_validation_summary.csv",
+  validation_summary_file,
   row.names = FALSE
 )
 
 jsonlite::write_json(
   normalized_snapshot,
-  "results/logs/project_initialization_normalized_snapshot.json",
+  normalized_snapshot_file,
   pretty = TRUE,
   auto_unbox = TRUE,
   null = "null"
@@ -957,6 +1318,11 @@ if (length(warnings) > 0L) {
     "\n"
   )
 }
+
+cat("\nValidation reports saved:\n")
+cat("- ", validation_report_file, "\n", sep = "")
+cat("- ", validation_summary_file, "\n", sep = "")
+cat("- ", normalized_snapshot_file, "\n", sep = "")
 
 cat(
   "\nDo not activate the drafts until human decisions are resolved.\n"

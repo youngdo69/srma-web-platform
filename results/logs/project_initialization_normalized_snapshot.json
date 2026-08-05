@@ -2,167 +2,128 @@
   "screening_decisions": ["Include", "Exclude", "Unclear"],
   "exclusion_reasons": [
     {
-      "code": "POP",
-      "label": "Not the target population/procedure",
-      "description": "Population is not adults undergoing cardiac surgery (e.g., non-surgical, non-cardiac surgery)."
+      "code": "E01",
+      "label": "Not human adult population",
+      "description": "Study includes non-human subjects or pediatric population (<18 years)."
     },
     {
-      "code": "PROC",
-      "label": "Wrong setting/procedure",
-      "description": "Study focuses on transcatheter cardiac procedures, heart transplantation, or VAD implantation without eligible surgical cohorts."
+      "code": "E02",
+      "label": "Not a cardiac surgical population",
+      "description": "Population does not undergo open cardiac surgery (e.g., general cardiology patients)."
     },
     {
-      "code": "INT",
-      "label": "Not SGLT2 inhibitor exposure",
-      "description": "Intervention/exposure does not include an SGLT2 inhibitor agent or class."
+      "code": "E03",
+      "label": "Ineligible intervention/exposure",
+      "description": "No exposure to SGLT2 inhibitors or exposure limited to other agents only."
     },
     {
-      "code": "TIME",
-      "label": "Exposure not perioperative/preoperative",
-      "description": "SGLT2 exposure is unrelated to the index surgical episode (e.g., chronic outpatient use only without perioperative relevance)."
+      "code": "E04",
+      "label": "Ineligible comparator",
+      "description": "No comparative group (e.g., placebo, standard care, or no SGLT2 inhibitor) reported."
     },
     {
-      "code": "COMP",
-      "label": "No eligible comparator",
-      "description": "No non-SGLT2 comparator, placebo, or standard care arm available."
-    },
-    {
-      "code": "DES",
+      "code": "E05",
       "label": "Ineligible study design",
-      "description": "Non-comparative design (single-arm), case series, case report, narrative review, editorial, or letter without original comparative data."
+      "description": "Non-comparative design (e.g., single-arm study, case report, case series) or cross-sectional without comparator."
     },
     {
-      "code": "NONHUM",
-      "label": "Not human",
-      "description": "Animal, in vitro, or preclinical research."
-    },
-    {
-      "code": "AGE",
-      "label": "Pediatric population",
-      "description": "Participants are <18 years old or predominantly pediatric."
-    },
-    {
-      "code": "TYPE",
-      "label": "Non-original/secondary source",
-      "description": "Review, guideline, commentary, or other non-original research."
-    },
-    {
-      "code": "CONF",
+      "code": "E06",
       "label": "Conference abstract only",
-      "description": "Abstract without a corresponding full-text article available."
+      "description": "Conference abstract without corresponding full-text article."
     },
     {
-      "code": "DUP",
-      "label": "Duplicate/superseded",
-      "description": "Duplicate record or superseded by a more complete publication."
+      "code": "E07",
+      "label": "Not original research",
+      "description": "Review, editorial, commentary, or letter without primary data."
     },
     {
-      "code": "OUT",
-      "label": "No relevant outcomes",
-      "description": "Does not report any of the prespecified outcomes."
+      "code": "E08",
+      "label": "Insufficient outcome data",
+      "description": "Does not report extractable data for prespecified outcomes."
+    },
+    {
+      "code": "E09",
+      "label": "Transcatheter-only procedure",
+      "description": "Study limited to transcatheter procedures (e.g., TAVR/TAVI, PCI, MitraClip)."
+    },
+    {
+      "code": "E10",
+      "label": "Heart transplantation population",
+      "description": "Population limited to heart transplant recipients or procedures."
+    },
+    {
+      "code": "E11",
+      "label": "Ventricular assist device population",
+      "description": "Population limited to VAD implantation or management."
+    },
+    {
+      "code": "E12",
+      "label": "Duplicate",
+      "description": "Duplicate record or overlapping dataset already included."
+    },
+    {
+      "code": "E13",
+      "label": "Outside perioperative window",
+      "description": "Exposure or outcomes unrelated to the preoperative or perioperative period of cardiac surgery."
+    },
+    {
+      "code": "E14",
+      "label": "Full text not available",
+      "description": "Full text unavailable after reasonable effort."
     }
   ],
   "search_concepts": [
     {
-      "concept_id": "C1",
-      "label": "SGLT2 inhibitor class and agents",
-      "role": "exposure/drug class",
+      "concept_id": "population",
+      "label": "Adult patients undergoing open cardiac surgery",
+      "role": "population",
       "required": true,
-      "free_text_terms": ["sodium-glucose cotransporter 2 inhibitor*", "sodium glucose cotransporter 2 inhibitor*", "sodium-glucose co-transporter 2 inhibitor*", "sodium glucose co-transporter 2 inhibitor*", "SGLT2 inhibitor*", "SGLT-2 inhibitor*", "gliflozin*", "dapagliflozin", "canagliflozin", "empagliflozin", "ertugliflozin", "ipragliflozin", "luseogliflozin", "tofogliflozin", "remogliflozin", "sotagliflozin"],
-      "abbreviations": ["SGLT2i", "SGLT-2i"],
-      "spelling_variants": ["sodium-glucose transporter 2", "sodium glucose transporter 2", "co transporter 2", "co-transporter 2"],
+      "free_text_terms": ["cardiac surgery", "heart surgery", "open-heart surgery", "coronary artery bypass", "coronary artery bypass grafting", "coronary bypass", "CABG", "valve surgery", "valve replacement", "valvular surgery", "aortic surgery", "aortic root replacement", "aortic arch surgery"],
+      "abbreviations": "CABG",
+      "spelling_variants": ["open heart surgery", "valvular operation", "coronary by-pass"],
       "controlled_vocabulary": {
-        "pubmed_mesh_candidates": ["Sodium-Glucose Transporter 2 Inhibitors", "Dapagliflozin", "Canagliflozin", "Empagliflozin", "Ertugliflozin", "Ipragliflozin", "Luseogliflozin", "Tofogliflozin", "Sotagliflozin", "Remogliflozin"],
-        "embase_emtree_candidates": ["sodium glucose cotransporter 2 inhibitor/", "dapagliflozin/", "canagliflozin/", "empagliflozin/", "ertugliflozin/", "ipragliflozin/", "luseogliflozin/", "tofogliflozin/", "sotagliflozin/", "remogliflozin etabonate/"]
+        "pubmed_mesh_candidates": ["Cardiac Surgical Procedures", "Coronary Artery Bypass", "Heart Valve Prosthesis Implantation", "Aortic Aneurysm, Thoracic"],
+        "embase_emtree_candidates": ["heart surgery", "coronary artery bypass graft", "heart valve replacement", "aorta surgery"]
       }
     },
     {
-      "concept_id": "C2",
-      "label": "Cardiac surgery population and procedures",
-      "role": "population/procedure",
+      "concept_id": "intervention",
+      "label": "SGLT2 inhibitors (gliflozins), preoperative or perioperative exposure",
+      "role": "intervention",
       "required": true,
-      "free_text_terms": ["cardiac surg*", "heart surg*", "open heart surg*", "open-heart surg*", "cardiothoracic surg*", "coronary artery bypass", "coronary bypass", "aortocoronary bypass", "bypass graft*", "CABG", "ACB", "valve surg*", "valvular surg*", "valve replacement", "valve repair", "aortic valve replacement", "mitral valve replacement", "mitral repair", "tricuspid valve surgery", "aortic surg*", "aorta surg*", "ascending aorta", "aortic root replacement", "Bentall", "hemiarch", "arch replacement", "sternotomy", "cardiopulmonary bypass", "CPB", "on pump", "off pump", "OPCAB", "SAVR"],
-      "abbreviations": ["CABG", "AVR", "MVR", "MVr", "TVR", "CPB", "OPCAB", "SAVR"],
-      "spelling_variants": ["coronary revascularisation", "coronary revascularization", "cardio-thoracic"],
+      "free_text_terms": ["sodium-glucose cotransporter 2 inhibitor", "sodium-glucose co-transporter 2 inhibitor", "sglt2 inhibitor", "gliflozin", "dapagliflozin", "empagliflozin", "canagliflozin", "ertugliflozin", "ipragliflozin"],
+      "abbreviations": ["SGLT2", "SGLT2i"],
+      "spelling_variants": ["sodium glucose cotransporter 2 inhibitor", "sodium glucose co-transporter 2 inhibitor", "co transporter 2"],
       "controlled_vocabulary": {
-        "pubmed_mesh_candidates": ["Cardiac Surgical Procedures", "Coronary Artery Bypass", "Heart Valve Prosthesis Implantation", "Aorta/surgery", "Aortic Aneurysm/surgery", "Cardiopulmonary Bypass", "Thoracic Surgery"],
-        "embase_emtree_candidates": ["heart surgery/", "coronary artery bypass graft/", "heart valve surgery/", "heart valve replacement/", "aortic surgery/", "aorta surgery/", "cardiothoracic surgery/", "cardiopulmonary bypass/", "sternotomy/"]
-      }
-    },
-    {
-      "concept_id": "C3",
-      "label": "Perioperative timing (optional sensitivity)",
-      "role": "context/timing",
-      "required": false,
-      "free_text_terms": ["perioperativ*", "peri-operativ*", "preoperativ*", "pre-operativ*", "presurg*", "pre-surg*", "postsurg*", "post-surg*", "postoperativ*", "around the time of surgery", "before surg*", "after surg*", "preop", "postop", "periop"],
-      "abbreviations": ["preop", "postop", "periop"],
-      "spelling_variants": ["pre-operative", "post-operative", "peri-operative"],
-      "controlled_vocabulary": {
-        "pubmed_mesh_candidates": ["Perioperative Period", "Preoperative Period", "Perioperative Care"],
-        "embase_emtree_candidates": ["perioperative period/", "preoperative period/", "perioperative care/"]
+        "pubmed_mesh_candidates": ["Sodium-Glucose Transporter 2 Inhibitors", "Dapagliflozin", "Empagliflozin", "Canagliflozin", "Ertugliflozin"],
+        "embase_emtree_candidates": ["sodium glucose cotransporter 2 inhibitor", "dapagliflozin", "empagliflozin", "canagliflozin", "ertugliflozin"]
       }
     }
   ],
   "human_decisions_required": [
     {
-      "decision_id": "HD1-procedure-scope-transcatheter",
-      "question": "Should isolated transcatheter cardiac procedures (e.g., TAVR/TAVI, MitraClip, WATCHMAN) be included?",
-      "why_it_matters": "Including these procedures broadens the population beyond open surgical cardiac procedures and may introduce different perioperative risk profiles and care pathways.",
-      "suggested_options": ["Exclude (default)", "Include", "Include only if converted to open surgery or combined with open surgical procedures"]
+      "decision_id": "D01_transcatheter_scope",
+      "question": "Should transcatheter-only cardiac procedures (e.g., TAVR/TAVI, MitraClip, PCI) be included as eligible populations?",
+      "why_it_matters": "Including transcatheter procedures broadens the population beyond open cardiac surgery and may change risk profiles and perioperative management, affecting applicability and heterogeneity.",
+      "suggested_options": ["exclude_transcatheter_only", "include_transcatheter_only"]
     },
     {
-      "decision_id": "HD2-procedure-scope-transplant",
-      "question": "Should heart transplantation be included?",
-      "why_it_matters": "Transplant recipients have distinct perioperative management and outcomes that may not generalize to routine cardiac surgery.",
-      "suggested_options": ["Exclude (default)", "Include as a separate subgroup", "Include"]
+      "decision_id": "D02_heart_transplant_scope",
+      "question": "Should heart transplantation procedures be included as eligible cardiac surgery?",
+      "why_it_matters": "Heart transplantation patients have unique perioperative and immunosuppressive considerations that may affect safety and efficacy outcomes.",
+      "suggested_options": ["exclude_heart_transplant", "include_heart_transplant"]
     },
     {
-      "decision_id": "HD3-procedure-scope-VAD",
-      "question": "Should durable ventricular assist device (VAD) implantation be included?",
-      "why_it_matters": "VAD implantation involves unique indications and perioperative considerations distinct from CABG/valve/aortic surgery.",
-      "suggested_options": ["Exclude (default)", "Include as a separate subgroup", "Include"]
+      "decision_id": "D03_vad_scope",
+      "question": "Should ventricular assist device (VAD) implantation procedures be included as eligible cardiac surgery?",
+      "why_it_matters": "VAD implantation has distinct perioperative risks and patient characteristics that may alter intervention effects and safety outcomes.",
+      "suggested_options": ["exclude_vad", "include_vad"]
     },
     {
-      "decision_id": "HD4-exposure-window",
-      "question": "What perioperative exposure window qualifies as eligible SGLT2 inhibitor exposure?",
-      "why_it_matters": "Defines which studies qualify (e.g., chronic users up to day of surgery; initiation within a defined pre/postoperative window).",
-      "suggested_options": ["Preoperative use continued up to the day of surgery (or held per protocol) counts as exposure", "Initiation within 30 days pre-op to 7 days post-op counts as exposure", "Restrict to exposure from 7 days pre-op to 48 hours post-op", "Other (specify)"]
-    },
-    {
-      "decision_id": "HD5-exposure-withheld",
-      "question": "If SGLT2 inhibitors are routinely withheld immediately preoperatively in chronic users, do such patients still count as exposed?",
-      "why_it_matters": "Common perioperative practice may classify users as exposed despite temporary withholding; misclassification impacts effect estimates.",
-      "suggested_options": ["Count as exposed if regular preoperative users (default)", "Require active dosing within X days before surgery (specify window)"]
-    },
-    {
-      "decision_id": "HD6-agent-scope-dual",
-      "question": "Should dual SGLT1/2 inhibitors (e.g., sotagliflozin) be included as part of the SGLT2 class?",
-      "why_it_matters": "Including dual inhibitors may introduce mechanistic heterogeneity but may be relevant to class effects.",
-      "suggested_options": ["Include", "Exclude (default)", "Include but analyze separately"]
-    },
-    {
-      "decision_id": "HD7-agent-scope-regional",
-      "question": "Should region-specific or less widely used SGLT2 agents (e.g., ipragliflozin, luseogliflozin, tofogliflozin, remogliflozin) be included?",
-      "why_it_matters": "Affects comprehensiveness and heterogeneity; names vary across regions and indexing.",
-      "suggested_options": ["Include (default)", "Exclude", "Include only if approved/available in study region"]
-    },
-    {
-      "decision_id": "HD8-design-quasi-experimental",
-      "question": "Should quasi-experimental comparative designs (e.g., before-after, interrupted time series, difference-in-differences) be eligible?",
-      "why_it_matters": "These designs can provide comparative evidence but differ from RCTs/cohorts in risk of bias and analytic requirements.",
-      "suggested_options": ["Include (analyze separately)", "Exclude (default)"]
-    },
-    {
-      "decision_id": "HD9-comparator-scope",
-      "question": "Is comparison against other antidiabetic agents (without SGLT2 inhibitors) acceptable as eligible comparators?",
-      "why_it_matters": "Determines inclusion of studies comparing SGLT2 inhibitors versus other glucose-lowering therapies beyond placebo/standard care.",
-      "suggested_options": ["Include (default)", "Exclude", "Include only specific classes (specify)"]
-    },
-    {
-      "decision_id": "HD10-conference-abstracts",
-      "question": "Should conference abstracts without a full-text article be included?",
-      "why_it_matters": "Affects coverage, risk of bias, and data completeness; many perioperative studies are presented first as abstracts.",
-      "suggested_options": ["Exclude (default)", "Include if sufficient data for effect estimates", "Include and seek additional information from authors"]
+      "decision_id": "D04_conference_abstracts",
+      "question": "Should conference abstracts without full-text articles be included?",
+      "why_it_matters": "Including abstracts can increase recall but may introduce incomplete data and risk of bias; exclusion may omit recent evidence.",
+      "suggested_options": ["exclude_conference_abstracts", "include_conference_abstracts"]
     }
   ]
 }
