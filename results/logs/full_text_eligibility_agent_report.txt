@@ -1,0 +1,51 @@
+Universal SR-MA Agent Toolkit
+TASK-011 — Multimodal Full-Text Eligibility
+
+Generated at: 2026-08-09 22:53:55
+Project ID: sglt2_inhibitors_cardiac_surgery
+Project title: Efficacy and safety of preoperative or perioperative SGLT2 inhibitors in adult cardiac surgery: a systematic review and meta-analysis
+
+CANONICAL INPUT
+--------------------------------------------------
+Full-text registry: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/full_text/full_text_registry.csv
+Registry records: 30
+
+AGENT REVIEW
+--------------------------------------------------
+Agent Reviewer 1: Agent Reviewer 1 — Full Text
+Provider: openai
+Model: gpt-5
+Valid decisions: 30
+Include: 25
+Exclude: 3
+Human Review Required: 2
+Full-text PDF evidence: 17
+Metadata-only evidence: 13
+Unresolved failures: 0
+Missing agent decisions: 0
+
+TWO-STAGE ROLE PRESERVATION
+--------------------------------------------------
+Final human reviewer: 1st Author
+Author final decision fields populated by R/23: NO
+Second independent human reviewer used: NO
+Conflict/adjudication stage used: NO
+
+OUTPUTS
+--------------------------------------------------
+Eligibility workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/full_text/full_text_eligibility_agent.xlsx
+Decision log: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/full_text_eligibility_agent_decisions.csv
+Failure log: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/full_text_eligibility_agent_failures.csv
+Checkpoint: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/full_text_eligibility_agent_checkpoint.csv
+Report: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/full_text_eligibility_agent_report.txt
+
+STAGE BOUNDARY
+--------------------------------------------------
+Authoritative Included Studies created: NO
+Runner integration performed: NO
+Next action after PASS: 1st Author completes Author_Final_Review
+Next script after author review: TASK-012 — Final Included Studies
+
+TASK STATUS
+--------------------------------------------------
+TASK-011 Agent Stage: PASS
