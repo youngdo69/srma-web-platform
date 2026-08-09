@@ -34,8 +34,17 @@ source("R/utils/path_utils.R")
 source("R/utils/screening_prompt_utils.R")
 source("R/utils/llm_provider_utils.R")
 
-config <- load_project_config(quiet = FALSE)
-paths <- build_project_paths(config, create_directories = TRUE)
+config <- load_project_config(
+  "config/project_config.yml",
+  validate = TRUE,
+  quiet = FALSE
+)
+
+paths <- build_project_paths(
+  config = config,
+  create_directories = TRUE,
+  validate = TRUE
+)
 
 agent_config_file <- "config/agent_screening.yml"
 if (!file.exists(agent_config_file)) {
@@ -56,15 +65,31 @@ project_title <- get_project_title(config)
 decision_options <- get_screening_decisions(config)
 exclusion_reason_table <- get_exclusion_reasons(config)
 
-review_question <- config$review$question %||%
-  config$eligibility$review_question %||%
-  config$project$review_question %||%
-  "Not explicitly specified in project_config.yml"
+review_question <- config$research_question$question
 
-inclusion_criteria <- config$eligibility$inclusion %||%
-  config$screening$inclusion_criteria %||%
-  config$review$inclusion_criteria %||%
-  "Apply the finalized review protocol."
+if (
+  is.null(review_question) ||
+  !is.character(review_question) ||
+  length(review_question) != 1L ||
+  !nzchar(trimws(review_question))
+) {
+  stop(
+    "Canonical research_question.question is missing or empty.",
+    call. = FALSE
+  )
+}
+
+inclusion_criteria <- config$eligibility$inclusion
+
+if (
+  is.null(inclusion_criteria) ||
+  length(inclusion_criteria) == 0L
+) {
+  stop(
+    "Canonical eligibility.inclusion is missing or empty.",
+    call. = FALSE
+  )
+}
 
 provider_config <- agent_config$provider
 provider_config$timeout_seconds <- agent_config$processing$timeout_seconds %||% 120
@@ -73,6 +98,35 @@ provider_name <- provider_config$name
 model_name <- provider_config$model
 reviewer_name <- agent_config$reviewer$name %||% "Agent Reviewer 1"
 prompt_version <- agent_config$prompt$version %||% "unknown"
+
+human_reviewer_2_name <- get_reviewer_name(
+  config,
+  reviewer = "reviewer_2",
+  fallback = "Human Reviewer 2"
+)
+
+human_adjudicator_name <- get_reviewer_name(
+  config,
+  reviewer = "third_reviewer",
+  fallback = "Human Adjudicator"
+)
+
+if (
+  identical(
+    trimws(tolower(reviewer_name)),
+    trimws(tolower(human_reviewer_2_name))
+  ) ||
+  identical(
+    trimws(tolower(reviewer_name)),
+    trimws(tolower(human_adjudicator_name))
+  )
+) {
+  stop(
+    "Agent Reviewer 1 must be distinct from the human Reviewer 2 ",
+    "and human adjudicator identities.",
+    call. = FALSE
+  )
+}
 
 input_workbook <- paths$screening_workbook
 
@@ -172,10 +226,162 @@ if (resume_enabled && file.exists(checkpoint_file)) {
   )
 }
 
-completed_ids <- if (nrow(decision_log) > 0L) {
-  unique(decision_log$screening_id[decision_log$validation_status == "valid"])
-} else {
-  character(0)
+# completed_ids will be finalized only after checkpoint rows are
+# revalidated against the CURRENT project screening policy.
+completed_ids <- character(0)
+
+
+# ============================================================
+# Resume hydration
+# ------------------------------------------------------------
+# When resuming from a checkpoint, Reviewer_1 is reloaded from
+# the pristine R/18 workbook. Therefore previously completed
+# checkpoint decisions must be restored into reviewer_data
+# before those records are skipped in the main loop.
+# ============================================================
+
+if (
+  resume_enabled &&
+  nrow(decision_log) > 0L
+) {
+
+  valid_checkpoint_rows <- decision_log[
+    decision_log$validation_status == "valid",
+    ,
+    drop = FALSE
+  ]
+
+  # Revalidate historical checkpoint rows against the CURRENT
+  # decision and exclusion-reason policy before restoring them.
+  current_reason_pairs <- paste(
+    exclusion_reason_table$code,
+    exclusion_reason_table$label,
+    sep = "||"
+  )
+
+  checkpoint_policy_valid <- vapply(
+    seq_len(nrow(valid_checkpoint_rows)),
+    function(i) {
+      row <- valid_checkpoint_rows[i, , drop = FALSE]
+
+      decision <- as.character(row$decision[[1]])
+      reason_code <- as.character(row$exclusion_reason_code[[1]])
+      reason_label <- as.character(row$exclusion_reason[[1]])
+      confidence <- as.character(row$confidence[[1]])
+
+      if (!decision %in% decision_options) {
+        return(FALSE)
+      }
+
+      if (!confidence %in% agent_config$decision_policy$allowed_confidence) {
+        return(FALSE)
+      }
+
+      if (identical(decision, "Exclude")) {
+        return(
+          paste(reason_code, reason_label, sep = "||") %in%
+            current_reason_pairs
+        )
+      }
+
+      !nzchar(trimws(reason_code)) &&
+        !nzchar(trimws(reason_label))
+    },
+    logical(1)
+  )
+
+  invalid_checkpoint_rows <- valid_checkpoint_rows[
+    !checkpoint_policy_valid,
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(invalid_checkpoint_rows) > 0L) {
+    cat(
+      "Checkpoint policy refresh: ",
+      nrow(invalid_checkpoint_rows),
+      " previously valid record(s) will be re-screened because ",
+      "they no longer satisfy the current screening policy.\n",
+      sep = ""
+    )
+  }
+
+  valid_checkpoint_rows <- valid_checkpoint_rows[
+    checkpoint_policy_valid,
+    ,
+    drop = FALSE
+  ]
+
+  # Keep only currently valid checkpoint rows in the in-memory log.
+  # Re-screened IDs will replace stale historical rows in this run.
+  decision_log <- valid_checkpoint_rows
+
+  completed_ids <- unique(
+    valid_checkpoint_rows$screening_id
+  )
+
+  if (anyDuplicated(valid_checkpoint_rows$screening_id) > 0L) {
+    stop(
+      "Checkpoint contains duplicated valid screening IDs.",
+      call. = FALSE
+    )
+  }
+
+  checkpoint_index <- match(
+    reviewer_data$screening_id,
+    valid_checkpoint_rows$screening_id
+  )
+
+  restore_rows <- which(
+    !is.na(checkpoint_index)
+  )
+
+  if (length(restore_rows) > 0L) {
+
+    checkpoint_rows <- valid_checkpoint_rows[
+      checkpoint_index[restore_rows],
+      ,
+      drop = FALSE
+    ]
+
+    reviewer_data$reviewer[restore_rows] <-
+      checkpoint_rows$reviewer
+
+    reviewer_data$decision[restore_rows] <-
+      checkpoint_rows$decision
+
+    reviewer_data$exclusion_reason[restore_rows] <-
+      ifelse(
+        checkpoint_rows$decision == "Exclude",
+        checkpoint_rows$exclusion_reason,
+        NA_character_
+      )
+
+    reviewer_data$confidence[restore_rows] <-
+      checkpoint_rows$confidence
+
+    reviewer_data$notes[restore_rows] <- paste0(
+      "[Agent rationale] ",
+      checkpoint_rows$rationale,
+      " [Reason code: ",
+      ifelse(
+        nzchar(checkpoint_rows$exclusion_reason_code),
+        checkpoint_rows$exclusion_reason_code,
+        "NA"
+      ),
+      "]"
+    )
+
+    reviewer_data$screened_at[restore_rows] <-
+      checkpoint_rows$completed_at
+
+    cat(
+      "Restored ",
+      length(restore_rows),
+      " valid checkpoint decision(s) into Reviewer_1.\n",
+      sep = ""
+    )
+  }
 }
 
 json_schema <- build_screening_json_schema(
@@ -507,6 +713,59 @@ report_lines <- c(
 
 writeLines(report_lines, report_file, useBytes = TRUE)
 
+# ============================================================
+# TASK-008 R/19 standalone validation
+# ============================================================
+
+required_outputs <- c(
+  agent_workbook = output_workbook,
+  decision_log = decisions_file,
+  failure_log = failures_file,
+  checkpoint = checkpoint_file,
+  report = report_file
+)
+
+output_nonempty <- vapply(
+  required_outputs,
+  function(file_path) {
+    file.exists(file_path) &&
+      !is.na(file.info(file_path)$size) &&
+      file.info(file_path)$size > 0
+  },
+  logical(1)
+)
+
+if (!all(output_nonempty)) {
+  failed_outputs <- names(required_outputs)[!output_nonempty]
+
+  stop(
+    "TASK-008 R/19 standalone validation failed. Missing or empty output(s): ",
+    paste(failed_outputs, collapse = ", "),
+    call. = FALSE
+  )
+}
+
+if (nrow(failure_log) > 0L) {
+  stop(
+    "TASK-008 R/19 standalone validation failed: ",
+    nrow(failure_log),
+    " record(s) failed agent screening.",
+    call. = FALSE
+  )
+}
+
+agent_nonblank <- !is.na(reviewer_data$decision) &
+  nzchar(trimws(as.character(reviewer_data$decision)))
+
+if (!all(agent_nonblank)) {
+  stop(
+    "TASK-008 R/19 standalone validation failed: ",
+    sum(!agent_nonblank),
+    " Reviewer_1 record(s) remain unscreened.",
+    call. = FALSE
+  )
+}
+
 cat("\n====================================================\n")
 cat("Agent Screening Complete\n")
 cat("====================================================\n\n")
@@ -514,3 +773,4 @@ cat("Workbook:", output_workbook, "\n")
 cat("Decision log:", decisions_file, "\n")
 cat("Failure log:", failures_file, "\n")
 cat("Report:", report_file, "\n")
+cat("\nPASS: TASK-008 R/19 Agent Reviewer 1 screening completed successfully.\n")

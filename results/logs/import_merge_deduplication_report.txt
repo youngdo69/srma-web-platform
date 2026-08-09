@@ -1,39 +1,23 @@
-SR-MA Agent Toolkit v2.0
+Universal SR-MA Agent Toolkit
 Search Import, Merge, and Deduplication Report
 
-Project ID: sglt2i_cardiac_surgery
-Review title: Effects of SGLT2 Inhibitors in Patients Undergoing Cardiac Surgery
-Configuration file: C:/Users/Jason/Projects/srma-agent-toolkit/config/project_config.yml
-Enabled databases: pubmed, embase, central
-Completed at: 2026-08-02 11:48:45
+Completed at: 2026-08-08 22:59:34
 
 DATABASE COUNTS
 --------------------------------------------------
-PubMed: 131
+PubMed: 198
 Embase: 25
 CENTRAL: 53
-Total before deduplication: 209
-Duplicates removed: 23
-Records after deduplication: 186
+Total before deduplication: 276
+Duplicates removed: 24
+Records after deduplication: 252
 
 DEDUPLICATION HIERARCHY
 --------------------------------------------------
 1. Exact normalized title and publication year
 2. Exact normalized DOI
-3. Exact normalized PMID
-4. Unique internal record ID
-
-VALIDATION
---------------------------------------------------
-Merged-record count valid: TRUE
-Deduplication arithmetic valid: TRUE
-Deduplication-map row count valid: TRUE
-
-INPUT FILES
---------------------------------------------------
-PubMed: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/pubmed/pubmed_sglt2i_cardiac_surgery.csv
-Embase: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/embase/embase_sglt2i_cardiac_surgery.ris
-CENTRAL: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/central/central_sglt2i_cardiac_surgery.ris
+3. Exact PMID
+4. Unique source record
 
 OUTPUT FILES
 --------------------------------------------------

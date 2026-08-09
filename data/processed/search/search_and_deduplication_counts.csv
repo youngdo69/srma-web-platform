@@ -1,7 +1,7 @@
 stage,count
-Records identified from PubMed,131
+Records identified from PubMed,198
 Records identified from Embase,25
 Records identified from CENTRAL,53
-Total records before deduplication,209
-Duplicate records removed,23
-Records after deduplication,186
+Total records before deduplication,276
+Duplicate records removed,24
+Records after deduplication,252

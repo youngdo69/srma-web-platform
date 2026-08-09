@@ -1,10 +1,10 @@
-workflow: universal_srma_initialization_to_search
-runner_version: 1.0.0
+workflow: universal_srma_phase1
+runner_version: 2.0.0
 status: completed
 current_step: ''
 started_at: 2026-08-05 23:36:25
-updated_at: 2026-08-05 23:46:04
-completed_at: 2026-08-05 23:46:04
+updated_at: 2026-08-09 16:14:52
+completed_at: 2026-08-09 16:14:52
 last_error: ''
 completed_steps:
 - initialization_validation
@@ -12,6 +12,15 @@ completed_steps:
 - human_decision_finalization
 - search_generation
 - search_validation
+- pubmed_download
+- database_input_gate
+- merge_deduplication
+- screening_workbook
+- agent_screening
+- agent_validation
+- human_reviewer_2_gate
+- human_adjudication_gate
+- screening_finalization
 step_records:
   initialization_validation:
     status: completed
@@ -76,3 +85,104 @@ step_records:
       passed: yes
       message: All 34 R/12 validation check(s) passed.
       validation_file: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/search_strategy_validation.csv
+  pubmed_download:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-09 13:32:45
+    message: Canonical PubMed download outputs are complete.
+    validation:
+      passed: yes
+      message: Canonical PubMed download outputs are complete.
+      files:
+        pubmed_xml: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/pubmed/pubmed_sglt2_inhibitors_cardiac_surgery.xml
+        pubmed_csv: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/pubmed/pubmed_sglt2_inhibitors_cardiac_surgery.csv
+        pubmed_report: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/pubmed_sglt2_inhibitors_cardiac_surgery_download_report.txt
+  database_input_gate:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-09 13:32:45
+    message: 'All enabled database inputs are present: pubmed, embase, central'
+    validation:
+      passed: yes
+      message: 'All enabled database inputs are present: pubmed, embase, central'
+      enabled_databases:
+      - pubmed
+      - embase
+      - central
+      files:
+        pubmed: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/pubmed/pubmed_sglt2_inhibitors_cardiac_surgery.csv
+        embase: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/embase/embase_sglt2_inhibitors_cardiac_surgery.ris
+        central: C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/search/central/central_sglt2_inhibitors_cardiac_surgery.ris
+  merge_deduplication:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-09 13:32:45
+    message: R/17 merge/deduplication outputs are complete.
+    validation:
+      passed: yes
+      message: R/17 merge/deduplication outputs are complete.
+      files:
+        merged_records: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/all_database_records_before_deduplication.csv
+        deduplicated_records: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/deduplicated_records_for_screening.csv
+        removed_duplicates: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/removed_duplicate_records.csv
+        deduplication_map: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/deduplication_map.csv
+        prisma_counts: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/search/search_and_deduplication_counts.csv
+        report: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/import_merge_deduplication_report.txt
+  screening_workbook:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-09 13:32:45
+    message: R/18 screening workbook structure is complete.
+    validation:
+      passed: yes
+      message: R/18 screening workbook structure is complete.
+      workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/screening/title_abstract_screening_workbook.xlsx
+  agent_screening:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-09 13:32:45
+    message: R/19 Agent Reviewer 1 screening outputs are complete.
+    validation:
+      passed: yes
+      message: R/19 Agent Reviewer 1 screening outputs are complete.
+      workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/screening/title_abstract_screening_agent.xlsx
+  agent_validation:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-09 13:32:46
+    message: R/20 historical PASS recovered from validated downstream R/21 finalization
+      artifacts.
+    validation:
+      passed: yes
+      message: R/20 historical PASS recovered from validated downstream R/21 finalization
+        artifacts.
+      recovered_from_downstream: yes
+  human_reviewer_2_gate:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-09 13:32:46
+    message: Human Reviewer 2 completion recovered from R/21 finalization.
+    validation:
+      passed: yes
+      message: Human Reviewer 2 completion recovered from R/21 finalization.
+  human_adjudication_gate:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-09 13:32:46
+    message: Human adjudication completion recovered from R/21 finalization.
+    validation:
+      passed: yes
+      message: Human adjudication completion recovered from R/21 finalization.
+  screening_finalization:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-09 13:32:46
+    message: R/21 final screening outputs and full-text-review handoff are complete.
+    validation:
+      passed: yes
+      message: R/21 final screening outputs and full-text-review handoff are complete.
+      files:
+        completed_workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/screening/title_abstract_screening_completed.xlsx
+        final_screening_csv: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/screening/final_title_abstract_screening.csv
+        included_for_full_text_review_csv: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/screening/included_for_full_text_review.csv
+        final_report: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/final_title_abstract_screening_report.txt

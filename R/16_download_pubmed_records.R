@@ -1,5 +1,5 @@
 # ============================================================
-# SR-MA Toolkit v2.0
+# Universal SR-MA Agent Toolkit
 # R/16_download_pubmed_records.R
 #
 # Purpose
@@ -69,13 +69,29 @@ source(
 )
 
 config <- load_project_config(
+  "config/project_config.yml",
+  validate = TRUE,
   quiet = FALSE
 )
 
 paths <- build_project_paths(
-  config,
-  create_directories = TRUE
+  config = config,
+  create_directories = TRUE,
+  validate = TRUE
 )
+
+enabled_databases <- get_enabled_databases(
+  config,
+  validate = FALSE
+)
+
+if (!"pubmed" %in% enabled_databases) {
+  stop(
+    "PubMed is not enabled in project_config.yml.\n",
+    "Enable PubMed under search.databases before running R/16.",
+    call. = FALSE
+  )
+}
 
 project_id <- get_project_id(
   config
@@ -90,36 +106,8 @@ project_title <- get_project_title(
 # 3. Input and output paths
 # ============================================================
 
-search_file_candidates <- file.path(
-  paths$search_strategies_directory,
-  c(
-    "pubmed_search_final.txt",
-    "pubmed_search.txt"
-  )
-)
-
-existing_search_files <- search_file_candidates[
-  file.exists(
-    search_file_candidates
-  )
-]
-
-if (length(existing_search_files) == 0L) {
-
-  stop(
-    "No PubMed search strategy file was found.\n",
-    "Expected one of:\n",
-    paste(
-      paste0(
-        "- ",
-        search_file_candidates
-      ),
-      collapse = "\n"
-    )
-  )
-}
-
-search_file <- existing_search_files[1]
+search_file <-
+  paths$pubmed_search
 
 output_directory <-
   paths$pubmed_directory
@@ -135,7 +123,24 @@ report_output_file <-
 
 assert_file_exists(
   search_file,
-  "Final PubMed search-strategy file"
+  "Canonical PubMed search-strategy file"
+)
+
+cat(
+  "
+Canonical PubMed input/output paths
+",
+  "------------------------------------
+",
+  "Search strategy: ", search_file, "
+",
+  "XML output:      ", xml_output_file, "
+",
+  "CSV output:      ", csv_output_file, "
+",
+  "Download report:", report_output_file, "
+",
+  sep = ""
 )
 
 # ============================================================
@@ -970,7 +975,7 @@ if (parsed_count != record_count) {
 # ============================================================
 
 report_lines <- c(
-  "SR-MA Agent Toolkit v2.0",
+  "Universal SR-MA Agent Toolkit",
   "PubMed Detailed Record Download Report",
   "",
   paste0(
@@ -1055,10 +1060,54 @@ cat("-", xml_output_file, "\n")
 cat("-", csv_output_file, "\n")
 cat("-", report_output_file, "\n")
 
+# ============================================================
+# 16. Standalone TASK-005 output validation
+# ============================================================
+
+required_outputs <- c(
+  pubmed_xml = xml_output_file,
+  pubmed_csv = csv_output_file,
+  download_report = report_output_file
+)
+
+output_nonempty <- vapply(
+  required_outputs,
+  function(file_path) {
+    file.exists(file_path) &&
+      !is.na(file.info(file_path)$size) &&
+      file.info(file_path)$size > 0
+  },
+  logical(1)
+)
+
+if (!all(output_nonempty)) {
+
+  failed_outputs <- names(required_outputs)[
+    !output_nonempty
+  ]
+
+  stop(
+    "TASK-005 standalone validation failed.\n",
+    "Missing or empty output(s): ",
+    paste(failed_outputs, collapse = ", "),
+    call. = FALSE
+  )
+}
+
+if (parsed_count <= 0L) {
+  stop(
+    "TASK-005 standalone validation failed: ",
+    "no parsed PubMed records were produced.",
+    call. = FALSE
+  )
+}
+
+cat(
+  "\nPASS: TASK-005 Canonical PubMed Download completed successfully.\n"
+)
+
 cat(
   "\nNext step:",
-  "\n1. Confirm that the Embase RIS file is present.",
-  "\n2. Confirm that the CENTRAL RIS file is present.",
-  "\n3. Run R/17_import_merge_deduplicate.R.",
+  "\nTASK-006 — R/17 Merge & Deduplication",
   "\n"
 )

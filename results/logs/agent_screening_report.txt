@@ -1,40 +1,46 @@
 Universal SR-MA Agent Toolkit
 Agent Title/Abstract Screening Report
 
-Project ID: sglt2i_cardiac_surgery
-Review title: Effects of SGLT2 Inhibitors in Patients Undergoing Cardiac Surgery
+Project ID: sglt2_inhibitors_cardiac_surgery
+Review title: Efficacy and safety of preoperative or perioperative SGLT2 inhibitors in adult cardiac surgery: a systematic review and meta-analysis
 Agent reviewer: Agent Reviewer 1
 Provider: openai
 Model: gpt-5
 Prompt version: 1.0.0
-Generated at: 2026-08-02 15:00:35
+Generated at: 2026-08-09 07:36:48
 
 SUMMARY
 --------------------------------------------------
-Records in Reviewer_1 sheet: 186
-Valid agent decisions logged: 186
+Records in Reviewer_1 sheet: 252
+Valid agent decisions logged: 252
 Failures: 0
 
 DECISIONS
 --------------------------------------------------
-Exclude: 132
-Include: 43
-Unclear: 11
+Exclude: 213
+Include: 33
+Unclear: 6
 
 CONFIDENCE
 --------------------------------------------------
-High: 162
-Low: 1
-Moderate: 23
+High: 239
+Low: 2
+Moderate: 11
 
 EXCLUSION REASONS
 --------------------------------------------------
-E08 | Protocol, editorial, commentary, or review: 57
-E01 | Not cardiac surgery: 36
-E07 | Animal or laboratory study: 15
-E05 | Wrong study design: 11
-E02 | No SGLT2 inhibitor exposure: 9
-E06 | No relevant clinical outcome: 4
+E07 | Not original research: 54
+E02 | Not a cardiac surgical population: 38
+E09 | Transcatheter-only procedure: 33
+E05 | Ineligible study design: 24
+E10 | Heart transplantation population: 22
+E03 | Ineligible intervention/exposure: 17
+E08 | Insufficient outcome data: 8
+E04 | Ineligible comparator: 7
+E01 | Not human adult population: 6
+E13 | Outside perioperative window: 2
+E06 | Conference abstract only: 1
+E11 | Ventricular assist device population: 1
 
 OUTPUT FILES
 --------------------------------------------------

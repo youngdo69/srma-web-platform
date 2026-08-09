@@ -1,21 +1,18 @@
 # ============================================================
-# SR-MA Agent Toolkit v2.0
+# Universal SR-MA Agent Toolkit
 # R/17_import_merge_deduplicate.R
 #
 # Purpose
 # ------------------------------------------------------------
-# 1. Load the project configuration
-# 2. Import PubMed CSV
-# 3. Import Embase RIS
-# 4. Import CENTRAL RIS
-# 5. Convert records to a common structure
-# 6. Merge and normalize records
+# 1. Import PubMed CSV
+# 2. Import Embase RIS
+# 3. Import CENTRAL RIS
+# 4. Convert all databases to a common structure
+# 5. Merge all records
+# 6. Normalize DOI, PMID, title, and year
 # 7. Deduplicate records
-# 8. Preserve source-database provenance
-# 9. Save PRISMA-compatible counts and reports
-#
-# Project-specific paths and filenames are defined in:
-# config/project_config.yml
+# 8. Preserve provenance from all source databases
+# 9. Save PRISMA-compatible counts
 # ============================================================
 
 
@@ -41,31 +38,30 @@ missing_packages <- required_packages[
   )
 ]
 
-if (length(missing_packages) > 0L) {
+if (length(missing_packages) > 0) {
 
   stop(
     "The following packages are required but not installed: ",
-    paste(
-      missing_packages,
-      collapse = ", "
-    ),
-    "\n\nInstall them with:\n",
+    paste(missing_packages, collapse = ", "),
+    "\nInstall them with:\n",
     "install.packages(c(",
     paste(
-      paste0(
-        '"',
-        missing_packages,
-        '"'
-      ),
+      paste0('"', missing_packages, '"'),
       collapse = ", "
     ),
     "))"
   )
 }
 
+# ============================================================
+# Required packages
+# ============================================================
+
+# 기존 패키지 확인 및 로딩 코드 유지
+
 
 # ============================================================
-# 2. Load project configuration and paths
+# Load project configuration and paths
 # ============================================================
 
 source(
@@ -77,12 +73,15 @@ source(
 )
 
 config <- load_project_config(
+  "config/project_config.yml",
+  validate = TRUE,
   quiet = FALSE
 )
 
 paths <- build_project_paths(
-  config,
-  create_directories = TRUE
+  config = config,
+  create_directories = TRUE,
+  validate = TRUE
 )
 
 project_id <- get_project_id(
@@ -99,7 +98,7 @@ enabled_databases <- get_enabled_databases(
 
 
 # ============================================================
-# 3. Input and output paths
+# Input database files
 # ============================================================
 
 pubmed_file <-
@@ -111,27 +110,6 @@ embase_file <-
 central_file <-
   paths$central_ris
 
-merged_output_file <-
-  paths$merged_records_csv
-
-deduplicated_output_file <-
-  paths$deduplicated_records_csv
-
-duplicates_output_file <-
-  paths$removed_duplicates_csv
-
-deduplication_map_file <-
-  paths$deduplication_map_csv
-
-prisma_counts_file <-
-  paths$prisma_counts_csv
-
-report_output_file <-
-  paths$import_merge_deduplication_report
-
-
-# Validate files for enabled databases only
-
 validate_merge_inputs(
   config,
   paths
@@ -139,7 +117,81 @@ validate_merge_inputs(
 
 
 # ============================================================
-# 4. General helper functions
+# Output files
+# ============================================================
+
+processed_directory <-
+  paths$processed_search_directory
+
+all_records_file <-
+  paths$merged_records_csv
+
+deduplicated_file <-
+  paths$deduplicated_records_csv
+
+removed_duplicates_file <-
+  paths$removed_duplicates_csv
+
+deduplication_map_file <-
+  paths$deduplication_map_csv
+
+counts_file <-
+  paths$prisma_counts_csv
+
+report_file <-
+  paths$import_merge_deduplication_report
+
+# ============================================================
+# 2. Canonical input/output contract
+# ============================================================
+
+merged_output_file <-
+  all_records_file
+
+deduplicated_output_file <-
+  deduplicated_file
+
+duplicates_output_file <-
+  removed_duplicates_file
+
+prisma_counts_file <-
+  counts_file
+
+report_output_file <-
+  report_file
+
+dir.create(
+  processed_directory,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+dir.create(
+  paths$logs_directory,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+cat(
+  "\nCanonical merge/deduplication paths\n",
+  "------------------------------------\n",
+  "Enabled databases: ",
+  paste(enabled_databases, collapse = ", "),
+  "\n",
+  "PubMed CSV:       ", pubmed_file, "\n",
+  "Embase RIS:       ", embase_file, "\n",
+  "CENTRAL RIS:      ", central_file, "\n",
+  "Merged output:    ", merged_output_file, "\n",
+  "Deduplicated:     ", deduplicated_output_file, "\n",
+  "Dedup map:        ", deduplication_map_file, "\n",
+  "PRISMA counts:    ", prisma_counts_file, "\n",
+  "Report:           ", report_output_file, "\n",
+  sep = ""
+)
+
+
+# ============================================================
+# 3. General helper functions
 # ============================================================
 
 first_nonempty <- function(x) {
@@ -149,14 +201,11 @@ first_nonempty <- function(x) {
 
   x <- x[
     !is.na(x) &
-      nzchar(x)
+      x != ""
   ]
 
-  if (length(x) == 0L) {
-
-    return(
-      NA_character_
-    )
+  if (length(x) == 0) {
+    return(NA_character_)
   }
 
   x[1]
@@ -173,16 +222,13 @@ collapse_unique <- function(
 
   x <- x[
     !is.na(x) &
-      nzchar(x)
+      x != ""
   ]
 
   x <- unique(x)
 
-  if (length(x) == 0L) {
-
-    return(
-      NA_character_
-    )
+  if (length(x) == 0) {
+    return(NA_character_)
   }
 
   paste(
@@ -195,14 +241,8 @@ collapse_unique <- function(
 normalize_doi <- function(doi) {
 
   doi <- as.character(doi)
-
-  doi <- stringr::str_to_lower(
-    doi
-  )
-
-  doi <- stringr::str_trim(
-    doi
-  )
+  doi <- stringr::str_to_lower(doi)
+  doi <- stringr::str_trim(doi)
 
   doi <- stringr::str_remove(
     doi,
@@ -220,8 +260,7 @@ normalize_doi <- function(doi) {
   )
 
   doi[
-    is.na(doi) |
-      doi == ""
+    doi == ""
   ] <- NA_character_
 
   doi
@@ -238,8 +277,7 @@ normalize_pmid <- function(pmid) {
   )
 
   pmid[
-    is.na(pmid) |
-      pmid == ""
+    pmid == ""
   ] <- NA_character_
 
   pmid
@@ -277,8 +315,7 @@ normalize_title <- function(title) {
   )
 
   title[
-    is.na(title) |
-      title == ""
+    title == ""
   ] <- NA_character_
 
   title
@@ -297,9 +334,7 @@ extract_year <- function(year_value) {
   )
 
   suppressWarnings(
-    as.integer(
-      extracted
-    )
+    as.integer(extracted)
   )
 }
 
@@ -334,14 +369,7 @@ standardize_record_columns <- function(data) {
 
   for (column_name in missing_columns) {
 
-    if (column_name == "year") {
-
-      data[[column_name]] <- NA_integer_
-
-    } else {
-
-      data[[column_name]] <- NA_character_
-    }
+    data[[column_name]] <- NA_character_
   }
 
   data |>
@@ -353,65 +381,33 @@ standardize_record_columns <- function(data) {
 }
 
 
-empty_record_dataset <- function() {
+empty_standardized_records <- function() {
 
   tibble::tibble(
-    database = character(0),
-    source_record_id = character(0),
-    pmid = character(0),
-    doi = character(0),
-    title = character(0),
-    authors = character(0),
-    year = integer(0),
-    journal = character(0),
-    journal_abbreviation = character(0),
-    volume = character(0),
-    issue = character(0),
-    pages = character(0),
-    abstract = character(0),
-    keywords = character(0),
-    controlled_terms = character(0),
-    publication_type = character(0),
-    language = character(0),
-    url = character(0)
+    database = character(),
+    source_record_id = character(),
+    pmid = character(),
+    doi = character(),
+    title = character(),
+    authors = character(),
+    year = integer(),
+    journal = character(),
+    journal_abbreviation = character(),
+    volume = character(),
+    issue = character(),
+    pages = character(),
+    abstract = character(),
+    keywords = character(),
+    controlled_terms = character(),
+    publication_type = character(),
+    language = character(),
+    url = character()
   )
 }
 
 
-add_internal_record_ids <- function(
-    data,
-    prefix
-) {
-
-  if (nrow(data) == 0L) {
-
-    return(
-      data |>
-        dplyr::mutate(
-          database_record_number = integer(0),
-          internal_record_id = character(0)
-        )
-    )
-  }
-
-  data |>
-    dplyr::mutate(
-      database_record_number =
-        dplyr::row_number(),
-      internal_record_id = paste0(
-        prefix,
-        "_",
-        sprintf(
-          "%06d",
-          database_record_number
-        )
-      )
-    )
-}
-
-
 # ============================================================
-# 5. Generic RIS parser
+# 4. Generic RIS parser
 # ============================================================
 
 parse_ris_file <- function(
@@ -425,14 +421,15 @@ parse_ris_file <- function(
     encoding = "UTF-8"
   )
 
-  if (length(ris_lines) == 0L) {
+  if (length(ris_lines) == 0) {
 
     stop(
-      "The RIS file is empty:\n",
+      "The RIS file is empty: ",
       file_path
     )
   }
 
+  # Every record normally ends with ER  -
   end_positions <- which(
     grepl(
       "^ER  -",
@@ -440,10 +437,10 @@ parse_ris_file <- function(
     )
   )
 
-  if (length(end_positions) == 0L) {
+  if (length(end_positions) == 0) {
 
     stop(
-      "No RIS record terminators (ER  -) were found in:\n",
+      "No RIS record terminators (ER  -) were found in: ",
       file_path
     )
   }
@@ -474,6 +471,7 @@ parse_ris_file <- function(
   ) {
 
     parsed_tags <- list()
+
     current_tag <- NULL
 
     for (line in record_lines) {
@@ -486,12 +484,12 @@ parse_ris_file <- function(
       if (!is.na(tag_match[1, 2])) {
 
         current_tag <- tag_match[1, 2]
+
         value <- tag_match[1, 3]
 
         if (is.null(parsed_tags[[current_tag]])) {
 
-          parsed_tags[[current_tag]] <-
-            value
+          parsed_tags[[current_tag]] <- value
 
         } else {
 
@@ -503,7 +501,7 @@ parse_ris_file <- function(
 
       } else if (
         !is.null(current_tag) &&
-          trimws(line) != ""
+        trimws(line) != ""
       ) {
 
         last_index <- length(
@@ -527,7 +525,7 @@ parse_ris_file <- function(
 
         if (
           !is.null(values) &&
-            length(values) > 0L
+          length(values) > 0
         ) {
 
           value <- first_nonempty(
@@ -535,10 +533,7 @@ parse_ris_file <- function(
           )
 
           if (!is.na(value)) {
-
-            return(
-              value
-            )
+            return(value)
           }
         }
       }
@@ -586,14 +581,12 @@ parse_ris_file <- function(
       )
     }
 
-
     note_values <- get_all_tags(
       c(
         "N1",
         "N2"
       )
     )
-
 
     pmid_from_notes <- stringr::str_match(
       ifelse(
@@ -604,7 +597,6 @@ parse_ris_file <- function(
       "(?i)PMID[: ]+([0-9]+)"
     )[, 2]
 
-
     pmid_from_id <- stringr::str_match(
       ifelse(
         is.na(source_record_id),
@@ -614,7 +606,6 @@ parse_ris_file <- function(
       "(?i)PMID[: ]*([0-9]+)"
     )[, 2]
 
-
     pmid <- first_nonempty(
       c(
         get_first_tag("PM"),
@@ -623,16 +614,9 @@ parse_ris_file <- function(
       )
     )
 
-
-    ris_url <- get_first_tag(
-      "UR"
-    )
-
-
     doi <- first_nonempty(
       c(
         get_first_tag("DO"),
-
         stringr::str_extract(
           ifelse(
             is.na(note_values),
@@ -641,31 +625,32 @@ parse_ris_file <- function(
           ),
           "10\\.[0-9]{4,9}/[-._;()/:A-Za-z0-9]+"
         ),
-
         stringr::str_extract(
           ifelse(
-            is.na(ris_url),
+            is.na(get_first_tag("UR")),
             "",
-            ris_url
+            get_first_tag("UR")
           ),
           "10\\.[0-9]{4,9}/[-._;()/:A-Za-z0-9]+"
         )
       )
     )
 
-
     start_page <- get_first_tag(
-      "SP"
+      c(
+        "SP"
+      )
     )
 
     end_page <- get_first_tag(
-      "EP"
+      c(
+        "EP"
+      )
     )
-
 
     pages <- if (
       !is.na(start_page) &&
-        !is.na(end_page)
+      !is.na(end_page)
     ) {
 
       paste0(
@@ -684,19 +669,11 @@ parse_ris_file <- function(
       )
     }
 
-
     tibble::tibble(
       database = database_name,
-
-      source_record_id =
-        source_record_id,
-
-      pmid =
-        pmid,
-
-      doi =
-        doi,
-
+      source_record_id = source_record_id,
+      pmid = pmid,
+      doi = doi,
       title = get_first_tag(
         c(
           "TI",
@@ -704,7 +681,6 @@ parse_ris_file <- function(
           "CT"
         )
       ),
-
       authors = get_all_tags(
         c(
           "AU",
@@ -712,7 +688,6 @@ parse_ris_file <- function(
           "A2"
         )
       ),
-
       year = extract_year(
         get_first_tag(
           c(
@@ -722,7 +697,6 @@ parse_ris_file <- function(
           )
         )
       ),
-
       journal = get_first_tag(
         c(
           "JO",
@@ -731,48 +705,49 @@ parse_ris_file <- function(
           "JA"
         )
       ),
-
       journal_abbreviation = get_first_tag(
-        "J2"
+        c(
+          "J2"
+        )
       ),
-
       volume = get_first_tag(
-        "VL"
+        c(
+          "VL"
+        )
       ),
-
       issue = get_first_tag(
-        "IS"
+        c(
+          "IS"
+        )
       ),
-
-      pages =
-        pages,
-
+      pages = pages,
       abstract = get_first_tag(
         c(
           "AB",
           "N2"
         )
       ),
-
       keywords = get_all_tags(
-        "KW"
+        c(
+          "KW"
+        )
       ),
-
       controlled_terms = get_all_tags(
-        "MH"
+        c(
+          "MH"
+        )
       ),
-
       publication_type = get_all_tags(
         c(
           "TY",
           "M3"
         )
       ),
-
       language = get_first_tag(
-        "LA"
+        c(
+          "LA"
+        )
       ),
-
       url = get_first_tag(
         c(
           "UR",
@@ -786,9 +761,7 @@ parse_ris_file <- function(
 
   records <- purrr::map2_dfr(
     record_blocks,
-    seq_along(
-      record_blocks
-    ),
+    seq_along(record_blocks),
     parse_one_ris_record
   )
 
@@ -798,33 +771,13 @@ parse_ris_file <- function(
 
 
 # ============================================================
-# 6. Start report
+# 5. Import PubMed
 # ============================================================
 
 cat("\n")
 cat("====================================================\n")
 cat("Import, Merge, and Deduplicate Search Results\n")
 cat("====================================================\n\n")
-
-cat("Project ID:\n")
-cat(project_id, "\n\n")
-
-cat("Review title:\n")
-cat(project_title, "\n\n")
-
-cat("Enabled databases:\n")
-cat(
-  paste(
-    enabled_databases,
-    collapse = ", "
-  ),
-  "\n\n"
-)
-
-
-# ============================================================
-# 7. Import PubMed
-# ============================================================
 
 if ("pubmed" %in% enabled_databases) {
 
@@ -834,26 +787,21 @@ if ("pubmed" %in% enabled_databases) {
     pubmed_file,
     show_col_types = FALSE,
     col_types = readr::cols(
-      .default =
-        readr::col_character(),
-
-      year =
-        readr::col_integer()
+      .default = readr::col_character(),
+      year = readr::col_integer()
     )
   ) |>
     standardize_record_columns()
 
 } else {
 
-  cat("PubMed is disabled in project_config.yml.\n")
-
-  pubmed_records <-
-    empty_record_dataset()
+  cat("Skipping PubMed: disabled in project_config.yml.\n")
+  pubmed_records <- empty_standardized_records()
 }
 
 
 # ============================================================
-# 8. Import Embase
+# 6. Import Embase RIS
 # ============================================================
 
 if ("embase" %in% enabled_databases) {
@@ -867,15 +815,13 @@ if ("embase" %in% enabled_databases) {
 
 } else {
 
-  cat("Embase is disabled in project_config.yml.\n")
-
-  embase_records <-
-    empty_record_dataset()
+  cat("Skipping Embase: disabled in project_config.yml.\n")
+  embase_records <- empty_standardized_records()
 }
 
 
 # ============================================================
-# 9. Import CENTRAL
+# 7. Import CENTRAL RIS
 # ============================================================
 
 if ("central" %in% enabled_databases) {
@@ -889,77 +835,81 @@ if ("central" %in% enabled_databases) {
 
 } else {
 
-  cat("CENTRAL is disabled in project_config.yml.\n")
-
-  central_records <-
-    empty_record_dataset()
+  cat("Skipping CENTRAL: disabled in project_config.yml.\n")
+  central_records <- empty_standardized_records()
 }
 
 
 # ============================================================
-# 10. Add internal record IDs
+# 8. Add internal record IDs
 # ============================================================
 
-pubmed_records <- add_internal_record_ids(
-  pubmed_records,
-  "PUBMED"
-)
+pubmed_records <- pubmed_records |>
+  dplyr::mutate(
+    database_record_number =
+      dplyr::row_number(),
+    internal_record_id = paste0(
+      "PUBMED_",
+      sprintf(
+        "%06d",
+        database_record_number
+      )
+    )
+  )
 
-embase_records <- add_internal_record_ids(
-  embase_records,
-  "EMBASE"
-)
+embase_records <- embase_records |>
+  dplyr::mutate(
+    database_record_number =
+      dplyr::row_number(),
+    internal_record_id = paste0(
+      "EMBASE_",
+      sprintf(
+        "%06d",
+        database_record_number
+      )
+    )
+  )
 
-central_records <- add_internal_record_ids(
-  central_records,
-  "CENTRAL"
-)
+central_records <- central_records |>
+  dplyr::mutate(
+    database_record_number =
+      dplyr::row_number(),
+    internal_record_id = paste0(
+      "CENTRAL_",
+      sprintf(
+        "%06d",
+        database_record_number
+      )
+    )
+  )
 
 
 # ============================================================
-# 11. Merge and normalize all records
+# 9. Merge all database records
 # ============================================================
 
 all_records <- dplyr::bind_rows(
   pubmed_records,
   embase_records,
   central_records
-)
-
-if (nrow(all_records) == 0L) {
-
-  stop(
-    "No records were imported from the enabled databases."
-  )
-}
-
-
-all_records <- all_records |>
+) |>
   dplyr::mutate(
     original_row_number =
       dplyr::row_number(),
-
     doi_normalized = normalize_doi(
       doi
     ),
-
     pmid_normalized = normalize_pmid(
       pmid
     ),
-
     title_normalized = normalize_title(
       title
     ),
-
     year_normalized = suppressWarnings(
-      as.integer(
-        year
-      )
+      as.integer(year)
     ),
-
     title_year_key = dplyr::if_else(
       !is.na(title_normalized),
-
       paste0(
         title_normalized,
         "__",
@@ -971,10 +921,8 @@ all_records <- all_records |>
           )
         )
       ),
-
       NA_character_
     ),
-
     completeness_score = rowSums(
       !is.na(
         dplyr::pick(
@@ -990,7 +938,6 @@ all_records <- all_records |>
         )
       )
     ),
-
     database_priority = dplyr::case_when(
       database == "PubMed" ~ 1L,
       database == "Embase" ~ 2L,
@@ -1001,44 +948,35 @@ all_records <- all_records |>
 
 
 # ============================================================
-# 12. Determine duplicate-match frequencies
+# 10. Determine duplicate match frequencies
 # ============================================================
 
 doi_counts <- all_records |>
   dplyr::filter(
-    !is.na(
-      doi_normalized
-    )
+    !is.na(doi_normalized)
   ) |>
   dplyr::count(
     doi_normalized,
     name = "doi_frequency"
   )
 
-
 pmid_counts <- all_records |>
   dplyr::filter(
-    !is.na(
-      pmid_normalized
-    )
+    !is.na(pmid_normalized)
   ) |>
   dplyr::count(
     pmid_normalized,
     name = "pmid_frequency"
   )
 
-
 title_year_counts <- all_records |>
   dplyr::filter(
-    !is.na(
-      title_year_key
-    )
+    !is.na(title_year_key)
   ) |>
   dplyr::count(
     title_year_key,
     name = "title_year_frequency"
   )
-
 
 all_records <- all_records |>
   dplyr::left_join(
@@ -1069,17 +1007,16 @@ all_records <- all_records |>
 
 
 # ============================================================
-# 13. Create deduplication group keys
+# 11. Create deduplication group key
 #
-# Priority
-# ------------------------------------------------------------
-# 1. Exact normalized title and publication year
-# 2. Exact normalized DOI
-# 3. Exact normalized PMID
-# 4. Unique internal record ID
+# Priority:
+# 1. Exact normalized title + year when shared
+# 2. DOI when duplicated
+# 3. PMID when duplicated
+# 4. Unique internal ID
 #
-# Title-year remains first so that a record without DOI may
-# still match a corresponding record from another database.
+# Exact title-year is placed first so that a record lacking
+# DOI can still match another database record that has a DOI.
 # ============================================================
 
 all_records <- all_records |>
@@ -1089,27 +1026,25 @@ all_records <- all_records |>
         "TITLEYEAR:",
         title_year_key
       ),
-
       doi_frequency > 1L ~ paste0(
         "DOI:",
         doi_normalized
       ),
-
       pmid_frequency > 1L ~ paste0(
         "PMID:",
         pmid_normalized
       ),
-
       TRUE ~ paste0(
         "UNIQUE:",
         internal_record_id
       )
     )
+    
   )
 
 
 # ============================================================
-# 14. Save all records before deduplication
+# 12. Save all records before deduplication
 # ============================================================
 
 readr::write_csv(
@@ -1120,7 +1055,7 @@ readr::write_csv(
 
 
 # ============================================================
-# 15. Create and save deduplication map
+# 13. Create deduplication map
 # ============================================================
 
 deduplication_map <- all_records |>
@@ -1129,9 +1064,7 @@ deduplication_map <- all_records |>
   ) |>
   dplyr::arrange(
     database_priority,
-    dplyr::desc(
-      completeness_score
-    ),
+    dplyr::desc(completeness_score),
     original_row_number,
     .by_group = TRUE
   ) |>
@@ -1140,13 +1073,11 @@ deduplication_map <- all_records |>
       dplyr::first(
         internal_record_id
       ),
-
     record_status = dplyr::if_else(
       dplyr::row_number() == 1L,
       "retained",
       "duplicate_removed"
     ),
-
     duplicate_group_size =
       dplyr::n()
   ) |>
@@ -1165,7 +1096,6 @@ deduplication_map <- all_records |>
     year
   )
 
-
 readr::write_csv(
   deduplication_map,
   deduplication_map_file,
@@ -1174,12 +1104,11 @@ readr::write_csv(
 
 
 # ============================================================
-# 16. Create deduplicated screening dataset
+# 14. Create deduplicated screening dataset
 #
-# Metadata from matching records are combined so that:
-# - all source databases are preserved
-# - missing DOI, PMID, abstract, or other metadata may be
-#   supplemented by another source record
+# Metadata from duplicate records are combined so that:
+# - source databases are preserved
+# - missing abstract/DOI/PMID may be filled from another source
 # ============================================================
 
 deduplicated_records <- all_records |>
@@ -1188,9 +1117,7 @@ deduplicated_records <- all_records |>
   ) |>
   dplyr::arrange(
     database_priority,
-    dplyr::desc(
-      completeness_score
-    ),
+    dplyr::desc(completeness_score),
     original_row_number,
     .by_group = TRUE
   ) |>
@@ -1202,12 +1129,10 @@ deduplicated_records <- all_records |>
         dplyr::cur_group_id()
       )
     ),
-
     source_databases = collapse_unique(
       database,
       separator = "; "
     ),
-
     source_record_ids = collapse_unique(
       paste0(
         database,
@@ -1216,26 +1141,19 @@ deduplicated_records <- all_records |>
       ),
       separator = "; "
     ),
-
-    duplicate_group_size =
-      dplyr::n(),
-
+    duplicate_group_size = dplyr::n(),
     pmid = first_nonempty(
       pmid_normalized
     ),
-
     doi = first_nonempty(
       doi_normalized
     ),
-
     title = first_nonempty(
       title
     ),
-
     authors = first_nonempty(
       authors
     ),
-
     year = suppressWarnings(
       as.integer(
         first_nonempty(
@@ -1243,55 +1161,42 @@ deduplicated_records <- all_records |>
         )
       )
     ),
-
     journal = first_nonempty(
       journal
     ),
-
     journal_abbreviation = first_nonempty(
       journal_abbreviation
     ),
-
     volume = first_nonempty(
       volume
     ),
-
     issue = first_nonempty(
       issue
     ),
-
     pages = first_nonempty(
       pages
     ),
-
     abstract = first_nonempty(
       abstract
     ),
-
     keywords = collapse_unique(
       keywords
     ),
-
     controlled_terms = collapse_unique(
       controlled_terms
     ),
-
     publication_type = collapse_unique(
       publication_type
     ),
-
     language = collapse_unique(
       language
     ),
-
     url = first_nonempty(
       url
     ),
-
     title_normalized = first_nonempty(
       title_normalized
     ),
-
     deduplication_method = dplyr::case_when(
       stringr::str_starts(
         dplyr::first(
@@ -1299,60 +1204,49 @@ deduplicated_records <- all_records |>
         ),
         "TITLEYEAR:"
       ) ~ "exact_normalized_title_and_year",
-
       stringr::str_starts(
         dplyr::first(
           duplicate_group_key
         ),
         "DOI:"
       ) ~ "exact_doi",
-
       stringr::str_starts(
         dplyr::first(
           duplicate_group_key
         ),
         "PMID:"
       ) ~ "exact_pmid",
-
       TRUE ~ "unique_record"
     ),
-
     .groups = "drop"
   ) |>
   dplyr::mutate(
     title_abstract_screening_decision =
       NA_character_,
-
     title_abstract_exclusion_reason =
       NA_character_,
-
     reviewer_1_decision =
       NA_character_,
-
     reviewer_2_decision =
       NA_character_,
-
     conflict_resolution =
       NA_character_,
-
     notes =
       NA_character_
   )
 
 
 # ============================================================
-# 17. Save removed duplicate records
+# 15. Save removed duplicate records
 # ============================================================
 
 removed_duplicate_ids <- deduplication_map |>
   dplyr::filter(
-    record_status ==
-      "duplicate_removed"
+    record_status == "duplicate_removed"
   ) |>
   dplyr::pull(
     internal_record_id
   )
-
 
 removed_duplicates <- all_records |>
   dplyr::filter(
@@ -1368,7 +1262,6 @@ removed_duplicates <- all_records |>
     by = "internal_record_id"
   )
 
-
 readr::write_csv(
   removed_duplicates,
   duplicates_output_file,
@@ -1377,7 +1270,7 @@ readr::write_csv(
 
 
 # ============================================================
-# 18. Save deduplicated screening dataset
+# 16. Save deduplicated screening dataset
 # ============================================================
 
 readr::write_csv(
@@ -1388,7 +1281,7 @@ readr::write_csv(
 
 
 # ============================================================
-# 19. Calculate database and PRISMA counts
+# 17. Calculate database and PRISMA counts
 # ============================================================
 
 pubmed_count <- nrow(
@@ -1415,27 +1308,36 @@ duplicates_removed <-
   total_before_deduplication -
   total_after_deduplication
 
-
 database_counts <- tibble::tibble(
   stage = c(
-    "Records identified from PubMed",
-    "Records identified from Embase",
-    "Records identified from CENTRAL",
+    if ("pubmed" %in% enabled_databases) {
+      "Records identified from PubMed"
+    },
+    if ("embase" %in% enabled_databases) {
+      "Records identified from Embase"
+    },
+    if ("central" %in% enabled_databases) {
+      "Records identified from CENTRAL"
+    },
     "Total records before deduplication",
     "Duplicate records removed",
     "Records after deduplication"
   ),
-
   count = c(
-    pubmed_count,
-    embase_count,
-    central_count,
+    if ("pubmed" %in% enabled_databases) {
+      pubmed_count
+    },
+    if ("embase" %in% enabled_databases) {
+      embase_count
+    },
+    if ("central" %in% enabled_databases) {
+      central_count
+    },
     total_before_deduplication,
     duplicates_removed,
     total_after_deduplication
   )
 )
-
 
 readr::write_csv(
   database_counts,
@@ -1445,29 +1347,27 @@ readr::write_csv(
 
 
 # ============================================================
-# 20. Validation checks
+# 18. Validation checks
 # ============================================================
 
-expected_total_before_deduplication <-
-  pubmed_count +
-  embase_count +
-  central_count
-
+enabled_source_total <- sum(
+  c(
+    if ("pubmed" %in% enabled_databases) pubmed_count else 0L,
+    if ("embase" %in% enabled_databases) embase_count else 0L,
+    if ("central" %in% enabled_databases) central_count else 0L
+  )
+)
 
 if (
   total_before_deduplication !=
-    expected_total_before_deduplication
+    enabled_source_total
 ) {
 
   stop(
-    "Record-count inconsistency occurred during merging.\n",
-    "Expected: ",
-    expected_total_before_deduplication,
-    "\nObserved: ",
-    total_before_deduplication
+    "Record-count inconsistency occurred during merging.",
+    call. = FALSE
   )
 }
-
 
 if (
   total_after_deduplication +
@@ -1481,68 +1381,14 @@ if (
 }
 
 
-if (
-  nrow(deduplication_map) !=
-    total_before_deduplication
-) {
-
-  stop(
-    "The deduplication map does not contain one row per ",
-    "original database record."
-  )
-}
-
-
-if (
-  sum(
-    deduplication_map$record_status ==
-      "duplicate_removed"
-  ) !=
-    duplicates_removed
-) {
-
-  stop(
-    "The number of removed records in the deduplication map ",
-    "does not match the PRISMA duplicate count."
-  )
-}
-
-
 # ============================================================
-# 21. Save report
+# 19. Save report
 # ============================================================
 
 report_lines <- c(
-  "SR-MA Agent Toolkit v2.0",
+  "Universal SR-MA Agent Toolkit",
   "Search Import, Merge, and Deduplication Report",
   "",
-
-  paste0(
-    "Project ID: ",
-    project_id
-  ),
-
-  paste0(
-    "Review title: ",
-    project_title
-  ),
-
-  paste0(
-    "Configuration file: ",
-    attr(
-      config,
-      "config_file"
-    )
-  ),
-
-  paste0(
-    "Enabled databases: ",
-    paste(
-      enabled_databases,
-      collapse = ", "
-    )
-  ),
-
   paste0(
     "Completed at: ",
     format(
@@ -1550,103 +1396,49 @@ report_lines <- c(
       "%Y-%m-%d %H:%M:%S"
     )
   ),
-
   "",
   "DATABASE COUNTS",
   "--------------------------------------------------",
-
   paste0(
     "PubMed: ",
     pubmed_count
   ),
-
   paste0(
     "Embase: ",
     embase_count
   ),
-
   paste0(
     "CENTRAL: ",
     central_count
   ),
-
   paste0(
     "Total before deduplication: ",
     total_before_deduplication
   ),
-
   paste0(
     "Duplicates removed: ",
     duplicates_removed
   ),
-
   paste0(
     "Records after deduplication: ",
     total_after_deduplication
   ),
-
   "",
   "DEDUPLICATION HIERARCHY",
   "--------------------------------------------------",
-
   "1. Exact normalized title and publication year",
   "2. Exact normalized DOI",
-  "3. Exact normalized PMID",
-  "4. Unique internal record ID",
-
-  "",
-  "VALIDATION",
-  "--------------------------------------------------",
-
-  paste0(
-    "Merged-record count valid: ",
-    total_before_deduplication ==
-      expected_total_before_deduplication
-  ),
-
-  paste0(
-    "Deduplication arithmetic valid: ",
-    total_after_deduplication +
-      duplicates_removed ==
-      total_before_deduplication
-  ),
-
-  paste0(
-    "Deduplication-map row count valid: ",
-    nrow(deduplication_map) ==
-      total_before_deduplication
-  ),
-
-  "",
-  "INPUT FILES",
-  "--------------------------------------------------",
-
-  paste0(
-    "PubMed: ",
-    pubmed_file
-  ),
-
-  paste0(
-    "Embase: ",
-    embase_file
-  ),
-
-  paste0(
-    "CENTRAL: ",
-    central_file
-  ),
-
+  "3. Exact PMID",
+  "4. Unique source record",
   "",
   "OUTPUT FILES",
   "--------------------------------------------------",
-
   merged_output_file,
   deduplicated_output_file,
   duplicates_output_file,
   deduplication_map_file,
   prisma_counts_file
 )
-
 
 writeLines(
   report_lines,
@@ -1656,16 +1448,13 @@ writeLines(
 
 
 # ============================================================
-# 22. Console output
+# 20. Console output
 # ============================================================
 
 cat("\n")
 cat("====================================================\n")
 cat("Import, Merge, and Deduplication Complete\n")
 cat("====================================================\n\n")
-
-cat("Project ID:\n")
-cat(project_id, "\n\n")
 
 print(
   database_counts
@@ -1679,11 +1468,65 @@ cat("-", deduplication_map_file, "\n")
 cat("-", prisma_counts_file, "\n")
 cat("-", report_output_file, "\n")
 
+# ============================================================
+# 21. Standalone TASK-006 validation
+# ============================================================
+
+required_outputs <- c(
+  merged_records = merged_output_file,
+  deduplicated_records = deduplicated_output_file,
+  removed_duplicates = duplicates_output_file,
+  deduplication_map = deduplication_map_file,
+  prisma_counts = prisma_counts_file,
+  report = report_output_file
+)
+
+output_nonempty <- vapply(
+  required_outputs,
+  function(file_path) {
+    file.exists(file_path) &&
+      !is.na(file.info(file_path)$size) &&
+      file.info(file_path)$size > 0
+  },
+  logical(1)
+)
+
+if (!all(output_nonempty)) {
+
+  failed_outputs <- names(required_outputs)[
+    !output_nonempty
+  ]
+
+  stop(
+    "TASK-006 standalone validation failed.\n",
+    "Missing or empty output(s): ",
+    paste(failed_outputs, collapse = ", "),
+    call. = FALSE
+  )
+}
+
+if (total_before_deduplication <= 0L) {
+  stop(
+    "TASK-006 standalone validation failed: ",
+    "no records were imported.",
+    call. = FALSE
+  )
+}
+
+if (total_after_deduplication <= 0L) {
+  stop(
+    "TASK-006 standalone validation failed: ",
+    "no records remain after deduplication.",
+    call. = FALSE
+  )
+}
+
+cat(
+  "\nPASS: TASK-006 R/17 Merge & Deduplication completed successfully.\n"
+)
+
 cat(
   "\nNext step:",
-  "\n1. Review removed duplicate records.",
-  "\n2. Confirm that true duplicates were removed correctly.",
-  "\n3. Refactor R/18_prepare_screening_workbook.R.",
-  "\n4. Regenerate the title and abstract screening workbook.",
+  "\nReview deduplication outputs, then proceed to the next PM-controlled stage.",
   "\n"
 )

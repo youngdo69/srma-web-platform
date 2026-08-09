@@ -1,19 +1,15 @@
 # ============================================================
-# SR-MA Agent Toolkit v2.0
+# Universal SR-MA Agent Toolkit
 # R/18_prepare_screening_workbook.R
 #
 # Purpose
 # ------------------------------------------------------------
-# 1. Load project configuration and shared paths
-# 2. Import deduplicated records prepared by R/17
-# 3. Generate independent title/abstract screening sheets
-# 4. Add config-driven decision and exclusion-reason lists
-# 5. Compare Reviewer 1 and Reviewer 2 decisions
-# 6. Create a conflict-resolution sheet
-# 7. Save and validate a reproducible Excel workbook
-#
-# Project-specific settings are defined in:
-# config/project_config.yml
+# 1. Import deduplicated records prepared by R/17
+# 2. Generate independent title/abstract screening sheets
+# 3. Add standardized decision and exclusion-reason lists
+# 4. Compare Reviewer 1 and Reviewer 2 decisions
+# 5. Create a conflict-resolution sheet
+# 6. Save a reproducible Excel screening workbook
 # ============================================================
 
 
@@ -38,22 +34,15 @@ missing_packages <- required_packages[
   )
 ]
 
-if (length(missing_packages) > 0L) {
+if (length(missing_packages) > 0) {
 
   stop(
     "The following packages are required but not installed: ",
-    paste(
-      missing_packages,
-      collapse = ", "
-    ),
-    "\n\nInstall them with:\n",
+    paste(missing_packages, collapse = ", "),
+    "\nInstall them with:\n",
     "install.packages(c(",
     paste(
-      paste0(
-        '"',
-        missing_packages,
-        '"'
-      ),
+      paste0('"', missing_packages, '"'),
       collapse = ", "
     ),
     "))"
@@ -62,7 +51,7 @@ if (length(missing_packages) > 0L) {
 
 
 # ============================================================
-# 2. Load project configuration and paths
+# 2. Load canonical project configuration and paths
 # ============================================================
 
 source(
@@ -74,12 +63,15 @@ source(
 )
 
 config <- load_project_config(
+  "config/project_config.yml",
+  validate = TRUE,
   quiet = FALSE
 )
 
 paths <- build_project_paths(
-  config,
-  create_directories = TRUE
+  config = config,
+  create_directories = TRUE,
+  validate = TRUE
 )
 
 project_id <- get_project_id(
@@ -90,43 +82,14 @@ project_title <- get_project_title(
   config
 )
 
-project_short_name <- get_project_short_name(
-  config
-)
-
-
-# ============================================================
-# 3. Input and output paths
-# ============================================================
-
-input_file <-
-  paths$deduplicated_records_csv
-
-output_file <-
-  paths$screening_workbook
-
-report_file <-
-  paths$screening_workbook_report
-
-validate_screening_workbook_inputs(
-  paths
-)
-
-
-# ============================================================
-# 4. Config-driven screening settings
-# ============================================================
-
 decision_options <- get_screening_decisions(
-  config
+  config,
+  validate = FALSE
 )
 
-exclusion_reason_table <- get_exclusion_reasons(
+exclusion_reason_options <- get_exclusion_reason_labels(
   config
 )
-
-exclusion_reason_options <-
-  exclusion_reason_table$label
 
 reviewer_1_name <- get_reviewer_name(
   config,
@@ -147,67 +110,51 @@ third_reviewer_name <- get_reviewer_name(
 )
 
 
-# Final conflict-resolution choices remain workflow-level
-# settings during Phase 1. They may be moved into config later.
+# ============================================================
+# 3. Canonical input/output paths
+# ============================================================
 
-final_decision_options <- c(
-  "Include",
-  "Exclude",
-  "Awaiting full-text clarification"
+input_file <-
+  paths$deduplicated_records_csv
+
+output_directory <-
+  paths$screening_results_directory
+
+output_file <-
+  paths$screening_workbook
+
+report_file <-
+  paths$screening_workbook_report
+
+
+# ============================================================
+# 4. Preliminary checks
+# ============================================================
+
+if (!file.exists(input_file)) {
+
+  stop(
+    "The deduplicated screening dataset was not found:\n",
+    input_file,
+    "\nRun R/17_import_merge_deduplicate.R first."
+  )
+}
+
+dir.create(
+  output_directory,
+  recursive = TRUE,
+  showWarnings = FALSE
 )
 
-confidence_options <- c(
-  "High",
-  "Moderate",
-  "Low"
+dir.create(
+  paths$logs_directory,
+  recursive = TRUE,
+  showWarnings = FALSE
 )
 
 
 # ============================================================
-# 5. Validate screening configuration
-# ============================================================
-
-if (length(decision_options) == 0L) {
-
-  stop(
-    "No screening decisions were found in ",
-    "config/project_config.yml."
-  )
-}
-
-if (length(exclusion_reason_options) == 0L) {
-
-  stop(
-    "No screening exclusion reasons were found in ",
-    "config/project_config.yml."
-  )
-}
-
-required_decisions <- c(
-  "Include",
-  "Exclude",
-  "Unclear"
-)
-
-missing_required_decisions <- setdiff(
-  required_decisions,
-  decision_options
-)
-
-if (length(missing_required_decisions) > 0L) {
-
-  stop(
-    "The following required screening decisions are missing:\n- ",
-    paste(
-      missing_required_decisions,
-      collapse = "\n- "
-    )
-  )
-}
-
-
-# ============================================================
-# 6. Helper functions
+# 5. Helper functions
 # ============================================================
 
 first_existing_column <- function(
@@ -220,7 +167,7 @@ first_existing_column <- function(
     candidates %in% names(data)
   ]
 
-  if (length(matching_columns) == 0L) {
+  if (length(matching_columns) == 0) {
 
     return(
       rep(
@@ -259,32 +206,17 @@ clean_character <- function(x) {
 
 excel_column_name <- function(column_number) {
 
-  if (
-    length(column_number) != 1L ||
-      is.na(column_number) ||
-      column_number < 1L
-  ) {
-
-    stop(
-      "column_number must be one positive integer."
-    )
-  }
-
-  column_number <- as.integer(
-    column_number
-  )
-
   column_name <- ""
 
-  while (column_number > 0L) {
+  while (column_number > 0) {
 
     remainder <- (
-      column_number - 1L
-    ) %% 26L
+      column_number - 1
+    ) %% 26
 
     column_name <- paste0(
       LETTERS[
-        remainder + 1L
+        remainder + 1
       ],
       column_name
     )
@@ -292,77 +224,27 @@ excel_column_name <- function(column_number) {
     column_number <- (
       column_number -
         remainder -
-        1L
-    ) %/% 26L
+        1
+    ) %/% 26
   }
 
   column_name
 }
 
 
-pad_character_vector <- function(
-    values,
-    target_length
-) {
-
-  values <- as.character(values)
-
-  padding_length <-
-    target_length -
-    length(values)
-
-  if (padding_length > 0L) {
-
-    values <- c(
-      values,
-      rep(
-        NA_character_,
-        padding_length
-      )
-    )
-  }
-
-  values
-}
-
-
-build_validation_range <- function(
-    column_letter,
-    number_of_options
-) {
-
-  if (number_of_options < 1L) {
-
-    stop(
-      "number_of_options must be at least 1."
-    )
-  }
-
-  paste0(
-    "'Validation_Lists'!$",
-    column_letter,
-    "$2:$",
-    column_letter,
-    "$",
-    number_of_options + 1L
-  )
-}
-
-
 # ============================================================
-# 7. Import deduplicated records
+# 6. Import deduplicated records
 # ============================================================
 
 screening_source <- readr::read_csv(
   input_file,
   show_col_types = FALSE,
   col_types = readr::cols(
-    .default =
-      readr::col_character()
+    .default = readr::col_character()
   )
 )
 
-if (nrow(screening_source) == 0L) {
+if (nrow(screening_source) == 0) {
 
   stop(
     "The deduplicated screening dataset contains no records."
@@ -371,7 +253,7 @@ if (nrow(screening_source) == 0L) {
 
 
 # ============================================================
-# 8. Create standardized screening dataset
+# 7. Create standardized screening dataset
 # ============================================================
 
 screening_id <- first_existing_column(
@@ -399,7 +281,6 @@ screening_id[
     )
   )
 )
-
 
 screening_data <- tibble::tibble(
   screening_id = clean_character(
@@ -429,7 +310,9 @@ screening_data <- tibble::tibble(
   abstract = clean_character(
     first_existing_column(
       screening_source,
-      "abstract"
+      c(
+        "abstract"
+      )
     )
   ),
 
@@ -466,39 +349,48 @@ screening_data <- tibble::tibble(
   doi = clean_character(
     first_existing_column(
       screening_source,
-      "doi"
+      c(
+        "doi"
+      )
     )
   ),
 
   pmid = clean_character(
     first_existing_column(
       screening_source,
-      "pmid"
+      c(
+        "pmid"
+      )
     )
   ),
 
   publication_type = clean_character(
     first_existing_column(
       screening_source,
-      "publication_type"
+      c(
+        "publication_type"
+      )
     )
   ),
 
   language = clean_character(
     first_existing_column(
       screening_source,
-      "language"
+      c(
+        "language"
+      )
     )
   ),
 
   url = clean_character(
     first_existing_column(
       screening_source,
-      "url"
+      c(
+        "url"
+      )
     )
   )
 )
-
 
 screening_data <- screening_data |>
   dplyr::distinct(
@@ -510,16 +402,33 @@ screening_data <- screening_data |>
   )
 
 
-if (anyDuplicated(screening_data$screening_id) > 0L) {
+# ============================================================
+# 8. Define screening choices
+# ============================================================
 
+final_decision_options <- c(
+  "Include",
+  "Exclude",
+  "Awaiting full-text clarification"
+)
+
+if (length(decision_options) == 0L) {
   stop(
-    "Duplicate screening IDs remain after standardization."
+    "No screening decisions were available from project_config.yml.",
+    call. = FALSE
+  )
+}
+
+if (length(exclusion_reason_options) == 0L) {
+  stop(
+    "No screening exclusion reasons were available from project_config.yml.",
+    call. = FALSE
   )
 }
 
 
 # ============================================================
-# 9. Create reviewer datasets
+# 9. Create reviewer sheets
 # ============================================================
 
 create_reviewer_data <- function(
@@ -529,23 +438,12 @@ create_reviewer_data <- function(
 
   data |>
     dplyr::mutate(
-      reviewer =
-        reviewer_name,
-
-      decision =
-        NA_character_,
-
-      exclusion_reason =
-        NA_character_,
-
-      confidence =
-        NA_character_,
-
-      notes =
-        NA_character_,
-
-      screened_at =
-        NA_character_
+      reviewer = reviewer_name,
+      decision = NA_character_,
+      exclusion_reason = NA_character_,
+      confidence = NA_character_,
+      notes = NA_character_,
+      screened_at = NA_character_
     ) |>
     dplyr::select(
       screening_id,
@@ -582,7 +480,7 @@ reviewer_2_data <- create_reviewer_data(
 
 
 # ============================================================
-# 10. Create conflict-resolution dataset
+# 10. Create conflict-resolution data
 # ============================================================
 
 conflict_data <- screening_data |>
@@ -591,33 +489,15 @@ conflict_data <- screening_data |>
     title,
     year,
     journal,
-
-    reviewer_1_decision =
-      NA_character_,
-
-    reviewer_2_decision =
-      NA_character_,
-
-    agreement_status =
-      NA_character_,
-
-    conflict_status =
-      NA_character_,
-
-    final_decision =
-      NA_character_,
-
-    final_exclusion_reason =
-      NA_character_,
-
-    adjudicator =
-      third_reviewer_name,
-
-    resolution_notes =
-      NA_character_,
-
-    resolved_at =
-      NA_character_
+    reviewer_1_decision = NA_character_,
+    reviewer_2_decision = NA_character_,
+    agreement_status = NA_character_,
+    conflict_status = NA_character_,
+    final_decision = NA_character_,
+    final_exclusion_reason = NA_character_,
+    adjudicator = third_reviewer_name,
+    resolution_notes = NA_character_,
+    resolved_at = NA_character_
   )
 
 
@@ -638,21 +518,16 @@ source_summary <- screening_data |>
     name = "record_count"
   ) |>
   dplyr::arrange(
-    dplyr::desc(
-      record_count
-    )
+    dplyr::desc(record_count)
   )
-
 
 source_summary <- dplyr::bind_rows(
   source_summary,
-
   tibble::tibble(
-    source_databases =
-      "Total unique records",
-
-    record_count =
-      nrow(screening_data)
+    source_databases = "Total unique records",
+    record_count = nrow(
+      screening_data
+    )
   )
 )
 
@@ -688,7 +563,7 @@ instructions <- tibble::tibble(
 
     paste(
       "This workbook is used for independent title and abstract",
-      "screening of records identified for this systematic review."
+      "screening of records identified for the systematic review."
     ),
 
     paste(
@@ -725,7 +600,7 @@ instructions <- tibble::tibble(
 
     paste(
       "The Conflict_Resolution sheet automatically compares decisions.",
-      "Records marked Conflict require discussion or adjudication."
+      "Records marked Conflict require adjudication."
     ),
 
     paste(
@@ -759,7 +634,7 @@ instructions <- tibble::tibble(
 # ============================================================
 
 workbook <- openxlsx::createWorkbook(
-  creator = "SR-MA Agent Toolkit v2.0"
+  creator = "Universal SR-MA Agent Toolkit"
 )
 
 openxlsx::addWorksheet(
@@ -838,6 +713,13 @@ screening_input_style <- openxlsx::createStyle(
   border = "TopBottomLeftRight"
 )
 
+center_style <- openxlsx::createStyle(
+  halign = "center",
+  valign = "center",
+  wrapText = TRUE,
+  border = "TopBottomLeftRight"
+)
+
 conflict_style <- openxlsx::createStyle(
   textDecoration = "bold"
 )
@@ -851,9 +733,31 @@ maximum_list_length <- max(
   length(decision_options),
   length(exclusion_reason_options),
   length(final_decision_options),
-  length(confidence_options)
+  3L
 )
 
+pad_character_vector <- function(
+    values,
+    target_length
+) {
+
+  values <- as.character(values)
+
+  padding_length <- target_length - length(values)
+
+  if (padding_length > 0L) {
+
+    values <- c(
+      values,
+      rep(
+        NA_character_,
+        padding_length
+      )
+    )
+  }
+
+  values
+}
 
 validation_lists <- tibble::tibble(
   decisions = pad_character_vector(
@@ -872,11 +776,14 @@ validation_lists <- tibble::tibble(
   ),
 
   confidence = pad_character_vector(
-    confidence_options,
+    c(
+      "High",
+      "Moderate",
+      "Low"
+    ),
     maximum_list_length
   )
 )
-
 
 openxlsx::writeData(
   workbook,
@@ -885,28 +792,6 @@ openxlsx::writeData(
   withFilter = FALSE
 )
 
-
-decision_validation_range <- build_validation_range(
-  "A",
-  length(decision_options)
-)
-
-exclusion_validation_range <- build_validation_range(
-  "B",
-  length(exclusion_reason_options)
-)
-
-final_decision_validation_range <- build_validation_range(
-  "C",
-  length(final_decision_options)
-)
-
-confidence_validation_range <- build_validation_range(
-  "D",
-  length(confidence_options)
-)
-
-
 # ============================================================
 # 16. Write Instructions sheet
 # ============================================================
@@ -914,10 +799,7 @@ confidence_validation_range <- build_validation_range(
 openxlsx::writeData(
   workbook,
   "Instructions",
-  paste0(
-    project_title,
-    " — Title and Abstract Screening Workbook"
-  ),
+  paste0(project_title, " — Title and Abstract Screening Workbook"),
   startRow = 1,
   startCol = 1
 )
@@ -953,7 +835,7 @@ openxlsx::addStyle(
   "Instructions",
   body_style,
   rows = 4:(
-    nrow(instructions) + 3L
+    nrow(instructions) + 3
   ),
   cols = 1:2,
   gridExpand = TRUE
@@ -988,15 +870,15 @@ write_reviewer_sheet <- function(
     workbook,
     sheet_name,
     reviewer_data,
-    reviewer_name
+    reviewer_number
 ) {
 
   openxlsx::writeData(
     workbook,
     sheet_name,
     paste0(
-      project_title,
-      " — Independent Screening"
+      "Independent Title and Abstract Screening — ",
+      if (reviewer_number == 1) reviewer_1_name else reviewer_2_name
     ),
     startRow = 1,
     startCol = 1
@@ -1022,9 +904,7 @@ write_reviewer_sheet <- function(
     workbook,
     sheet_name,
     paste0(
-      "Reviewer: ",
-      reviewer_name,
-      ". Select Include, Exclude, or Unclear. ",
+      "Select Include, Exclude, or Unclear. ",
       "When Exclude is selected, record one exclusion reason."
     ),
     startRow = 2,
@@ -1058,11 +938,10 @@ write_reviewer_sheet <- function(
     keepNA = FALSE
   )
 
-  first_data_row <- 5L
-
-  last_data_row <-
-    nrow(reviewer_data) +
-    4L
+  first_data_row <- 5
+  last_data_row <- nrow(
+    reviewer_data
+  ) + 4
 
   openxlsx::addStyle(
     workbook,
@@ -1074,29 +953,15 @@ write_reviewer_sheet <- function(
   )
 
   decision_column <- which(
-    names(reviewer_data) ==
-      "decision"
+    names(reviewer_data) == "decision"
   )
 
   exclusion_column <- which(
-    names(reviewer_data) ==
-      "exclusion_reason"
+    names(reviewer_data) == "exclusion_reason"
   )
 
   confidence_column <- which(
-    names(reviewer_data) ==
-      "confidence"
-  )
-
-  screening_entry_columns <- which(
-    names(reviewer_data) %in%
-      c(
-        "decision",
-        "exclusion_reason",
-        "confidence",
-        "notes",
-        "screened_at"
-      )
+    names(reviewer_data) == "confidence"
   )
 
   openxlsx::addStyle(
@@ -1104,7 +969,18 @@ write_reviewer_sheet <- function(
     sheet_name,
     screening_input_style,
     rows = first_data_row:last_data_row,
-    cols = screening_entry_columns,
+    cols = c(
+      decision_column,
+      exclusion_column,
+      confidence_column,
+      which(
+        names(reviewer_data) %in%
+          c(
+            "notes",
+            "screened_at"
+          )
+      )
+    ),
     gridExpand = TRUE
   )
 
@@ -1114,7 +990,7 @@ write_reviewer_sheet <- function(
     cols = decision_column,
     rows = first_data_row:last_data_row,
     type = "list",
-    value = decision_validation_range
+    value = "'Validation_Lists'!$A$2:$A$4"
   )
 
   openxlsx::dataValidation(
@@ -1123,7 +999,10 @@ write_reviewer_sheet <- function(
     cols = exclusion_column,
     rows = first_data_row:last_data_row,
     type = "list",
-    value = exclusion_validation_range
+    value = paste0(
+      "'Validation_Lists'!$B$2:$B$",
+      length(exclusion_reason_options) + 1
+    )
   )
 
   openxlsx::dataValidation(
@@ -1132,7 +1011,7 @@ write_reviewer_sheet <- function(
     cols = confidence_column,
     rows = first_data_row:last_data_row,
     type = "list",
-    value = confidence_validation_range
+    value = "'Validation_Lists'!$D$2:$D$4"
   )
 
   openxlsx::freezePane(
@@ -1212,7 +1091,7 @@ write_reviewer_sheet <- function(
     cols = decision_column,
     rows = first_data_row:last_data_row,
     rule = paste0(
-      "$",
+      '$',
       decision_letter,
       first_data_row,
       '="Include"'
@@ -1228,7 +1107,7 @@ write_reviewer_sheet <- function(
     cols = decision_column,
     rows = first_data_row:last_data_row,
     rule = paste0(
-      "$",
+      '$',
       decision_letter,
       first_data_row,
       '="Exclude"'
@@ -1244,7 +1123,7 @@ write_reviewer_sheet <- function(
     cols = exclusion_column,
     rows = first_data_row:last_data_row,
     rule = paste0(
-      "AND($",
+      'AND($',
       decision_letter,
       first_data_row,
       '="Exclude",$',
@@ -1261,14 +1140,14 @@ write_reviewer_sheet(
   workbook,
   "Reviewer_1",
   reviewer_1_data,
-  reviewer_1_name
+  1
 )
 
 write_reviewer_sheet(
   workbook,
   "Reviewer_2",
   reviewer_2_data,
-  reviewer_2_name
+  2
 )
 
 
@@ -1279,10 +1158,7 @@ write_reviewer_sheet(
 openxlsx::writeData(
   workbook,
   "Conflict_Resolution",
-  paste0(
-    project_title,
-    " — Reviewer Agreement and Conflict Resolution"
-  ),
+  paste0(project_title, " — Reviewer Agreement and Conflict Resolution"),
   startRow = 1,
   startCol = 1
 )
@@ -1313,20 +1189,17 @@ openxlsx::writeData(
   withFilter = TRUE
 )
 
-conflict_first_row <- 4L
-
-conflict_last_row <-
-  nrow(conflict_data) +
-  3L
+conflict_first_row <- 4
+conflict_last_row <- nrow(
+  conflict_data
+) + 3
 
 reviewer_1_decision_column <- which(
-  names(reviewer_1_data) ==
-    "decision"
+  names(reviewer_1_data) == "decision"
 )
 
 reviewer_2_decision_column <- which(
-  names(reviewer_2_data) ==
-    "decision"
+  names(reviewer_2_data) == "decision"
 )
 
 reviewer_1_decision_letter <- excel_column_name(
@@ -1337,18 +1210,9 @@ reviewer_2_decision_letter <- excel_column_name(
   reviewer_2_decision_column
 )
 
+for (row_number in conflict_first_row:conflict_last_row) {
 
-for (
-  row_number in
-  conflict_first_row:conflict_last_row
-) {
-
-  # Reviewer sheets start data on row 5.
-  # Conflict sheet starts data on row 4.
-
-  reviewer_row <-
-    row_number +
-    1L
+  reviewer_row <- row_number + 1
 
   openxlsx::writeFormula(
     workbook,
@@ -1409,14 +1273,13 @@ for (
   )
 }
 
-
 openxlsx::dataValidation(
   workbook,
   "Conflict_Resolution",
   cols = 9,
   rows = conflict_first_row:conflict_last_row,
   type = "list",
-  value = final_decision_validation_range
+  value = "'Validation_Lists'!$C$2:$C$4"
 )
 
 openxlsx::dataValidation(
@@ -1425,7 +1288,10 @@ openxlsx::dataValidation(
   cols = 10,
   rows = conflict_first_row:conflict_last_row,
   type = "list",
-  value = exclusion_validation_range
+  value = paste0(
+    "'Validation_Lists'!$B$2:$B$",
+    length(exclusion_reason_options) + 1
+  )
 )
 
 openxlsx::addStyle(
@@ -1478,7 +1344,7 @@ openxlsx::conditionalFormatting(
   cols = 8,
   rows = conflict_first_row:conflict_last_row,
   rule = paste0(
-    "$H",
+    '$H',
     conflict_first_row,
     '="Conflict"'
   ),
@@ -1493,10 +1359,7 @@ openxlsx::conditionalFormatting(
 openxlsx::writeData(
   workbook,
   "Source_Summary",
-  paste0(
-    project_short_name,
-    " — Search Source Summary"
-  ),
+  "Search Source Summary",
   startRow = 1,
   startCol = 1
 )
@@ -1532,8 +1395,7 @@ openxlsx::addStyle(
   "Source_Summary",
   body_style,
   rows = 4:(
-    nrow(source_summary) +
-      3L
+    nrow(source_summary) + 3
   ),
   cols = 1:2,
   gridExpand = TRUE
@@ -1555,8 +1417,9 @@ openxlsx::setColWidths(
 
 
 # ============================================================
-# 20. Save workbook
+# 20. Workbook properties and save
 # ============================================================
+
 
 openxlsx::saveWorkbook(
   workbook,
@@ -1572,11 +1435,13 @@ openxlsx::saveWorkbook(
 if (!file.exists(output_file)) {
 
   stop(
-    "The screening workbook was not created successfully:\n",
-    output_file
+    "The screening workbook was not created successfully."
   )
 }
 
+workbook_sheets <- openxlsx::getSheetNames(
+  output_file
+)
 
 expected_sheets <- c(
   "Instructions",
@@ -1587,74 +1452,91 @@ expected_sheets <- c(
   "Validation_Lists"
 )
 
-
-workbook_sheets <- openxlsx::getSheetNames(
-  output_file
-)
-
-
 missing_sheets <- setdiff(
   expected_sheets,
   workbook_sheets
 )
 
-if (length(missing_sheets) > 0L) {
+if (length(missing_sheets) > 0) {
 
   stop(
-    "The workbook is missing the following sheets:\n- ",
+    "The workbook is missing the following sheets: ",
     paste(
       missing_sheets,
-      collapse = "\n- "
+      collapse = ", "
     )
   )
 }
 
 
-saved_reviewer_1 <- openxlsx::readWorkbook(
-  output_file,
-  sheet = "Reviewer_1",
-  startRow = 4,
-  colNames = TRUE,
-  skipEmptyRows = FALSE
-)
-
-saved_reviewer_2 <- openxlsx::readWorkbook(
-  output_file,
-  sheet = "Reviewer_2",
-  startRow = 4,
-  colNames = TRUE,
-  skipEmptyRows = FALSE
-)
-
-
 if (
-  nrow(saved_reviewer_1) !=
-    nrow(screening_data)
+  !file.exists(output_file) ||
+  is.na(file.info(output_file)$size) ||
+  file.info(output_file)$size <= 0
 ) {
 
   stop(
-    "Reviewer_1 sheet record count does not match ",
-    "the deduplicated screening dataset.\n",
-    "Expected: ",
-    nrow(screening_data),
-    "\nObserved: ",
-    nrow(saved_reviewer_1)
+    "The screening workbook is missing or empty after saving.",
+    call. = FALSE
   )
 }
 
+reviewer_1_saved <- openxlsx::readWorkbook(
+  output_file,
+  sheet = "Reviewer_1",
+  startRow = 4,
+  colNames = TRUE
+)
+
+reviewer_2_saved <- openxlsx::readWorkbook(
+  output_file,
+  sheet = "Reviewer_2",
+  startRow = 4,
+  colNames = TRUE
+)
+
+required_reviewer_columns <- c(
+  "screening_id",
+  "source_databases",
+  "title",
+  "abstract",
+  "reviewer",
+  "decision",
+  "exclusion_reason",
+  "confidence",
+  "notes",
+  "screened_at"
+)
+
+missing_reviewer_1_columns <- setdiff(
+  required_reviewer_columns,
+  names(reviewer_1_saved)
+)
+
+missing_reviewer_2_columns <- setdiff(
+  required_reviewer_columns,
+  names(reviewer_2_saved)
+)
 
 if (
-  nrow(saved_reviewer_2) !=
-    nrow(screening_data)
+  length(missing_reviewer_1_columns) > 0L ||
+  length(missing_reviewer_2_columns) > 0L
 ) {
 
   stop(
-    "Reviewer_2 sheet record count does not match ",
-    "the deduplicated screening dataset.\n",
-    "Expected: ",
-    nrow(screening_data),
-    "\nObserved: ",
-    nrow(saved_reviewer_2)
+    "The saved screening workbook is missing required reviewer columns.",
+    call. = FALSE
+  )
+}
+
+if (
+  nrow(reviewer_1_saved) != nrow(screening_data) ||
+  nrow(reviewer_2_saved) != nrow(screening_data)
+) {
+
+  stop(
+    "Reviewer-sheet row counts do not match the deduplicated input records.",
+    call. = FALSE
   )
 }
 
@@ -1664,33 +1546,11 @@ if (
 # ============================================================
 
 report_lines <- c(
-  "SR-MA Agent Toolkit v2.0",
+  "Universal SR-MA Agent Toolkit",
   "Title and Abstract Screening Workbook Report",
   "",
-
-  paste0(
-    "Project ID: ",
-    project_id
-  ),
-
-  paste0(
-    "Review title: ",
-    project_title
-  ),
-
-  paste0(
-    "Project short name: ",
-    project_short_name
-  ),
-
-  paste0(
-    "Configuration file: ",
-    attr(
-      config,
-      "config_file"
-    )
-  ),
-
+  paste0("Project ID: ", project_id),
+  paste0("Project title: ", project_title),
   paste0(
     "Generated at: ",
     format(
@@ -1698,98 +1558,43 @@ report_lines <- c(
       "%Y-%m-%d %H:%M:%S"
     )
   ),
-
   paste0(
     "Input file: ",
     input_file
   ),
-
   paste0(
     "Records included in workbook: ",
     nrow(screening_data)
   ),
-
-  paste0(
-    "Reviewer 1: ",
-    reviewer_1_name
-  ),
-
-  paste0(
-    "Reviewer 2: ",
-    reviewer_2_name
-  ),
-
-  paste0(
-    "Third reviewer: ",
-    third_reviewer_name
-  ),
-
   paste0(
     "Workbook file: ",
     output_file
   ),
-
-  "",
-  "VALIDATION",
-  "--------------------------------------------------",
-
   paste0(
-    "Workbook exists: ",
-    file.exists(output_file)
+    "Reviewer 1: ",
+    reviewer_1_name
   ),
-
   paste0(
-    "All expected worksheets present: ",
-    length(missing_sheets) == 0L
+    "Reviewer 2: ",
+    reviewer_2_name
   ),
-
   paste0(
-    "Reviewer_1 row count valid: ",
-    nrow(saved_reviewer_1) ==
-      nrow(screening_data)
+    "Third reviewer: ",
+    third_reviewer_name
   ),
-
-  paste0(
-    "Reviewer_2 row count valid: ",
-    nrow(saved_reviewer_2) ==
-      nrow(screening_data)
-  ),
-
   "",
   "WORKSHEETS",
   "--------------------------------------------------",
-
   expected_sheets,
-
   "",
   "DECISION OPTIONS",
   "--------------------------------------------------",
-
   decision_options,
-
   "",
   "EXCLUSION REASONS",
   "--------------------------------------------------",
-
-  paste0(
-    exclusion_reason_table$code,
-    ": ",
-    exclusion_reason_table$label
-  ),
-
-  "",
-  "FINAL DECISION OPTIONS",
-  "--------------------------------------------------",
-
-  final_decision_options,
-
-  "",
-  "CONFIDENCE OPTIONS",
-  "--------------------------------------------------",
-
-  confidence_options
+  exclusion_reason_options
 )
-
 
 writeLines(
   report_lines,
@@ -1806,18 +1611,6 @@ cat("\n")
 cat("====================================================\n")
 cat("Screening Workbook Created Successfully\n")
 cat("====================================================\n\n")
-
-cat("Project ID:\n")
-cat(project_id, "\n\n")
-
-cat("Review title:\n")
-cat(project_title, "\n\n")
-
-cat("Reviewer 1:\n")
-cat(reviewer_1_name, "\n\n")
-
-cat("Reviewer 2:\n")
-cat(reviewer_2_name, "\n\n")
 
 cat(
   "Records prepared for screening:",
@@ -1842,13 +1635,46 @@ for (sheet_name in expected_sheets) {
   )
 }
 
+# ============================================================
+# 24. Standalone TASK-007 validation
+# ============================================================
+
+required_outputs <- c(
+  screening_workbook = output_file,
+  screening_report = report_file
+)
+
+output_nonempty <- vapply(
+  required_outputs,
+  function(file_path) {
+    file.exists(file_path) &&
+      !is.na(file.info(file_path)$size) &&
+      file.info(file_path)$size > 0
+  },
+  logical(1)
+)
+
+if (!all(output_nonempty)) {
+
+  failed_outputs <- names(required_outputs)[
+    !output_nonempty
+  ]
+
+  stop(
+    "TASK-007 standalone validation failed.\n",
+    "Missing or empty output(s): ",
+    paste(failed_outputs, collapse = ", "),
+    call. = FALSE
+  )
+}
+
+cat(
+  "\nPASS: TASK-007 R/18 Screening Workbook completed successfully.\n"
+)
+
 cat(
   "\nNext step:",
-  "\n1. Open the regenerated screening workbook.",
-  "\n2. Confirm the project title and reviewer names.",
-  "\n3. Confirm the decision dropdowns.",
-  "\n4. Confirm the exclusion-reason dropdowns.",
-  "\n5. Confirm the number of records matches R/17 output.",
-  "\n6. Begin independent title and abstract screening.",
+  "\nOpen the workbook and confirm that title/abstract display,",
+  "\ndrop-down lists, and conflict formulas behave correctly.",
   "\n"
 )
