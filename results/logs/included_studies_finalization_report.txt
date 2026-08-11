@@ -1,0 +1,44 @@
+Universal SR-MA Agent Toolkit
+TASK-012 — Final Included Studies Report
+
+Generated at: 2026-08-11 21:28:05
+Project ID: sglt2_inhibitors_cardiac_surgery
+Project title: Efficacy and safety of preoperative or perioperative SGLT2 inhibitors in adult cardiac surgery: a systematic review and meta-analysis
+
+AUTHORITATIVE SOURCE
+--------------------------------------------------
+Input workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/full_text/full_text_eligibility_agent.xlsx
+Authoritative decision: 1st Author Final Review
+Second reviewer/adjudication used: NO
+
+FINAL COUNTS
+--------------------------------------------------
+Total full-text candidate records: 30
+Final Included Studies: 21
+Excluded after full-text review: 9
+
+VALIDATION
+--------------------------------------------------
+All author_final_decision values complete: PASS
+Allowed author decision vocabulary: PASS
+Exclude reason required and canonical: PASS
+Include reason blank: PASS
+Final partition consistency: PASS
+Included_Studies workbook validation: PASS
+
+OUTPUTS
+--------------------------------------------------
+Finalized workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/full_text/full_text_eligibility_final.xlsx
+Included Studies CSV: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/full_text/included_studies.csv
+Excluded after full-text CSV: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/full_text/excluded_after_full_text.csv
+Final eligibility CSV: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/full_text/final_full_text_eligibility.csv
+Report: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/included_studies_finalization_report.txt
+
+STAGE BOUNDARY
+--------------------------------------------------
+Authoritative Included Studies created: YES
+Runner integration performed: NO
+
+TASK STATUS
+--------------------------------------------------
+TASK-012: PASS
