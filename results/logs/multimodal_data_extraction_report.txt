@@ -1,0 +1,53 @@
+Universal SR-MA Agent Toolkit
+TASK-013 — Multimodal Data Extraction Report
+
+Generated at: 2026-08-12 02:22:47
+Project ID: sglt2_inhibitors_cardiac_surgery
+Project title: Efficacy and safety of preoperative or perioperative SGLT2 inhibitors in adult cardiac surgery: a systematic review and meta-analysis
+
+ARCHITECTURE
+--------------------------------------------------
+DEC-008: Multimodal Agent Extraction -> Human Verification
+Agent extraction authoritative: NO
+Human verification populated by R/25: NO
+Runner integration performed: NO
+
+CANONICAL INPUT
+--------------------------------------------------
+Included Studies: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/full_text/included_studies.csv
+Included study count: 21
+Extraction schema: config/data_extraction_schema.yml
+Schema version: 1.0
+
+AGENT EXTRACTION
+--------------------------------------------------
+Valid Agent extractions: 21
+Complete extractions: 12
+Partial — metadata only: 3
+Partial — insufficient source: 6
+Full-text PDF evidence: 18
+Metadata-only evidence: 3
+Study-characteristics rows: 21
+Group rows: 37
+Outcome rows: 57
+Unresolved failures: 0
+Missing study extractions: 0
+
+OUTPUTS
+--------------------------------------------------
+Study characteristics CSV: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/extraction/study_characteristics_agent.csv
+Group characteristics CSV: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/extraction/group_characteristics_agent.csv
+Outcome data CSV: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/extraction/outcome_data_agent.csv
+Human verification workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/multimodal_data_extraction_agent.xlsx
+Checkpoint: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/multimodal_data_extraction_checkpoint.csv
+Failure log: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/multimodal_data_extraction_failures.csv
+Report: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/multimodal_data_extraction_report.txt
+
+STAGE BOUNDARY
+--------------------------------------------------
+Meta-analysis-ready authoritative dataset created: NO
+Next stage after PASS: TASK-014 — Human Verification
+
+TASK STATUS
+--------------------------------------------------
+TASK-013: PASS

@@ -1,0 +1,115 @@
+# ============================================================
+# Universal SR-MA Agent Toolkit
+# config/data_extraction_schema.yml
+#
+# TASK-013 — Multimodal Data Extraction Schema
+#
+# Topic-neutral design:
+# - Project-specific outcomes are read dynamically from
+#   config/project_config.yml.
+# - This file defines the extraction structure, not the clinical topic.
+# ============================================================
+
+schema_version: "1.0"
+
+architecture:
+  agent_extraction: true
+  human_verification: true
+  authoritative_after_task_014: human_verified_dataset
+
+evidence_policy:
+  pdf_primary: true
+  metadata_fallback: true
+  never_infer_unreported_values: true
+  preserve_reported_units: true
+  preserve_reported_timepoints: true
+  preserve_adjusted_and_unadjusted_results: true
+  require_source_location_when_available: true
+
+study_characteristics:
+  fields:
+    - study_design
+    - country
+    - setting
+    - enrollment_period
+    - analysis_population
+    - total_sample_size
+    - surgery_or_procedure
+    - intervention_or_exposure
+    - exposure_timing
+    - comparator
+    - follow_up
+    - funding
+    - conflicts_of_interest
+    - extraction_notes
+
+group_characteristics:
+  fields:
+    - group_name
+    - group_role
+    - sample_size
+    - age_mean
+    - age_sd
+    - male_n
+    - female_n
+    - baseline_renal_function
+    - baseline_diabetes_status
+    - baseline_characteristics_notes
+
+outcome_data:
+  project_outcomes_from_project_config: true
+
+  allowed_data_types:
+    - dichotomous
+    - continuous
+    - time_to_event
+    - reported_effect
+    - other
+
+  fields:
+    - outcome_name
+    - outcome_definition
+    - timepoint
+    - data_type
+    - intervention_events
+    - intervention_total
+    - comparator_events
+    - comparator_total
+    - intervention_mean
+    - intervention_sd
+    - intervention_n
+    - comparator_mean
+    - comparator_sd
+    - comparator_n
+    - unit
+    - effect_measure
+    - effect_estimate
+    - lower_ci
+    - upper_ci
+    - adjusted
+    - adjustment_variables
+    - source_location
+    - source_evidence
+    - extraction_notes
+
+missing_value_policy:
+  representation: ""
+  rule: "Leave unreported or non-extractable values blank; never calculate or impute during TASK-013."
+
+human_verification:
+  study_fields:
+    - verification_status
+    - corrected_value_notes
+    - verifier
+    - verified_at
+
+  outcome_fields:
+    - verification_status
+    - corrected_value_notes
+    - verifier
+    - verified_at
+
+  allowed_status:
+    - Verified
+    - Corrected
+    - Needs clarification

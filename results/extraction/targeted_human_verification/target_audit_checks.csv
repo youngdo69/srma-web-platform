@@ -1,0 +1,2 @@
+audit_id,screening_id,related_screening_ids,audit_question,audit_status,human_conclusion,verifier,verified_at
+AUDIT_001,SCR_000003,SCR_000024,Confirm sample overlap and duplication between SCR_000003 and SCR_000024; retain only one for any pooling.,,,,

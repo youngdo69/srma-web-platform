@@ -209,9 +209,8 @@ screening:
       name: ''
       initials: ''
 data_extraction:
-  reviewers: 2
-  independent_extraction: yes
-  disagreement_resolution: third_reviewer
+  agent_extraction: yes
+  human_verification: yes
 risk_of_bias:
   randomized_trials: Cochrane RoB 2
   nonrandomized_studies: ROBINS-I

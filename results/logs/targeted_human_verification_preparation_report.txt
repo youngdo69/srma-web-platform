@@ -1,0 +1,56 @@
+Universal SR-MA Agent Toolkit
+R/25B — Targeted Human Verification Preparation Report
+
+Generated at: 2026-08-12 22:28:25
+Project ID: sglt2_inhibitors_cardiac_surgery
+Project title: Efficacy and safety of preoperative or perioperative SGLT2 inhibitors in adult cardiac surgery: a systematic review and meta-analysis
+
+CONNECTION
+--------------------------------------------------
+Upstream Agent extraction: R/25
+Upstream scope advisory: R/25A
+R/25A advisory JSON loaded: YES
+R/25A candidate meta-analysis sets loaded: YES
+Study IDs hard-coded: NO
+
+RESEARCH SCOPE
+--------------------------------------------------
+Recommended topic: Perioperative SGLT2 inhibitors to prevent 7-day postoperative AKI after adult cardiac surgery
+Primary endpoint: Postoperative acute kidney injury within 7 days (KDIGO stage ≥1 or AKIN stage ≥1 or RIFLE ‘Risk’ or worse; creatinine-based preferred, urine-output accepted if per guideline definition)
+Mapped canonical outcome: Postoperative acute kidney injury
+
+TARGETED HUMAN VERIFICATION
+--------------------------------------------------
+Primary studies: 4 — SCR_000083 | SCR_000024 | SCR_000012 | SCR_000098
+Sensitivity-only studies: 0 — 
+Secondary observational studies: 3 — SCR_000118 | SCR_000096 | SCR_000113
+Audit-only studies: 1 — SCR_000003
+Total targeted study rows: 8
+Targeted outcome rows: 20
+Audit checks: 1
+
+OUTPUTS
+--------------------------------------------------
+Workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/targeted_human_verification/targeted_human_verification.xlsx
+Verification plan CSV: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/targeted_human_verification/targeted_verification_plan.csv
+Target study CSV: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/targeted_human_verification/target_study_data_agent.csv
+Target outcome CSV: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/targeted_human_verification/target_outcome_data_agent.csv
+Audit CSV: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/targeted_human_verification/target_audit_checks.csv
+
+STAGE BOUNDARY
+--------------------------------------------------
+Human Verification performed by R/25B: NO
+Systematic-review inclusion modified: NO
+Agent values modified: NO
+Meta-analysis performed: NO
+Runner integration performed: NO
+Runner-ready connection to R/25A: YES
+
+STATUS
+--------------------------------------------------
+R/25B: PASS
+
+NEXT STEP
+--------------------------------------------------
+Open targeted_human_verification.xlsx and complete the human fields.
+After completion, run R/26 to validate and finalize the human-verified dataset.
