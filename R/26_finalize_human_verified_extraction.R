@@ -2,42 +2,64 @@
 # Universal SR-MA Agent Toolkit
 # R/26_finalize_human_verified_extraction.R
 #
+# Revision: Universal analysis-set finalization
+#
 # PURPOSE
 # ------------------------------------------------------------
 # Canonical post-Human-Verification finalization step.
 #
-# This script:
-#   1) reads the completed Targeted Human Verification workbook,
-#   2) selects ONLY rows explicitly approved for planned analysis,
-#   3) resolves Human-Verified values as the authoritative source,
-#   4) separates approved rows by analysis_group,
-#   5) creates one meta-analysis-ready dataset per analysis_group,
-#   6) creates a universal meta-analysis manifest,
-#   7) prints a concise recommendation for the next meta-analysis step,
-#   8) stops with FAIL if Human Verification is incomplete or internally
-#      inconsistent.
+# R/26:
+#   1) reads completed targeted_human_verification.xlsx,
+#   2) selects ONLY Human-approved quantitative rows,
+#   3) resolves Human-verified values as authoritative,
+#   4) sanitizes non-applicable / invalid extraction fields,
+#   5) validates meta-analysis input compatibility,
+#   6) creates analysis SETS rather than merely raw groups,
+#   7) supports composite sensitivity sets:
 #
-# UNIVERSAL GOVERNANCE RULE
+#        sensitivity set = parent primary set + sensitivity-only rows
+#
+#   8) writes one meta-analysis-ready CSV per final analysis set,
+#   9) writes meta_analysis_manifest.csv,
+#  10) prints the recommended downstream analysis structure.
+#
+# UNIVERSAL HUMAN GATE
 # ------------------------------------------------------------
-# Quantitative synthesis eligibility is determined ONLY by:
+# Quantitative analysis requires:
 #
 #   human_include_in_planned_analysis == "Yes"
 #
-# and the row must also have:
+# AND
 #
 #   verification_status %in% c("Verified", "Corrected")
 #
 # Human-verified values are authoritative.
 #
-# R/26 does NOT:
-#   - decide which studies should be included,
-#   - perform Human Verification,
-#   - silently convert incompatible effect measures,
-#   - pool RCT and observational studies together,
-#   - perform the meta-analysis itself.
+# UNIVERSAL ANALYSIS-SET RULE
+# ------------------------------------------------------------
+# analysis_group describes the row's assigned role/group.
+# R/26 converts those groups into FINAL ANALYSIS SETS.
 #
-# R/26 prepares authoritative, analysis-ready datasets and tells the
-# downstream meta-analysis stage what can be analyzed.
+# Preferred explicit relation:
+#   parent_analysis_group
+#
+# Backward-compatible fallback:
+#   if a group is clearly a sensitivity group and no explicit parent
+#   exists, R/26 tries to infer ONE compatible primary parent using:
+#     - meta_analysis_role / analysis_group semantics,
+#     - outcome compatibility,
+#     - broad study-design compatibility.
+#
+# If parent inference is ambiguous, R/26 stops rather than guessing.
+#
+# IMPORTANT
+# ------------------------------------------------------------
+# R/26 does NOT:
+#   - perform meta-analysis,
+#   - silently pool different study designs,
+#   - silently convert RR <-> OR <-> HR,
+#   - change Human Include/Exclude decisions.
+#
 # ============================================================
 
 
@@ -86,9 +108,11 @@ clean_text <- function(x) {
 
 safe_chr <- function(x) {
   x <- clean_text(x)
+
   if (length(x) == 0L || is.na(x[[1]])) {
     return("")
   }
+
   as.character(x[[1]])
 }
 
@@ -165,17 +189,6 @@ safe_file_component <- function(x) {
   tolower(x)
 }
 
-first_nonmissing <- function(x) {
-  x <- clean_text(x)
-  x <- x[!is.na(x)]
-
-  if (length(x) == 0L) {
-    return(NA_character_)
-  }
-
-  x[[1]]
-}
-
 collapse_unique <- function(x, sep = "; ") {
   x <- clean_text(x)
   x <- unique(x[!is.na(x)])
@@ -200,6 +213,229 @@ all_same_or_mixed <- function(x) {
   }
 
   "Mixed"
+}
+
+first_existing_column <- function(data, candidates) {
+  hit <- candidates[
+    candidates %in% names(data)
+  ]
+
+  if (length(hit) == 0L) {
+    return(NA_character_)
+  }
+
+  hit[[1]]
+}
+
+normalize_effect_measure <- function(x) {
+  raw <- clean_text(x)
+  y <- toupper(raw)
+
+  y <- stringr::str_replace_all(
+    y,
+    "[^A-Z0-9]+",
+    ""
+  )
+
+  out <- dplyr::case_when(
+    y %in% c(
+      "RR",
+      "RISKRATIO",
+      "RELATIVERISK"
+    ) ~ "RR",
+
+    y %in% c(
+      "OR",
+      "ODDSRATIO"
+    ) ~ "OR",
+
+    y %in% c(
+      "HR",
+      "HAZARDRATIO"
+    ) ~ "HR",
+
+    y %in% c(
+      "RD",
+      "RISKDIFFERENCE"
+    ) ~ "RD",
+
+    y %in% c(
+      "MD",
+      "MEANDIFFERENCE"
+    ) ~ "MD",
+
+    y %in% c(
+      "SMD",
+      "STANDARDIZEDMEANDIFFERENCE",
+      "STANDARDISEDMEANDIFFERENCE"
+    ) ~ "SMD",
+
+    TRUE ~ NA_character_
+  )
+
+  out
+}
+
+normalize_data_type <- function(x) {
+  raw <- clean_text(x)
+  y <- tolower(raw)
+
+  dplyr::case_when(
+    stringr::str_detect(
+      y,
+      "reported.*effect|effect.*estimate"
+    ) ~ "reported_effect",
+
+    stringr::str_detect(
+      y,
+      "dichotom|binary|event"
+    ) ~ "dichotomous",
+
+    stringr::str_detect(
+      y,
+      "continuous|mean"
+    ) ~ "continuous",
+
+    TRUE ~ raw
+  )
+}
+
+infer_design_class <- function(x) {
+  y <- tolower(
+    clean_text(x)
+  )
+
+  dplyr::case_when(
+    stringr::str_detect(
+      y,
+      "randomized|randomised|\\brct\\b"
+    ) ~ "RCT",
+
+    stringr::str_detect(
+      y,
+      "observational|retrospective|prospective cohort|cohort|case.control|case-control|propensity|registry"
+    ) ~ "Observational",
+
+    is.na(y) ~ NA_character_,
+
+    TRUE ~ "Other_or_Unclear"
+  )
+}
+
+role_class <- function(group_name, role) {
+  txt <- tolower(
+    paste(
+      safe_chr(group_name),
+      safe_chr(role)
+    )
+  )
+
+  if (
+    stringr::str_detect(
+      txt,
+      "sensitiv|robust"
+    )
+  ) {
+    return("Sensitivity")
+  }
+
+  if (
+    stringr::str_detect(
+      txt,
+      "primary"
+    )
+  ) {
+    return("Primary")
+  }
+
+  if (
+    stringr::str_detect(
+      txt,
+      "observ|real.world|real world"
+    )
+  ) {
+    return("Observational")
+  }
+
+  "Standalone"
+}
+
+compatible_for_sensitivity <- function(
+    sensitivity_df,
+    primary_df
+) {
+
+  sensitivity_outcomes <- unique(
+    clean_text(
+      sensitivity_df$outcome_name
+    )
+  )
+
+  sensitivity_outcomes <- sensitivity_outcomes[
+    !is.na(
+      sensitivity_outcomes
+    )
+  ]
+
+  primary_outcomes <- unique(
+    clean_text(
+      primary_df$outcome_name
+    )
+  )
+
+  primary_outcomes <- primary_outcomes[
+    !is.na(
+      primary_outcomes
+    )
+  ]
+
+  outcome_ok <- (
+    length(sensitivity_outcomes) == 0L ||
+      length(primary_outcomes) == 0L ||
+      length(
+        intersect(
+          sensitivity_outcomes,
+          primary_outcomes
+        )
+      ) > 0L
+  )
+
+  sensitivity_design <- unique(
+    clean_text(
+      sensitivity_df$design_class
+    )
+  )
+
+  sensitivity_design <- sensitivity_design[
+    !is.na(
+      sensitivity_design
+    )
+  ]
+
+  primary_design <- unique(
+    clean_text(
+      primary_df$design_class
+    )
+  )
+
+  primary_design <- primary_design[
+    !is.na(
+      primary_design
+    )
+  ]
+
+  design_ok <- (
+    length(sensitivity_design) == 0L ||
+      length(primary_design) == 0L ||
+      length(
+        intersect(
+          sensitivity_design,
+          primary_design
+        )
+      ) > 0L
+  )
+
+  outcome_ok && design_ok
 }
 
 
@@ -297,26 +533,18 @@ if (!file.exists(input_workbook)) {
 
 
 # ============================================================
-# 4. Validate workbook
+# 4. Read workbook
 # ============================================================
 
 sheet_names <- openxlsx::getSheetNames(
   input_workbook
 )
 
-required_sheets <- c(
-  "Target_Outcome_Verification"
-)
-
-missing_sheets <- setdiff(
-  required_sheets,
-  sheet_names
-)
-
-if (length(missing_sheets) > 0L) {
+if (
+  !"Target_Outcome_Verification" %in% sheet_names
+) {
   stop(
-    "Required sheet(s) missing from targeted_human_verification.xlsx: ",
-    paste(missing_sheets, collapse = ", "),
+    "Required sheet missing: Target_Outcome_Verification",
     call. = FALSE
   )
 }
@@ -335,9 +563,22 @@ if (nrow(outcomes) == 0L) {
   )
 }
 
+study <- NULL
+
+if (
+  "Target_Study_Verification" %in% sheet_names
+) {
+  study <- openxlsx::readWorkbook(
+    input_workbook,
+    sheet = "Target_Study_Verification",
+    colNames = TRUE,
+    skipEmptyRows = TRUE
+  )
+}
+
 
 # ============================================================
-# 5. Universal minimum contract
+# 5. Minimum contract
 # ============================================================
 
 required_columns <- c(
@@ -358,24 +599,27 @@ missing_columns <- setdiff(
 if (length(missing_columns) > 0L) {
   stop(
     "Target_Outcome_Verification is missing required column(s):\n- ",
-    paste(missing_columns, collapse = "\n- "),
+    paste(
+      missing_columns,
+      collapse = "\n- "
+    ),
     call. = FALSE
   )
 }
 
 outcomes <- outcomes |>
   dplyr::mutate(
+    screening_id = clean_text(screening_id),
+    outcome_row_id = clean_text(outcome_row_id),
+    outcome_name = clean_text(outcome_name),
+    analysis_group = clean_text(analysis_group),
+    meta_analysis_role = clean_text(meta_analysis_role),
     verification_status = normalize_verification_status(
       verification_status
     ),
     human_include_in_planned_analysis = normalize_yes_no(
       human_include_in_planned_analysis
-    ),
-    screening_id = clean_text(screening_id),
-    outcome_row_id = clean_text(outcome_row_id),
-    outcome_name = clean_text(outcome_name),
-    analysis_group = clean_text(analysis_group),
-    meta_analysis_role = clean_text(meta_analysis_role)
+    )
   )
 
 
@@ -390,8 +634,7 @@ approved <- outcomes |>
 
 if (nrow(approved) == 0L) {
   stop(
-    "No row is marked Yes in human_include_in_planned_analysis. ",
-    "There is no Human-approved quantitative synthesis dataset.",
+    "No row is marked Yes in human_include_in_planned_analysis.",
     call. = FALSE
   )
 }
@@ -406,61 +649,62 @@ bad_status <- approved |>
 
 if (nrow(bad_status) > 0L) {
   stop(
-    "Human gate is incomplete. ",
+    "Human gate incomplete: ",
     nrow(bad_status),
-    " approved row(s) are not finalized as Verified or Corrected.",
+    " Human-approved row(s) are not Verified/Corrected.",
     call. = FALSE
   )
 }
 
-missing_group <- approved |>
-  dplyr::filter(
-    is.na(analysis_group)
+if (
+  any(
+    is.na(
+      approved$analysis_group
+    )
   )
-
-if (nrow(missing_group) > 0L) {
+) {
   stop(
-    "Human-approved row(s) are missing analysis_group. ",
-    "R/26 cannot create analysis-specific datasets.",
+    "Human-approved row(s) are missing analysis_group.",
     call. = FALSE
   )
 }
 
-missing_role <- approved |>
-  dplyr::filter(
-    is.na(meta_analysis_role)
+if (
+  any(
+    is.na(
+      approved$meta_analysis_role
+    )
   )
-
-if (nrow(missing_role) > 0L) {
+) {
   stop(
     "Human-approved row(s) are missing meta_analysis_role.",
     call. = FALSE
   )
 }
 
-if (anyDuplicated(approved$outcome_row_id) > 0L) {
+if (
+  anyDuplicated(
+    approved$outcome_row_id
+  ) > 0L
+) {
   stop(
-    "Duplicate outcome_row_id detected among approved rows.",
+    "Duplicate outcome_row_id detected among Human-approved rows.",
     call. = FALSE
   )
 }
 
 
 # ============================================================
-# 7. Resolve Human-Verified authoritative values
-# ============================================================
-# Rule:
-#   - human_verified_* overrides Agent extraction when present
-#   - otherwise the verified Agent value remains authoritative
-#
-# The script uses only columns that actually exist, making the
-# finalizer reusable across projects and extraction schemas.
+# 7. Resolve Human-verified authoritative values
 # ============================================================
 
 human_prefix <- "human_verified_"
 
 human_columns <- grep(
-  paste0("^", human_prefix),
+  paste0(
+    "^",
+    human_prefix
+  ),
   names(approved),
   value = TRUE
 )
@@ -468,7 +712,10 @@ human_columns <- grep(
 for (human_col in human_columns) {
 
   agent_col <- sub(
-    paste0("^", human_prefix),
+    paste0(
+      "^",
+      human_prefix
+    ),
     "",
     human_col
   )
@@ -478,7 +725,9 @@ for (human_col in human_columns) {
     agent_col
   )
 
-  if (agent_col %in% names(approved)) {
+  if (
+    agent_col %in% names(approved)
+  ) {
     approved[[final_col]] <- authoritative_value(
       approved[[human_col]],
       approved[[agent_col]]
@@ -490,12 +739,7 @@ for (human_col in human_columns) {
   }
 }
 
-
-# ============================================================
-# 8. Ensure commonly required final fields exist
-# ============================================================
-
-common_agent_fields <- c(
+common_fields <- c(
   "outcome_definition",
   "timepoint",
   "data_type",
@@ -503,6 +747,13 @@ common_agent_fields <- c(
   "intervention_total",
   "comparator_events",
   "comparator_total",
+  "intervention_mean",
+  "intervention_sd",
+  "intervention_n",
+  "comparator_mean",
+  "comparator_sd",
+  "comparator_n",
+  "unit",
   "effect_measure",
   "effect_estimate",
   "lower_ci",
@@ -512,16 +763,20 @@ common_agent_fields <- c(
   "source_location"
 )
 
-for (field in common_agent_fields) {
+for (field in common_fields) {
 
   final_field <- paste0(
     "final_",
     field
   )
 
-  if (!final_field %in% names(approved)) {
+  if (
+    !final_field %in% names(approved)
+  ) {
 
-    if (field %in% names(approved)) {
+    if (
+      field %in% names(approved)
+    ) {
       approved[[final_field]] <- clean_text(
         approved[[field]]
       )
@@ -533,163 +788,787 @@ for (field in common_agent_fields) {
 
 
 # ============================================================
-# 9. Derive generic meta-analysis input metadata
+# 8. Add authoritative study-design information
 # ============================================================
 
-infer_input_type <- function(
-    data_type,
-    intervention_events,
-    intervention_total,
-    comparator_events,
-    comparator_total,
-    effect_estimate,
-    lower_ci,
-    upper_ci
+approved$final_study_design <- NA_character_
+
+if (
+  !is.null(study) &&
+    "screening_id" %in% names(study)
 ) {
 
-  dt <- tolower(
-    safe_chr(data_type)
+  study$screening_id <- clean_text(
+    study$screening_id
   )
 
-  nums_raw <- safe_numeric(
-    c(
-      intervention_events,
-      intervention_total,
-      comparator_events,
-      comparator_total
-    )
-  )
-
-  nums_effect <- safe_numeric(
-    c(
-      effect_estimate,
-      lower_ci,
-      upper_ci
-    )
-  )
+  design_source <- NULL
 
   if (
-    grepl(
-      "dichotom|binary|event",
-      dt
-    ) &&
-    all(
-      is.finite(nums_raw)
-    )
+    "human_verified_study_design" %in% names(study) &&
+      "study_design" %in% names(study)
   ) {
-    return("raw_dichotomous")
+    design_source <- authoritative_value(
+      study$human_verified_study_design,
+      study$study_design
+    )
+  } else if (
+    "human_verified_study_design" %in% names(study)
+  ) {
+    design_source <- clean_text(
+      study$human_verified_study_design
+    )
+  } else if (
+    "study_design" %in% names(study)
+  ) {
+    design_source <- clean_text(
+      study$study_design
+    )
   }
 
-  if (
-    all(
-      is.finite(nums_effect)
-    )
-  ) {
-    return("reported_effect")
-  }
+  if (!is.null(design_source)) {
 
-  if (
-    grepl(
-      "continuous|mean",
-      dt
-    )
-  ) {
-    return("continuous")
-  }
+    study_design_lookup <- tibble::tibble(
+      screening_id = study$screening_id,
+      study_design_from_study_sheet = design_source
+    ) |>
+      dplyr::distinct(
+        screening_id,
+        .keep_all = TRUE
+      )
 
-  "other_or_incomplete"
+    approved <- approved |>
+      dplyr::left_join(
+        study_design_lookup,
+        by = "screening_id"
+      )
+
+    approved$final_study_design <- clean_text(
+      approved$study_design_from_study_sheet
+    )
+
+    approved$study_design_from_study_sheet <- NULL
+  }
 }
 
-approved$meta_input_type <- purrr::pmap_chr(
-  list(
-    approved$final_data_type,
-    approved$final_intervention_events,
-    approved$final_intervention_total,
-    approved$final_comparator_events,
-    approved$final_comparator_total,
-    approved$final_effect_estimate,
-    approved$final_lower_ci,
-    approved$final_upper_ci
-  ),
-  infer_input_type
+approved$design_class <- infer_design_class(
+  approved$final_study_design
 )
 
 
 # ============================================================
-# 10. Flag design-mixing risks
-# ============================================================
-# R/26 does not assume fixed design labels. It looks for any
-# available study-design field and warns if an analysis_group
-# contains materially different designs.
+# 9. Sanitize data type and effect measure
 # ============================================================
 
-design_candidates <- c(
-  "final_study_design",
-  "study_design",
-  "design",
-  "study_type"
+approved$final_data_type <- normalize_data_type(
+  approved$final_data_type
 )
 
-design_col <- design_candidates[
-  design_candidates %in% names(approved)
-]
+raw_effect_measure <- approved$final_effect_measure
 
-if (length(design_col) > 0L) {
-  design_col <- design_col[[1]]
-} else {
-  design_col <- NA_character_
-}
-
-if (!is.na(design_col)) {
-  approved$final_design_for_manifest <- clean_text(
-    approved[[design_col]]
-  )
-} else {
-  approved$final_design_for_manifest <- NA_character_
-}
-
-
-# ============================================================
-# 11. Split automatically by analysis_group
-# ============================================================
-
-analysis_groups <- sort(
-  unique(
-    approved$analysis_group
-  )
+approved$final_effect_measure <- normalize_effect_measure(
+  approved$final_effect_measure
 )
 
-analysis_groups <- analysis_groups[
+approved$effect_measure_source <- ifelse(
   !is.na(
-    analysis_groups
-  )
-]
+    approved$final_effect_measure
+  ),
+  "verified_explicit",
+  NA_character_
+)
 
-if (length(analysis_groups) == 0L) {
+# Universal default for COMPLETE raw dichotomous data:
+# RR is used only when no valid explicit measure exists.
+# This is recorded transparently in effect_measure_source.
+for (i in seq_len(nrow(approved))) {
+
+  data_type_i <- safe_chr(
+    approved$final_data_type[[i]]
+  )
+
+  measure_i <- safe_chr(
+    approved$final_effect_measure[[i]]
+  )
+
+  if (
+    data_type_i == "dichotomous" &&
+      measure_i == ""
+  ) {
+    approved$final_effect_measure[[i]] <- "RR"
+    approved$effect_measure_source[[i]] <- "default_RR_for_raw_dichotomous"
+  }
+}
+
+
+# ============================================================
+# 10. Remove structurally non-applicable placeholder fields
+# ============================================================
+# This is deliberately semantic rather than value-specific.
+#
+# Example:
+# A reported-effect row does not use raw event-count or mean/SD
+# fields. Therefore arbitrary placeholder values in those cells are
+# removed automatically, regardless of whether the placeholder was
+# "64", "999", or something else.
+# ============================================================
+
+event_fields <- c(
+  "final_intervention_events",
+  "final_intervention_total",
+  "final_comparator_events",
+  "final_comparator_total"
+)
+
+continuous_fields <- c(
+  "final_intervention_mean",
+  "final_intervention_sd",
+  "final_intervention_n",
+  "final_comparator_mean",
+  "final_comparator_sd",
+  "final_comparator_n",
+  "final_unit"
+)
+
+reported_effect_fields <- c(
+  "final_effect_estimate",
+  "final_lower_ci",
+  "final_upper_ci"
+)
+
+sanitized_cell_count <- 0L
+
+for (i in seq_len(nrow(approved))) {
+
+  data_type_i <- safe_chr(
+    approved$final_data_type[[i]]
+  )
+
+  if (
+    data_type_i == "reported_effect"
+  ) {
+
+    for (field in c(
+      event_fields,
+      continuous_fields
+    )) {
+
+      if (
+        field %in% names(approved) &&
+          !is.na(
+            clean_text(
+              approved[[field]][[i]]
+            )
+          )
+      ) {
+        sanitized_cell_count <- sanitized_cell_count + 1L
+      }
+
+      if (
+        field %in% names(approved)
+      ) {
+        approved[[field]][[i]] <- NA_character_
+      }
+    }
+  }
+
+  if (
+    data_type_i == "dichotomous"
+  ) {
+
+    for (field in continuous_fields) {
+
+      if (
+        field %in% names(approved) &&
+          !is.na(
+            clean_text(
+              approved[[field]][[i]]
+            )
+          )
+      ) {
+        sanitized_cell_count <- sanitized_cell_count + 1L
+      }
+
+      if (
+        field %in% names(approved)
+      ) {
+        approved[[field]][[i]] <- NA_character_
+      }
+    }
+
+    # If the original effect-measure field was invalid, any associated
+    # reported estimate/CI cells are not trustworthy for this raw-count
+    # analysis row and are cleared.
+    original_measure_valid <- !is.na(
+      normalize_effect_measure(
+        raw_effect_measure[[i]]
+      )
+    )
+
+    if (!original_measure_valid) {
+
+      for (field in reported_effect_fields) {
+
+        if (
+          field %in% names(approved) &&
+            !is.na(
+              clean_text(
+                approved[[field]][[i]]
+              )
+            )
+        ) {
+          sanitized_cell_count <- sanitized_cell_count + 1L
+        }
+
+        if (
+          field %in% names(approved)
+        ) {
+          approved[[field]][[i]] <- NA_character_
+        }
+      }
+    }
+  }
+}
+
+
+# ============================================================
+# 11. Validate and classify meta-analysis input
+# ============================================================
+
+approved$meta_input_type <- NA_character_
+approved$input_validation_status <- "PASS"
+approved$input_validation_note <- NA_character_
+
+for (i in seq_len(nrow(approved))) {
+
+  dt <- safe_chr(
+    approved$final_data_type[[i]]
+  )
+
+  measure <- safe_chr(
+    approved$final_effect_measure[[i]]
+  )
+
+  if (
+    dt == "dichotomous"
+  ) {
+
+    a <- safe_numeric(
+      approved$final_intervention_events[[i]]
+    )
+
+    n1 <- safe_numeric(
+      approved$final_intervention_total[[i]]
+    )
+
+    c_event <- safe_numeric(
+      approved$final_comparator_events[[i]]
+    )
+
+    n0 <- safe_numeric(
+      approved$final_comparator_total[[i]]
+    )
+
+    valid_counts <- (
+      length(a) == 1L &&
+        length(n1) == 1L &&
+        length(c_event) == 1L &&
+        length(n0) == 1L &&
+        is.finite(a) &&
+        is.finite(n1) &&
+        is.finite(c_event) &&
+        is.finite(n0) &&
+        a >= 0 &&
+        c_event >= 0 &&
+        n1 > 0 &&
+        n0 > 0 &&
+        a <= n1 &&
+        c_event <= n0
+    )
+
+    if (!valid_counts) {
+      approved$input_validation_status[[i]] <- "FAIL"
+      approved$input_validation_note[[i]] <- paste0(
+        "Invalid raw dichotomous counts/denominators for ",
+        approved$screening_id[[i]]
+      )
+    } else if (
+      !measure %in% c(
+        "RR",
+        "OR",
+        "RD"
+      )
+    ) {
+      approved$input_validation_status[[i]] <- "FAIL"
+      approved$input_validation_note[[i]] <- paste0(
+        "Unsupported raw dichotomous effect measure: ",
+        measure
+      )
+    } else {
+      approved$meta_input_type[[i]] <- "raw_dichotomous"
+    }
+  }
+
+  if (
+    dt == "reported_effect"
+  ) {
+
+    est <- safe_numeric(
+      approved$final_effect_estimate[[i]]
+    )
+
+    lower <- safe_numeric(
+      approved$final_lower_ci[[i]]
+    )
+
+    upper <- safe_numeric(
+      approved$final_upper_ci[[i]]
+    )
+
+    valid_measure <- measure %in% c(
+      "RR",
+      "OR",
+      "HR",
+      "RD",
+      "MD",
+      "SMD"
+    )
+
+    valid_ci <- (
+      length(est) == 1L &&
+        length(lower) == 1L &&
+        length(upper) == 1L &&
+        is.finite(est) &&
+        is.finite(lower) &&
+        is.finite(upper) &&
+        upper > lower
+    )
+
+    if (
+      measure %in% c(
+        "RR",
+        "OR",
+        "HR"
+      )
+    ) {
+      valid_ci <- (
+        valid_ci &&
+          est > 0 &&
+          lower > 0 &&
+          upper > 0
+      )
+    }
+
+    if (!valid_measure) {
+      approved$input_validation_status[[i]] <- "FAIL"
+      approved$input_validation_note[[i]] <- paste0(
+        "Reported effect has no supported effect measure for ",
+        approved$screening_id[[i]]
+      )
+    } else if (!valid_ci) {
+      approved$input_validation_status[[i]] <- "FAIL"
+      approved$input_validation_note[[i]] <- paste0(
+        "Invalid reported effect estimate/CI for ",
+        approved$screening_id[[i]]
+      )
+    } else {
+      approved$meta_input_type[[i]] <- "reported_effect"
+    }
+  }
+
+  if (
+    dt == "continuous"
+  ) {
+
+    m1 <- safe_numeric(
+      approved$final_intervention_mean[[i]]
+    )
+
+    sd1 <- safe_numeric(
+      approved$final_intervention_sd[[i]]
+    )
+
+    n1 <- safe_numeric(
+      approved$final_intervention_n[[i]]
+    )
+
+    m0 <- safe_numeric(
+      approved$final_comparator_mean[[i]]
+    )
+
+    sd0 <- safe_numeric(
+      approved$final_comparator_sd[[i]]
+    )
+
+    n0 <- safe_numeric(
+      approved$final_comparator_n[[i]]
+    )
+
+    valid_raw_continuous <- (
+      length(m1) == 1L &&
+        length(sd1) == 1L &&
+        length(n1) == 1L &&
+        length(m0) == 1L &&
+        length(sd0) == 1L &&
+        length(n0) == 1L &&
+        is.finite(m1) &&
+        is.finite(sd1) &&
+        is.finite(n1) &&
+        is.finite(m0) &&
+        is.finite(sd0) &&
+        is.finite(n0) &&
+        sd1 >= 0 &&
+        sd0 >= 0 &&
+        n1 > 0 &&
+        n0 > 0
+    )
+
+    if (!valid_raw_continuous) {
+      approved$input_validation_status[[i]] <- "FAIL"
+      approved$input_validation_note[[i]] <- paste0(
+        "Invalid raw continuous mean/SD/N data for ",
+        approved$screening_id[[i]]
+      )
+    } else if (
+      !measure %in% c(
+        "MD",
+        "SMD"
+      )
+    ) {
+      approved$input_validation_status[[i]] <- "FAIL"
+      approved$input_validation_note[[i]] <- paste0(
+        "Continuous outcome requires explicit MD or SMD."
+      )
+    } else {
+      approved$meta_input_type[[i]] <- "raw_continuous"
+    }
+  }
+
+  if (
+    !dt %in% c(
+      "dichotomous",
+      "reported_effect",
+      "continuous"
+    )
+  ) {
+    approved$input_validation_status[[i]] <- "FAIL"
+    approved$input_validation_note[[i]] <- paste0(
+      "Unsupported or unrecognized final_data_type: ",
+      dt
+    )
+  }
+}
+
+bad_input <- approved |>
+  dplyr::filter(
+    input_validation_status != "PASS"
+  )
+
+if (nrow(bad_input) > 0L) {
   stop(
-    "No usable analysis_group values found.",
+    "R/26 meta-analysis input validation failed for ",
+    nrow(bad_input),
+    " Human-approved row(s):\n- ",
+    paste(
+      paste0(
+        bad_input$screening_id,
+        ": ",
+        bad_input$input_validation_note
+      ),
+      collapse = "\n- "
+    ),
     call. = FALSE
   )
 }
 
-group_datasets <- split(
+
+# ============================================================
+# 12. Build BASE groups
+# ============================================================
+
+base_groups <- split(
   approved,
   approved$analysis_group
 )
 
+base_group_names <- names(
+  base_groups
+)
+
+if (
+  length(base_group_names) == 0L
+) {
+  stop(
+    "No analysis_group values were available after Human Verification.",
+    call. = FALSE
+  )
+}
+
+base_group_info <- purrr::imap_dfr(
+  base_groups,
+  function(df, group_name) {
+
+    role <- collapse_unique(
+      df$meta_analysis_role
+    )
+
+    tibble::tibble(
+      analysis_group = group_name,
+      meta_analysis_role = role,
+      role_class = role_class(
+        group_name,
+        role
+      ),
+      study_design = all_same_or_mixed(
+        df$design_class
+      ),
+      outcome = collapse_unique(
+        df$outcome_name
+      ),
+      base_study_count = dplyr::n_distinct(
+        df$screening_id
+      )
+    )
+  }
+)
+
 
 # ============================================================
-# 12. Universal effect-measure compatibility check
+# 13. Resolve explicit parent-analysis relation if present
 # ============================================================
-# R/26 does not automatically convert effect measures.
-# It records whether each group has one effect measure or mixed
-# measures, so the next meta-analysis stage can decide whether a
-# transformation or separate analysis is required.
+
+parent_col <- first_existing_column(
+  approved,
+  c(
+    "parent_analysis_group",
+    "analysis_parent_group",
+    "base_analysis_group"
+  )
+)
+
+explicit_parent_lookup <- list()
+
+if (!is.na(parent_col)) {
+
+  for (group_name in base_group_names) {
+
+    vals <- unique(
+      clean_text(
+        base_groups[[group_name]][[parent_col]]
+      )
+    )
+
+    vals <- vals[
+      !is.na(vals)
+    ]
+
+    if (length(vals) > 1L) {
+      stop(
+        "Analysis group ",
+        group_name,
+        " contains more than one explicit parent_analysis_group.",
+        call. = FALSE
+      )
+    }
+
+    if (length(vals) == 1L) {
+      explicit_parent_lookup[[group_name]] <- vals[[1]]
+    }
+  }
+}
+
+
+# ============================================================
+# 14. Convert BASE groups into FINAL ANALYSIS SETS
+# ============================================================
+# Standalone / primary / observational groups:
+#   final set = own rows
+#
+# Sensitivity groups:
+#   final set = compatible parent primary rows + sensitivity-only rows
+# ============================================================
+
+analysis_sets <- list()
+analysis_set_metadata <- list()
+
+for (group_name in base_group_names) {
+
+  df <- base_groups[[group_name]]
+
+  role <- collapse_unique(
+    df$meta_analysis_role
+  )
+
+  class_i <- role_class(
+    group_name,
+    role
+  )
+
+  if (class_i != "Sensitivity") {
+
+    analysis_sets[[group_name]] <- df
+
+    analysis_set_metadata[[group_name]] <- list(
+      analysis_set_type = "standalone",
+      parent_analysis_group = NA_character_,
+      source_analysis_groups = group_name,
+      is_composite = "No"
+    )
+
+    next
+  }
+
+  explicit_parent <- explicit_parent_lookup[[group_name]]
+
+  if (!is.null(explicit_parent)) {
+
+    if (
+      !explicit_parent %in% base_group_names
+    ) {
+      stop(
+        "Sensitivity group ",
+        group_name,
+        " specifies parent_analysis_group '",
+        explicit_parent,
+        "', but that group does not exist.",
+        call. = FALSE
+      )
+    }
+
+    if (
+      !compatible_for_sensitivity(
+        df,
+        base_groups[[explicit_parent]]
+      )
+    ) {
+      stop(
+        "Sensitivity group ",
+        group_name,
+        " is not outcome/design-compatible with explicit parent ",
+        explicit_parent,
+        ".",
+        call. = FALSE
+      )
+    }
+
+    parent_group <- explicit_parent
+
+  } else {
+
+    primary_candidates <- base_group_info |>
+      dplyr::filter(
+        role_class == "Primary"
+      ) |>
+      dplyr::pull(
+        analysis_group
+      )
+
+    compatible_candidates <- primary_candidates[
+      vapply(
+        primary_candidates,
+        function(candidate) {
+          compatible_for_sensitivity(
+            df,
+            base_groups[[candidate]]
+          )
+        },
+        FUN.VALUE = logical(1)
+      )
+    ]
+
+    if (
+      length(
+        compatible_candidates
+      ) == 0L
+    ) {
+      stop(
+        "Sensitivity group ",
+        group_name,
+        " has no compatible Primary parent. ",
+        "Add parent_analysis_group explicitly in the verification workflow.",
+        call. = FALSE
+      )
+    }
+
+    if (
+      length(
+        compatible_candidates
+      ) > 1L
+    ) {
+      stop(
+        "Sensitivity group ",
+        group_name,
+        " has multiple compatible Primary parents: ",
+        paste(
+          compatible_candidates,
+          collapse = ", "
+        ),
+        ". Add parent_analysis_group explicitly.",
+        call. = FALSE
+      )
+    }
+
+    parent_group <- compatible_candidates[[1]]
+  }
+
+  combined <- dplyr::bind_rows(
+    base_groups[[parent_group]],
+    df
+  )
+
+  combined <- combined |>
+    dplyr::distinct(
+      outcome_row_id,
+      .keep_all = TRUE
+    )
+
+  duplicate_studies <- combined |>
+    dplyr::count(
+      screening_id,
+      name = "n_rows"
+    ) |>
+    dplyr::filter(
+      n_rows > 1L
+    )
+
+  if (nrow(duplicate_studies) > 0L) {
+    stop(
+      "Composite sensitivity set ",
+      group_name,
+      " contains multiple dependent outcome rows from the same study: ",
+      paste(
+        duplicate_studies$screening_id,
+        collapse = ", "
+      ),
+      ". Explicit dependent-effect handling is required.",
+      call. = FALSE
+    )
+  }
+
+  analysis_sets[[group_name]] <- combined
+
+  analysis_set_metadata[[group_name]] <- list(
+    analysis_set_type = "composite_sensitivity",
+    parent_analysis_group = parent_group,
+    source_analysis_groups = paste(
+      c(
+        parent_group,
+        group_name
+      ),
+      collapse = " + "
+    ),
+    is_composite = "Yes"
+  )
+}
+
+
+# ============================================================
+# 15. Validate final analysis-set compatibility
 # ============================================================
 
 manifest <- purrr::imap_dfr(
-  group_datasets,
-  function(df, group_name) {
+  analysis_sets,
+  function(df, set_name) {
 
     effect_measure <- all_same_or_mixed(
       df$final_effect_measure
@@ -704,7 +1583,7 @@ manifest <- purrr::imap_dfr(
     )
 
     design <- all_same_or_mixed(
-      df$final_design_for_manifest
+      df$design_class
     )
 
     outcome <- collapse_unique(
@@ -719,39 +1598,37 @@ manifest <- purrr::imap_dfr(
       df$meta_analysis_role
     )
 
-    suggested_action <- dplyr::case_when(
+    metadata <- analysis_set_metadata[[set_name]]
+
+    next_action <- dplyr::case_when(
       identical(
         effect_measure,
         "Mixed"
       ) ~ paste0(
         "Do not pool yet: effect measures are mixed. ",
-        "Harmonize or analyze separately."
+        "Harmonize or separate before R/27."
       ),
 
       identical(
-        input_type,
-        "other_or_incomplete"
-      ) ~ paste0(
-        "Do not pool yet: meta-analysis input is incomplete."
-      ),
-
-      identical(
-        input_type,
+        design,
         "Mixed"
       ) ~ paste0(
-        "Review input compatibility before pooling. ",
-        "Raw and reported effects may require a common effect scale."
+        "Do not automatically pool: study designs are mixed. ",
+        "Confirm that the mixed-design analysis was explicitly planned."
       ),
 
       TRUE ~ paste0(
-        "Proceed to analysis-specific meta-analysis after checking ",
-        "clinical and methodological compatibility."
+        "Proceed to R/27 after confirming clinical compatibility."
       )
     )
 
     tibble::tibble(
-      analysis_group = group_name,
+      analysis_group = set_name,
       meta_analysis_role = role,
+      analysis_set_type = metadata$analysis_set_type,
+      is_composite = metadata$is_composite,
+      parent_analysis_group = metadata$parent_analysis_group,
+      source_analysis_groups = metadata$source_analysis_groups,
       study_count = dplyr::n_distinct(
         df$screening_id
       ),
@@ -762,48 +1639,65 @@ manifest <- purrr::imap_dfr(
       data_type = data_type,
       effect_measure = effect_measure,
       meta_input_type = input_type,
-      suggested_model = "Random-effects by default; justify fixed-effect if used",
+      suggested_model = "Random-effects by default; final choice belongs to the analysis stage",
       combine_with_other_analysis_groups = "NO unless explicitly prespecified and methodologically justified",
-      next_action = suggested_action
+      next_action = next_action
     )
   }
 )
 
+bad_sets <- manifest |>
+  dplyr::filter(
+    effect_measure == "Mixed" |
+      study_design == "Mixed"
+  )
+
+if (nrow(bad_sets) > 0L) {
+  warning(
+    "One or more analysis sets require methodological review before pooling: ",
+    paste(
+      bad_sets$analysis_group,
+      collapse = ", "
+    ),
+    call. = FALSE
+  )
+}
+
 
 # ============================================================
-# 13. Write one canonical CSV per analysis_group
+# 16. Write one canonical CSV per FINAL analysis set
 # ============================================================
 
 dataset_files <- character(
-  length(group_datasets)
+  length(
+    analysis_sets
+  )
 )
 
 names(dataset_files) <- names(
-  group_datasets
+  analysis_sets
 )
 
-for (group_name in names(group_datasets)) {
-
-  file_name <- paste0(
-    "meta_analysis_ready_",
-    safe_file_component(
-      group_name
-    ),
-    ".csv"
-  )
+for (set_name in names(analysis_sets)) {
 
   output_file <- file.path(
     output_data_directory,
-    file_name
+    paste0(
+      "meta_analysis_ready_",
+      safe_file_component(
+        set_name
+      ),
+      ".csv"
+    )
   )
 
   readr::write_csv(
-    group_datasets[[group_name]],
+    analysis_sets[[set_name]],
     output_file,
     na = ""
   )
 
-  dataset_files[[group_name]] <- output_file
+  dataset_files[[set_name]] <- output_file
 }
 
 manifest$dataset_file <- unname(
@@ -811,11 +1705,6 @@ manifest$dataset_file <- unname(
     manifest$analysis_group
   ]
 )
-
-
-# ============================================================
-# 14. Write all approved rows + manifest
-# ============================================================
 
 readr::write_csv(
   approved,
@@ -831,109 +1720,95 @@ readr::write_csv(
 
 
 # ============================================================
-# 15. Meta-analysis guidance
+# 17. Human-readable meta-analysis guidance
 # ============================================================
 
-make_guidance <- function(manifest) {
+guidance_lines <- c(
+  "UNIVERSAL META-ANALYSIS READY GUIDANCE",
+  "--------------------------------------------------",
+  paste0(
+    "Human-approved studies: ",
+    dplyr::n_distinct(
+      approved$screening_id
+    )
+  ),
+  paste0(
+    "Final analysis sets: ",
+    nrow(
+      manifest
+    )
+  ),
+  "",
+  "Selection rule:",
+  "  human_include_in_planned_analysis == Yes",
+  "  AND verification_status == Verified / Corrected",
+  "",
+  "Analysis-set rule:",
+  "  Sensitivity sets include the compatible parent primary set plus sensitivity-only rows.",
+  "",
+  "Downstream rule:",
+  "  Analyze each final analysis set separately.",
+  "  Do not combine different evidence designs or effect measures without explicit methodological justification.",
+  ""
+)
 
-  header <- c(
-    "UNIVERSAL META-ANALYSIS GUIDANCE",
-    "--------------------------------------------------",
+for (i in seq_len(nrow(manifest))) {
+
+  x <- manifest[
+    i,
+    ,
+    drop = FALSE
+  ]
+
+  guidance_lines <- c(
+    guidance_lines,
     paste0(
-      "Human-approved analysis groups: ",
-      nrow(manifest)
+      "[",
+      i,
+      "] ",
+      x$analysis_group
+    ),
+    paste0(
+      "  Role: ",
+      safe_chr(
+        x$meta_analysis_role
+      )
+    ),
+    paste0(
+      "  Set type: ",
+      x$analysis_set_type
+    ),
+    paste0(
+      "  Source group(s): ",
+      x$source_analysis_groups
+    ),
+    paste0(
+      "  Studies: ",
+      x$study_count
+    ),
+    paste0(
+      "  Design: ",
+      safe_chr(
+        x$study_design
+      )
+    ),
+    paste0(
+      "  Effect measure: ",
+      safe_chr(
+        x$effect_measure
+      )
+    ),
+    paste0(
+      "  Next: ",
+      x$next_action
     ),
     ""
   )
-
-  group_lines <- unlist(
-    lapply(
-      seq_len(nrow(manifest)),
-      function(i) {
-
-        x <- manifest[i, ]
-
-        c(
-          paste0(
-            "[",
-            i,
-            "] ",
-            x$analysis_group
-          ),
-          paste0(
-            "  Role: ",
-            safe_chr(
-              x$meta_analysis_role
-            )
-          ),
-          paste0(
-            "  Studies: ",
-            x$study_count
-          ),
-          paste0(
-            "  Outcome: ",
-            safe_chr(
-              x$outcome
-            )
-          ),
-          paste0(
-            "  Design: ",
-            safe_chr(
-              x$study_design
-            )
-          ),
-          paste0(
-            "  Effect measure: ",
-            safe_chr(
-              x$effect_measure
-            )
-          ),
-          paste0(
-            "  Input type: ",
-            safe_chr(
-              x$meta_input_type
-            )
-          ),
-          paste0(
-            "  Suggested model: ",
-            x$suggested_model
-          ),
-          paste0(
-            "  Recommendation: ",
-            x$next_action
-          ),
-          ""
-        )
-      }
-    )
-  )
-
-  footer <- c(
-    "GENERAL RULES",
-    "--------------------------------------------------",
-    "1. Analyze each analysis_group separately unless a combined analysis was explicitly prespecified.",
-    "2. Do not combine materially different study designs into one pooled estimate by default.",
-    "3. Do not silently combine RR, OR, HR, MD, SMD, or other incompatible effect measures.",
-    "4. Prefer adjusted effect estimates for observational studies when the planned estimand requires them.",
-    "5. Use sensitivity analyses to test robustness when broader eligibility or alternative definitions are allowed.",
-    "6. Interpret the primary analysis according to its prespecified evidence role; treat complementary analyses as supportive unless otherwise defined.",
-    ""
-  )
-
-  c(
-    header,
-    group_lines,
-    footer
-  )
 }
-
-guidance_lines <- make_guidance(
-  manifest
-)
 
 
 # ============================================================
-# 16. Final workbook
+# 18. Final workbook
 # ============================================================
 
 wb <- openxlsx::createWorkbook(
@@ -985,9 +1860,10 @@ add_table_sheet <- function(
 summary_table <- tibble::tibble(
   Metric = c(
     "Project",
-    "Human-approved rows",
+    "Human-approved outcome rows",
     "Human-approved studies",
-    "Analysis groups",
+    "Final analysis sets",
+    "Sanitized non-applicable cells",
     "Selection rule",
     "Authoritative source",
     "Meta-analysis execution"
@@ -995,7 +1871,9 @@ summary_table <- tibble::tibble(
   Value = c(
     project_title,
     as.character(
-      nrow(approved)
+      nrow(
+        approved
+      )
     ),
     as.character(
       dplyr::n_distinct(
@@ -1004,8 +1882,11 @@ summary_table <- tibble::tibble(
     ),
     as.character(
       length(
-        analysis_groups
+        analysis_sets
       )
+    ),
+    as.character(
+      sanitized_cell_count
     ),
     "human_include_in_planned_analysis == Yes",
     "Human-verified values",
@@ -1021,6 +1902,12 @@ add_table_sheet(
 
 add_table_sheet(
   wb,
+  "Base_Group_Summary",
+  base_group_info
+)
+
+add_table_sheet(
+  wb,
   "Meta_Analysis_Manifest",
   manifest
 )
@@ -1031,26 +1918,57 @@ add_table_sheet(
   approved
 )
 
-for (group_name in names(group_datasets)) {
+used_sheet_names <- c(
+  "Finalization_Summary",
+  "Base_Group_Summary",
+  "Meta_Analysis_Manifest",
+  "All_Approved_Outcomes"
+)
 
-  sheet_name <- safe_file_component(
-    group_name
-  )
+for (set_name in names(analysis_sets)) {
 
-  sheet_name <- substr(
-    sheet_name,
+  base_sheet_name <- substr(
+    safe_file_component(
+      set_name
+    ),
     1,
     31
   )
 
-  if (sheet_name == "") {
-    sheet_name <- "analysis_group"
+  if (
+    base_sheet_name == ""
+  ) {
+    base_sheet_name <- "analysis_set"
   }
+
+  sheet_name <- base_sheet_name
+  suffix <- 1L
+
+  while (
+    sheet_name %in% used_sheet_names
+  ) {
+    suffix <- suffix + 1L
+
+    sheet_name <- substr(
+      paste0(
+        base_sheet_name,
+        "_",
+        suffix
+      ),
+      1,
+      31
+    )
+  }
+
+  used_sheet_names <- c(
+    used_sheet_names,
+    sheet_name
+  )
 
   add_table_sheet(
     wb,
     sheet_name,
-    group_datasets[[group_name]]
+    analysis_sets[[set_name]]
   )
 }
 
@@ -1085,20 +2003,30 @@ openxlsx::saveWorkbook(
 
 
 # ============================================================
-# 17. Output validation
+# 19. Output validation
 # ============================================================
 
 required_outputs <- c(
   all_verified_csv,
   manifest_csv,
   final_workbook,
-  unname(dataset_files)
+  unname(
+    dataset_files
+  )
 )
 
 bad_outputs <- required_outputs[
-  !file.exists(required_outputs) |
-    is.na(file.info(required_outputs)$size) |
-    file.info(required_outputs)$size <= 0
+  !file.exists(
+    required_outputs
+  ) |
+    is.na(
+      file.info(
+        required_outputs
+      )$size
+    ) |
+    file.info(
+      required_outputs
+    )$size <= 0
 ]
 
 if (length(bad_outputs) > 0L) {
@@ -1114,12 +2042,12 @@ if (length(bad_outputs) > 0L) {
 
 
 # ============================================================
-# 18. Report
+# 20. Report
 # ============================================================
 
 report_lines <- c(
   "Universal SR-MA Agent Toolkit",
-  "R/26 — Human-Verified Extraction Finalization",
+  "R/26 — Human-Verified Meta-analysis-ready Finalization",
   "",
   paste0(
     "Generated at: ",
@@ -1134,7 +2062,7 @@ report_lines <- c(
     project_title
   ),
   "",
-  "CANONICAL HUMAN SELECTION RULE",
+  "HUMAN GATE",
   "--------------------------------------------------",
   "human_include_in_planned_analysis == Yes",
   "verification_status must be Verified or Corrected",
@@ -1142,8 +2070,10 @@ report_lines <- c(
   "FINALIZATION",
   "--------------------------------------------------",
   paste0(
-    "Human-approved outcome rows: ",
-    nrow(approved)
+    "Human-approved rows: ",
+    nrow(
+      approved
+    )
   ),
   paste0(
     "Human-approved studies: ",
@@ -1152,9 +2082,13 @@ report_lines <- c(
     )
   ),
   paste0(
-    "Analysis groups created: ",
+    "Sanitized non-applicable cells: ",
+    sanitized_cell_count
+  ),
+  paste0(
+    "Final analysis sets: ",
     length(
-      analysis_groups
+      analysis_sets
     )
   ),
   "",
@@ -1177,7 +2111,7 @@ report_lines <- c(
   "",
   "NEXT",
   "--------------------------------------------------",
-  "Proceed to the meta-analysis execution stage using the generated manifest and group-specific datasets."
+  "Run R/27 using the regenerated meta_analysis_manifest.csv and final analysis-set datasets."
 )
 
 writeLines(
@@ -1188,20 +2122,13 @@ writeLines(
 
 
 # ============================================================
-# 19. Console summary
+# 21. Console
 # ============================================================
 
 cat("\n")
 cat("============================================================\n")
-cat("R/26 — Universal Human-Verified Extraction Finalization\n")
+cat("R/26 — Universal Meta-analysis-ready Finalization\n")
 cat("============================================================\n\n")
-
-cat(
-  "Human-approved outcome rows: ",
-  nrow(approved),
-  "\n",
-  sep = ""
-)
 
 cat(
   "Human-approved studies: ",
@@ -1213,35 +2140,64 @@ cat(
 )
 
 cat(
-  "Analysis groups created: ",
-  length(analysis_groups),
+  "Sanitized non-applicable cells: ",
+  sanitized_cell_count,
+  "\n",
+  sep = ""
+)
+
+cat(
+  "Final analysis sets: ",
+  length(
+    analysis_sets
+  ),
   "\n\n",
   sep = ""
 )
 
 for (i in seq_len(nrow(manifest))) {
 
+  x <- manifest[
+    i,
+    ,
+    drop = FALSE
+  ]
+
   cat(
     "[",
     i,
     "] ",
-    manifest$analysis_group[[i]],
+    x$analysis_group,
     "\n",
     sep = ""
   )
 
   cat(
-    "    Role: ",
-    safe_chr(
-      manifest$meta_analysis_role[[i]]
-    ),
+    "    Type: ",
+    x$analysis_set_type,
+    "\n",
+    sep = ""
+  )
+
+  cat(
+    "    Source: ",
+    x$source_analysis_groups,
     "\n",
     sep = ""
   )
 
   cat(
     "    Studies: ",
-    manifest$study_count[[i]],
+    x$study_count,
+    "\n",
+    sep = ""
+  )
+
+  cat(
+    "    Design: ",
+    safe_chr(
+      x$study_design
+    ),
     "\n",
     sep = ""
   )
@@ -1249,37 +2205,31 @@ for (i in seq_len(nrow(manifest))) {
   cat(
     "    Effect measure: ",
     safe_chr(
-      manifest$effect_measure[[i]]
+      x$effect_measure
     ),
-    "\n",
-    sep = ""
-  )
-
-  cat(
-    "    Next: ",
-    manifest$next_action[[i]],
     "\n\n",
     sep = ""
   )
 }
 
 cat(
-  "PASS: R/26 finalized Human-approved meta-analysis-ready datasets.\n"
+  "PASS: R/26 finalized Human-approved analysis SETS.\n"
 )
 
 cat(
-  "PASS: Meta-analysis manifest created.\n"
+  "PASS: Composite sensitivity sets were resolved before R/27.\n"
 )
 
 cat(
-  "NEXT: Run each analysis_group separately according to the manifest.\n"
+  "NEXT: Re-run R/27 with the regenerated manifest and datasets.\n"
 )
 
 invisible(
   list(
     status = "PASS",
     approved_outcomes = approved,
-    group_datasets = group_datasets,
+    base_groups = base_groups,
+    analysis_sets = analysis_sets,
     manifest = manifest,
     workbook = final_workbook,
     report = report_file

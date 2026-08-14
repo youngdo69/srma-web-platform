@@ -1,0 +1,3 @@
+analysis_id,project_id,evidence_role,purpose,preferred_effect_measure,status,created_at,updated_at
+AA_20260814_133034_creatinine_only_aki_sensitivity_analysis,sglt2_inhibitors_cardiac_surgery,primary_randomized,Creatinine-only AKI sensitivity analysis,AUTO,COMPLETE,2026-08-14 13:30:34,2026-08-14 14:21:52
+AA_20260814_143238_creatinine_only_aki_sensitivity_analysis,sglt2_inhibitors_cardiac_surgery,sensitivity_randomized,Creatinine-only AKI sensitivity analysis,AUTO,COMPLETE,2026-08-14 14:32:38,2026-08-14 14:34:47

@@ -1,7 +1,7 @@
 Universal SR-MA Agent Toolkit
 TASK-013 — Multimodal Data Extraction Report
 
-Generated at: 2026-08-12 02:22:47
+Generated at: 2026-08-14 10:18:41
 Project ID: sglt2_inhibitors_cardiac_surgery
 Project title: Efficacy and safety of preoperative or perioperative SGLT2 inhibitors in adult cardiac surgery: a systematic review and meta-analysis
 

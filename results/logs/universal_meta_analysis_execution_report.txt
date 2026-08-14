@@ -1,7 +1,7 @@
 Universal SR-MA Agent Toolkit
 R/27 — Universal Meta-analysis Execution Report
 
-Generated at: 2026-08-14 01:04:27
+Generated at: 2026-08-14 10:46:19
 Project ID: sglt2_inhibitors_cardiac_surgery
 Project title: Efficacy and safety of preoperative or perioperative SGLT2 inhibitors in adult cardiac surgery: a systematic review and meta-analysis
 
@@ -12,8 +12,8 @@ Analysis groups requested: 3
 
 EXECUTION
 --------------------------------------------------
-PASS groups: 2
-SKIP groups: 1
+PASS groups: 3
+SKIP groups: 0
 FAIL groups: 0
 
 UNIVERSAL ANALYSIS RULES
@@ -32,7 +32,7 @@ EXECUTION SUMMARY
   <chr>                  <chr>              <chr>  <chr>    <int> <chr>         
 1 Primary_RCT            Primary RCT        PASS   <NA>         3 RR            
 2 Secondary_Observation… Observational sec… PASS   <NA>         2 RR            
-3 Sensitivity_RCT        Sensitivity RCT    SKIP   Fewer…       1 <NA>          
+3 Sensitivity_RCT        Primary RCT; Sens… PASS   <NA>         4 RR            
 # ℹ 17 more variables: model_name <chr>, tau2_method <chr>,
 #   inference_test <chr>, pooled_effect <dbl>, lower_ci <dbl>, upper_ci <dbl>,
 #   p_value <dbl>, tau2 <dbl>, i2 <dbl>, q <dbl>, q_df <dbl>, q_p_value <dbl>,

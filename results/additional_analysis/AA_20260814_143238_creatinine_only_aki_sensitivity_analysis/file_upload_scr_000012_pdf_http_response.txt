@@ -1,0 +1,14 @@
+HTTP STATUS: 200
+
+{
+  "object": "file",
+  "id": "file-1PjNfgBcz2mbqV2AgRv6fb",
+  "purpose": "user_data",
+  "filename": "SCR_000012.pdf",
+  "bytes": 781053,
+  "created_at": 1786685640,
+  "expires_at": null,
+  "status": "processed",
+  "status_details": null
+}
+

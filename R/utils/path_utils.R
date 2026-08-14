@@ -864,3 +864,86 @@ print_project_paths <- function(paths) {
 
   invisible(paths)
 }
+
+
+# ============================================================
+# Config-driven canonical project path resolver
+# Added by R/31_refactor_config_driven_canonical_paths.R
+# ============================================================
+
+resolve_configured_project_path <- function(
+    config,
+    project_root,
+    key,
+    create = FALSE
+) {
+
+  if (is.null(config$canonical_paths)) {
+    stop(
+      "project_config.yml is missing canonical_paths.",
+      call. = FALSE
+    )
+  }
+
+  value <- config$canonical_paths[[key]]
+
+  if (is.null(value) || length(value) != 1L || is.na(value) || trimws(value) == "") {
+    stop(
+      "Missing canonical path key: ",
+      key,
+      call. = FALSE
+    )
+  }
+
+  value <- gsub("\\\\", "/", trimws(as.character(value)))
+
+  if (grepl("^[A-Za-z]:/", value) || grepl("^/", value) || grepl("^//", value)) {
+    stop(
+      "Canonical path must be relative to project root: ",
+      key,
+      " = ",
+      value,
+      call. = FALSE
+    )
+  }
+
+  parts <- strsplit(value, "/", fixed = TRUE)[[1]]
+
+  if (any(parts == "..")) {
+    stop(
+      "Canonical path cannot contain '..': ",
+      key,
+      " = ",
+      value,
+      call. = FALSE
+    )
+  }
+
+  value <- gsub("/+", "/", value)
+  value <- sub("^\\./", "", value)
+  value <- sub("/$", "", value)
+
+  root_normalized <- normalizePath(
+    project_root,
+    winslash = "/",
+    mustWork = TRUE
+  )
+
+  resolved <- file.path(
+    root_normalized,
+    value
+  )
+
+  resolved <- gsub("\\\\", "/", resolved)
+
+  if (isTRUE(create)) {
+    dir.create(
+      resolved,
+      recursive = TRUE,
+      showWarnings = FALSE
+    )
+  }
+
+  resolved
+}
+

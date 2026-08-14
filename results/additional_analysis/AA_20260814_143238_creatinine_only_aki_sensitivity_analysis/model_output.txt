@@ -1,0 +1,34 @@
+Universal SR-MA Agent Toolkit
+R/29 Author-Directed Additional Analysis
+
+Analysis ID: AA_20260814_143238_creatinine_only_aki_sensitivity_analysis
+Purpose: Creatinine-only AKI sensitivity analysis
+Evidence role: sensitivity_randomized
+Effect measure:  RR 
+Model: Random-effects, REML, Knapp-Hartung
+
+
+Random-Effects Model (k = 3; tau^2 estimator: REML)
+
+tau^2 (estimated amount of total heterogeneity): 0.0588 (SE = 0.1461)
+tau (square root of estimated tau^2 value):      0.2426
+I^2 (total heterogeneity / total variability):   41.11%
+H^2 (total variability / sampling variability):  1.70
+
+Test for Heterogeneity:
+Q(df = 2) = 3.1104, p-val = 0.2111
+
+Model Results:
+
+estimate      se     tval  df    pval    ci.lb   ci.ub    
+ -0.3273  0.1956  -1.6738   2  0.2361  -1.1688  0.5141    
+
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+
+Prediction:
+
+    pred     se   ci.lb  ci.ub   pi.lb  pi.ub 
+ -0.3273 0.1956 -1.1688 0.5141 -1.6679 1.0133 
+

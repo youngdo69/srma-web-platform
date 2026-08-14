@@ -1,0 +1,37 @@
+Universal SR-MA Agent Toolkit
+R/33 — Forest Plots and Editable Tables
+
+Run time: 2026-08-14 17:14:52
+Repository root: C:/Users/Jason/Projects/srma-agent-toolkit
+
+INPUT
+--------------------------------------------------
+Manifest used: NO (fallback dataset discovery)
+Analysis groups detected: 5
+PASS groups: 0
+FAIL groups: 5
+
+OUTPUTS
+--------------------------------------------------
+Summary CSV: C:/Users/Jason/Projects/srma-agent-toolkit/results/meta_analysis/tables/meta_analysis_summary.csv
+Study CSV: C:/Users/Jason/Projects/srma-agent-toolkit/results/meta_analysis/tables/study_level_effects.csv
+Workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/meta_analysis/tables/meta_analysis_outputs.xlsx
+Figures directory: C:/Users/Jason/Projects/srma-agent-toolkit/results/meta_analysis/figures
+
+FIGURE OUTPUT POLICY
+--------------------------------------------------
+For each successful analysis group, R/33 created:
+- a high-resolution PNG forest plot
+- a vector PDF forest plot
+
+TABLE OUTPUT POLICY
+--------------------------------------------------
+Editable outputs include:
+- pooled summary table
+- study-level effects table
+- figure manifest
+- failure log sheet
+
+STATUS
+--------------------------------------------------
+FAIL: R/33 did not generate any successful analysis output.

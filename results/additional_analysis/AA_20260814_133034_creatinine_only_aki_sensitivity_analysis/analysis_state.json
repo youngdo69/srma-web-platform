@@ -1,0 +1,29 @@
+{
+  "analysis_id": "AA_20260814_133034_creatinine_only_aki_sensitivity_analysis",
+  "project_id": "sglt2_inhibitors_cardiac_surgery",
+  "project_title": "Efficacy and safety of preoperative or perioperative SGLT2 inhibitors in adult cardiac surgery: a systematic review and meta-analysis",
+  "evidence_role": "primary_randomized",
+  "purpose": "Creatinine-only AKI sensitivity analysis",
+  "preferred_effect_measure": "AUTO",
+  "status": "COMPLETE",
+  "created_at": "2026-08-14 13:30:34",
+  "updated_at": "2026-08-14 14:21:52",
+  "raw_directory": "C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis",
+  "processed_directory": "C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis",
+  "result_directory": "C:/Users/Jason/Projects/srma-agent-toolkit/results/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis",
+  "source_files": [
+    "C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis/SCR_000012.pdf",
+    "C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis/SCR_000024.pdf",
+    "C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis/SCR_000083.pdf",
+    "C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis/SCR_000098.pdf"
+  ],
+  "extraction_method": "multimodal_structured_extraction",
+  "final_effect_measure": "RR",
+  "extraction_model": "gpt-5.6",
+  "extracted_records_file": "C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis/additional_analysis_extracted_records.csv",
+  "meta_analysis_ready_file": "C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis/additional_analysis_meta_analysis_ready.csv",
+  "summary_file": "C:/Users/Jason/Projects/srma-agent-toolkit/results/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis/meta_analysis_summary.csv",
+  "forest_plot": "C:/Users/Jason/Projects/srma-agent-toolkit/results/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis/forest_plot.pdf",
+  "report_file": "C:/Users/Jason/Projects/srma-agent-toolkit/results/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis/additional_analysis_report.txt",
+  "manuscript_result_sentence_file": "C:/Users/Jason/Projects/srma-agent-toolkit/results/additional_analysis/AA_20260814_133034_creatinine_only_aki_sensitivity_analysis/manuscript_result_sentence.txt"
+}

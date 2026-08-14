@@ -1,0 +1,4 @@
+key,configured_relative_path,resolved_runtime_path,inside_project_root,directory_exists
+additional_analysis_raw,data/raw/additional_analysis,C:/Users/Jason/Projects/srma-agent-toolkit/data/raw/additional_analysis,TRUE,TRUE
+additional_analysis_processed,data/processed/additional_analysis,C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/additional_analysis,TRUE,TRUE
+additional_analysis_results,results/additional_analysis,C:/Users/Jason/Projects/srma-agent-toolkit/results/additional_analysis,TRUE,TRUE

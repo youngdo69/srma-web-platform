@@ -244,3 +244,14 @@ paths:
   figures_directory: results/figures
   tables_directory: results/tables
   manuscript_directory: results/manuscript
+
+
+# ------------------------------------------------------------
+# Canonical toolkit paths
+# Paths are relative to the runtime project root.
+# Do not replace these with user-specific absolute paths.
+# ------------------------------------------------------------
+canonical_paths:
+  additional_analysis_raw: data/raw/additional_analysis
+  additional_analysis_processed: data/processed/additional_analysis
+  additional_analysis_results: results/additional_analysis
