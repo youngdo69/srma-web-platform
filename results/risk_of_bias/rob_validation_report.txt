@@ -1,0 +1,29 @@
+Universal SR-MA Agent Toolkit
+R/36 — Risk of Bias
+
+Unique quantitative-synthesis studies: 6
+RoB 2 studies: 4
+ROBINS-I studies: 2
+PDF available: 6/6
+Signalling-question tasks: 144
+Agent assessment file present: TRUE
+Final export status: AGENT ASSESSMENT AVAILABLE; AUTHOR REVIEW REQUIRED BEFORE FINAL RoB EXPORT
+Repo-root .env found: TRUE
+.env variables loaded: none
+Pre-existing environment variables preserved: OPENAI_API_KEY, SRMA_ROB_AGENT_PROVIDER, SRMA_ROB_AGENT_MODEL, SRMA_ROB_AGENT_RUN, SRMA_ROB_FORCE_RERUN
+Multimodal Agent provider: openai
+Multimodal Agent model: gpt-5.6
+Automated Agent execution completed: TRUE
+Author workbook updated from generated assessment: TRUE
+Existing author-edited workbook preserved: FALSE
+
+OUTPUTS
+--------------------------------------------------
+C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/rob_study_result_manifest.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/rob_agent_tasks.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/rob_agent_tasks.jsonl
+C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/rob_agent_assessments.csv
+C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/risk_of_bias_generated.xlsx
+C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/risk_of_bias_author_editable.xlsx
+
+PASS: Agent assessments imported and validated; author review remains required.

@@ -340,6 +340,9 @@ mime_type_for_file <- function(path) {
 
 source("R/utils/config_utils.R")
 source("R/utils/path_utils.R")
+source("R/utils/llm_provider_utils.R")
+
+load_project_env(".env")
 
 config <- load_project_config(
   "config/project_config.yml",
@@ -2394,19 +2397,11 @@ run_multimodal_extraction <- function(
 
   require_api_packages()
 
-  api_key <- safe_chr(
-    Sys.getenv(
-      "OPENAI_API_KEY",
-      unset = ""
-    )
-  )
-
-  if (api_key == "") {
-    stop(
-      "OPENAI_API_KEY is required for PDF or non-canonical file extraction.",
-      call. = FALSE
-    )
+  if (!nzchar(Sys.getenv("OPENAI_API_KEY", unset = ""))) {
+    load_project_env(".env")
   }
+
+  api_key <- get_required_environment_value("OPENAI_API_KEY")
 
   model <- resolve_additional_analysis_model()
 

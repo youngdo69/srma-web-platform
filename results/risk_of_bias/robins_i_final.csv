@@ -1,0 +1,17 @@
+screening_id,domain_id,judgement,rationale,rob_tool,source
+SCR_000096,D1,Serious,,ROBINS-I,author_workbook
+SCR_000096,D2,Moderate,,ROBINS-I,author_workbook
+SCR_000096,D3,Moderate,,ROBINS-I,author_workbook
+SCR_000096,D4,Moderate,,ROBINS-I,author_workbook
+SCR_000096,D5,Serious,,ROBINS-I,author_workbook
+SCR_000096,D6,Moderate,,ROBINS-I,author_workbook
+SCR_000096,D7,Moderate,,ROBINS-I,author_workbook
+SCR_000118,D1,Serious,,ROBINS-I,author_workbook
+SCR_000118,D2,Serious,,ROBINS-I,author_workbook
+SCR_000118,D3,Moderate,,ROBINS-I,author_workbook
+SCR_000118,D4,Moderate,,ROBINS-I,author_workbook
+SCR_000118,D5,Serious,,ROBINS-I,author_workbook
+SCR_000118,D6,Low,,ROBINS-I,author_workbook
+SCR_000118,D7,Moderate,,ROBINS-I,author_workbook
+SCR_000096,Overall,Serious,,ROBINS-I,author_workbook
+SCR_000118,Overall,Serious,,ROBINS-I,author_workbook

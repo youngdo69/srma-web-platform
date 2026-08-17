@@ -1,0 +1,152 @@
+{
+  "model": "gpt-5.6",
+  "input": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "You are extracting quantitative evidence for an AUTHOR-DIRECTED additional meta-analysis within a systematic review.\n\nPROJECT TITLE:\nEfficacy and safety of preoperative or perioperative SGLT2 inhibitors in adult cardiac surgery: a systematic review and meta-analysis\n\nEVIDENCE ROLE REQUESTED:\nPrimary randomized evidence\n\nAUTHOR-STATED PURPOSE:\nCreatinine-only AKI sensitivity analysis\n\nPREFERRED EFFECT MEASURE:\nRR\n\nSOURCE FILES:\n- SCR_000012.pdf\n- SCR_000024.pdf\n- SCR_000024의 ScienceDirect Supplementary Tables.docx\n- SCR_000083.pdf\n- SCR_000098.pdf\n\nEXTRACTION RULES:\n1. Extract ONLY outcome data directly relevant to the Author-stated purpose.\n2. Use one record per independent study/outcome contribution intended for pooling.\n3. Do NOT infer or manufacture a value that is not explicitly supported by the source.\n4. Search the entire supplied file, including tables, figures, appendices and supplementary material contained in that file, before deciding that the requested endpoint is unavailable.\n4a. Word documents (DOCX/DOC) may contain supplementary tables that modify or clarify values reported in the main PDF and must be treated as equally eligible source material.\n5. If an outcome definition is unclear or the requested endpoint cannot be isolated, do NOT force inclusion. Record the reason in exclusions_or_uncertainties.\n6. For randomized evidence, prefer raw arm-level event/total data when clearly reported for the requested endpoint.\n7. For observational evidence, prefer the study's adjusted, weighted, propensity-based, or other causal effect estimate with its 95% CI when such an estimate is reported.\n8. If both adjusted and unadjusted estimates exist in an observational study, select the estimate most appropriate for causal interpretation and explain that choice in extraction_note.\n9. Preserve the source-reported effect measure. Never silently convert OR or HR to RR.\n10. For raw dichotomous randomized data, leave effect_measure blank if the source gives only event counts; the downstream meta-analysis engine may calculate RR if RR is selected.\n11. source_file MUST match the filename supplied to the API.\n12. source_location SHOULD identify page, table, figure, supplementary table, or section whenever possible.\n13. outcome_definition should preserve the operational definition relevant to this analysis, for example serum-creatinine-only AKI versus combined KDIGO creatinine/urine-output AKI.\n14. certainty must be High, Moderate, or Low according to how explicit the source is.\n15. Use empty strings for fields that are genuinely unavailable.\n\nReturn only the structured output matching the supplied JSON schema."
+        },
+        {
+          "type": "input_file",
+          "file_id": "file-9pp397arXR9LPFGhhEBqdn"
+        },
+        {
+          "type": "input_file",
+          "file_id": "file-TzdrobjhQmfuMcecjt2kbT"
+        },
+        {
+          "type": "input_file",
+          "file_id": "file-8LaS2RLzuANPCQiZKZXnUJ"
+        },
+        {
+          "type": "input_file",
+          "file_id": "file-3LXtrkESkMXPqzd1WZkH9V"
+        },
+        {
+          "type": "input_file",
+          "file_id": "file-8cBESWA57YWh2ffAmAUPHV"
+        }
+      ]
+    }
+  ],
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "name": "srma_additional_analysis_extraction",
+      "description": "Structured study-level extraction for an author-directed additional meta-analysis.",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "analysis_purpose_interpreted": {
+            "type": "string"
+          },
+          "evidence_role_interpreted": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "study_id": {
+                  "type": "string"
+                },
+                "study_label": {
+                  "type": "string"
+                },
+                "study_design": {
+                  "type": "string"
+                },
+                "outcome_name": {
+                  "type": "string"
+                },
+                "outcome_definition": {
+                  "type": "string"
+                },
+                "timepoint": {
+                  "type": "string"
+                },
+                "data_type": {
+                  "type": "string"
+                },
+                "effect_measure": {
+                  "type": "string"
+                },
+                "effect_estimate": {
+                  "type": "string"
+                },
+                "lower_ci": {
+                  "type": "string"
+                },
+                "upper_ci": {
+                  "type": "string"
+                },
+                "intervention_events": {
+                  "type": "string"
+                },
+                "intervention_total": {
+                  "type": "string"
+                },
+                "comparator_events": {
+                  "type": "string"
+                },
+                "comparator_total": {
+                  "type": "string"
+                },
+                "intervention_mean": {
+                  "type": "string"
+                },
+                "intervention_sd": {
+                  "type": "string"
+                },
+                "intervention_n": {
+                  "type": "string"
+                },
+                "comparator_mean": {
+                  "type": "string"
+                },
+                "comparator_sd": {
+                  "type": "string"
+                },
+                "comparator_n": {
+                  "type": "string"
+                },
+                "adjusted": {
+                  "type": "string"
+                },
+                "adjustment_variables": {
+                  "type": "string"
+                },
+                "source_file": {
+                  "type": "string"
+                },
+                "source_location": {
+                  "type": "string"
+                },
+                "extraction_note": {
+                  "type": "string"
+                },
+                "certainty": {
+                  "type": "string"
+                }
+              },
+              "required": ["study_id", "study_label", "study_design", "outcome_name", "outcome_definition", "timepoint", "data_type", "effect_measure", "effect_estimate", "lower_ci", "upper_ci", "intervention_events", "intervention_total", "comparator_events", "comparator_total", "intervention_mean", "intervention_sd", "intervention_n", "comparator_mean", "comparator_sd", "comparator_n", "adjusted", "adjustment_variables", "source_file", "source_location", "extraction_note", "certainty"]
+            }
+          },
+          "exclusions_or_uncertainties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["analysis_purpose_interpreted", "evidence_role_interpreted", "records", "exclusions_or_uncertainties"]
+      },
+      "strict": true
+    }
+  }
+}

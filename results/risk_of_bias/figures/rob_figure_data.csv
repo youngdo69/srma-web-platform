@@ -1,0 +1,41 @@
+screening_id,domain_id,judgement,rationale,rob_tool,source,study_label
+SCR_000012,D1,Low,,RoB 2,author_workbook,Pitta 2025
+SCR_000012,D2,Some concerns,,RoB 2,author_workbook,Pitta 2025
+SCR_000012,D3,Low,,RoB 2,author_workbook,Pitta 2025
+SCR_000012,D4,Low,,RoB 2,author_workbook,Pitta 2025
+SCR_000012,D5,Some concerns,,RoB 2,author_workbook,Pitta 2025
+SCR_000024,D1,Low,,RoB 2,author_workbook,Snel 2025
+SCR_000024,D2,Low,,RoB 2,author_workbook,Snel 2025
+SCR_000024,D3,Low,,RoB 2,author_workbook,Snel 2025
+SCR_000024,D4,Some concerns,,RoB 2,author_workbook,Snel 2025
+SCR_000024,D5,High,,RoB 2,author_workbook,Snel 2025
+SCR_000083,D1,Low,,RoB 2,author_workbook,Oosterom-Eijmael 2026
+SCR_000083,D2,Low,,RoB 2,author_workbook,Oosterom-Eijmael 2026
+SCR_000083,D3,Low,,RoB 2,author_workbook,Oosterom-Eijmael 2026
+SCR_000083,D4,Low,,RoB 2,author_workbook,Oosterom-Eijmael 2026
+SCR_000083,D5,Low,,RoB 2,author_workbook,Oosterom-Eijmael 2026
+SCR_000096,D1,Serious,,ROBINS-I,author_workbook,Ruste 2026
+SCR_000096,D2,Moderate,,ROBINS-I,author_workbook,Ruste 2026
+SCR_000096,D3,Moderate,,ROBINS-I,author_workbook,Ruste 2026
+SCR_000096,D4,Moderate,,ROBINS-I,author_workbook,Ruste 2026
+SCR_000096,D5,Serious,,ROBINS-I,author_workbook,Ruste 2026
+SCR_000096,D6,Moderate,,ROBINS-I,author_workbook,Ruste 2026
+SCR_000096,D7,Moderate,,ROBINS-I,author_workbook,Ruste 2026
+SCR_000098,D1,Some concerns,,RoB 2,author_workbook,Li 2026
+SCR_000098,D2,Some concerns,,RoB 2,author_workbook,Li 2026
+SCR_000098,D3,Some concerns,,RoB 2,author_workbook,Li 2026
+SCR_000098,D4,Low,,RoB 2,author_workbook,Li 2026
+SCR_000098,D5,Low,,RoB 2,author_workbook,Li 2026
+SCR_000118,D1,Serious,,ROBINS-I,author_workbook,Kolland 2026
+SCR_000118,D2,Serious,,ROBINS-I,author_workbook,Kolland 2026
+SCR_000118,D3,Moderate,,ROBINS-I,author_workbook,Kolland 2026
+SCR_000118,D4,Moderate,,ROBINS-I,author_workbook,Kolland 2026
+SCR_000118,D5,Serious,,ROBINS-I,author_workbook,Kolland 2026
+SCR_000118,D6,Low,,ROBINS-I,author_workbook,Kolland 2026
+SCR_000118,D7,Moderate,,ROBINS-I,author_workbook,Kolland 2026
+SCR_000012,Overall,Some concerns,,RoB 2,author_workbook,Pitta 2025
+SCR_000024,Overall,High,,RoB 2,author_workbook,Snel 2025
+SCR_000083,Overall,Low,,RoB 2,author_workbook,Oosterom-Eijmael 2026
+SCR_000096,Overall,Serious,,ROBINS-I,author_workbook,Ruste 2026
+SCR_000098,Overall,Some concerns,,RoB 2,author_workbook,Li 2026
+SCR_000118,Overall,Serious,,ROBINS-I,author_workbook,Kolland 2026

@@ -1,0 +1,48 @@
+Universal SR-MA Agent Toolkit
+R/35 — PRISMA 2020 Flow Diagram
+
+SOURCE POLICY
+--------------------------------------------------
+Manual count input: PROHIBITED
+prisma_counts.csv: NOT REQUIRED
+Counts derived from canonical row-level R/16-R/24 records.
+
+DATABASE IDENTIFICATION
+--------------------------------------------------
+  CENTRAL: 53
+  Embase: 25
+  PubMed: 198
+  Total: 276
+
+PRISMA COUNTS
+--------------------------------------------------
+Duplicates removed: 24
+Records screened: 252
+Records excluded: 222
+Reports sought for retrieval: 30
+Reports not retrieved: 0
+Reports assessed for eligibility: 30
+Reports excluded: 9
+Studies included: 21
+
+ARITHMETIC VALIDATION
+--------------------------------------------------
+  identified - duplicates = after deduplication: PASS
+  after deduplication = title/abstract records: PASS
+  screened - excluded = full-text handoff: PASS
+  reports sought = assessed + not retrieved: PASS
+  assessed - full-text excluded = included: PASS
+  full-text exclusion reasons sum to full-text excluded: PASS
+
+OPTIONAL RETRIEVAL AUDIT
+--------------------------------------------------
+Metadata-only eligibility assessments: 10
+Missing PDF at final eligibility: 9
+
+OUTPUTS
+--------------------------------------------------
+PDF: C:/Users/Jason/Projects/srma-agent-toolkit/results/prisma/prisma_2020_flow_diagram.pdf [CREATED]
+PNG: C:/Users/Jason/Projects/srma-agent-toolkit/results/prisma/prisma_2020_flow_diagram.png [CREATED]
+SVG: C:/Users/Jason/Projects/srma-agent-toolkit/results/prisma/prisma_2020_flow_diagram.svg [CREATED]
+
+PASS: R/35 generated the PRISMA 2020 flow diagram automatically.
