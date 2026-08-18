@@ -1,0 +1,35 @@
+order,step_id,category,enabled,run_log_status
+1,initialization_agent,RUN,TRUE,RECOVERED
+2,initialization_validation,RUN,TRUE,RECOVERED
+3,human_decision_review,RUN,TRUE,RECOVERED
+4,human_decision_finalization,HUMAN GATE,TRUE,RECOVERED
+5,prospero_preparation,RUN,TRUE,RECOVERED
+6,search_generation,RUN,TRUE,RECOVERED
+7,search_validation,RUN,TRUE,RECOVERED
+8,pubmed_download,RUN,TRUE,RECOVERED
+9,database_input_gate,HUMAN GATE,TRUE,RECOVERED
+10,merge_deduplication,RUN,TRUE,RECOVERED
+11,screening_workbook,RUN,TRUE,RECOVERED
+12,agent_screening,RUN,TRUE,RECOVERED
+13,agent_validation,RUN,TRUE,RECOVERED
+14,human_reviewer_2_gate,HUMAN GATE,TRUE,RECOVERED
+15,human_adjudication_gate,HUMAN GATE,TRUE,RECOVERED
+16,screening_finalization,RUN,TRUE,RECOVERED
+17,full_text_registry,RUN,TRUE,RECOVERED
+18,full_text_agent_eligibility,RUN,TRUE,RECOVERED
+19,full_text_author_gate,HUMAN GATE,TRUE,RECOVERED
+20,final_included_studies,RUN,TRUE,RECOVERED
+21,prisma,RUN,TRUE,RECOVERED
+22,multimodal_extraction,RUN,TRUE,RECOVERED
+23,manuscript_tables,RUN,TRUE,RECOVERED
+24,scope_advisory,OPTIONAL,TRUE,RECOVERED
+25,targeted_verification_prep,RUN,TRUE,RECOVERED
+26,extraction_human_gate,HUMAN GATE,TRUE,RECOVERED
+27,human_verified_finalization,RUN,TRUE,RECOVERED
+28,meta_analysis,RUN,TRUE,RECOVERED
+29,meta_analysis_diagnostics,RUN,TRUE,RECOVERED
+30,additional_analysis,OPTIONAL,FALSE,SKIPPED
+31,forest_plots,RUN,TRUE,RECOVERED
+32,risk_of_bias,RUN,TRUE,RECOVERED
+33,rob_author_gate,HUMAN GATE,TRUE,RECOVERED
+34,rob_finalization,RUN,TRUE,RECOVERED

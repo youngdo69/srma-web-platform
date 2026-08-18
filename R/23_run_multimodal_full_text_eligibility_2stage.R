@@ -1,6 +1,6 @@
 # ============================================================
 # Universal SR-MA Agent Toolkit
-# R/23_run_multimodal_full_text_eligibility.R
+# R/23_run_multimodal_full_text_eligibility_2stage.R
 #
 # TASK-011 — Multimodal Full-Text Eligibility
 #
@@ -26,7 +26,8 @@
 #   the authoritative final Include/Exclude decision.
 # - TASK-012 will validate the author's final decisions and create
 #   the authoritative Included Studies dataset.
-# - This script is standalone and is NOT connected to the Runner.
+# - This script remains independently executable and may also be
+#   invoked by the canonical Universal Runner.
 #
 # Decision vocabulary
 # ------------------------------------------------------------

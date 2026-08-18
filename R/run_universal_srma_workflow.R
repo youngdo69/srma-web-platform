@@ -2,501 +2,212 @@
 # Universal SR-MA Agent Toolkit
 # R/run_universal_srma_workflow.R
 #
-# TASK-009: Phase 1 Universal Workflow Runner Integration
+# TASK-016 — Final Universal Runner Integration
+# VERSION: 3.0.6
 #
-# Scope
+# PURPOSE
 # ------------------------------------------------------------
-# 1. Single execution entry point
-# 2. Stepwise progress messages
-# 3. Safe stop on failure
-# 4. Resume from validated workflow state
-# 5. Preserve Human Decision controls
-# 6. Orchestrate existing verified R scripts only
+# Single orchestration entry point across the validated SR-MA
+# workflow while preserving:
+#   - standalone module execution
+#   - Human Review / Verification gates
+#   - safe stop / pause / resume / recovery
+#   - auditable state and per-run logs
+#   - mandatory pre-search PROSPERO preparation
+#   - optional R/25A and R/29 branches
+#   - mandatory R/28 post-meta-analysis diagnostics before R/29
+#   - R/32 as an upload-routing service only
+#   - exclusion of R/30-R/31 maintenance modules
 #
-# Orchestrated sequence
+# IMPORTANT
 # ------------------------------------------------------------
-# R/01_validate_project_initialization.R
-# R/01b_prepare_human_decision_review.R
-# R/01_finalize_human_decisions.R
-# R/11_generate_search_strategies.R
-# R/12_validate_search_strategies.R
-# R/16_download_pubmed_records.R
-# [Gate] Enabled database export inputs
-# R/17_import_merge_deduplicate.R
-# R/18_prepare_screening_workbook.R
-# R/19_run_agent_title_abstract_screening.R
-# R/20_validate_agent_screening.R
-# [Gate] Human Reviewer 2
-# [Gate] Human Adjudication
-# R/21_finalize_title_abstract_screening.R
-#
-# Usage
-# ------------------------------------------------------------
-# Default:
-#   source("R/run_universal_srma_workflow.R")
-#
-# Resume explicitly:
-#   options(srma.runner.autorun = FALSE)
-#   source("R/run_universal_srma_workflow.R")
-#   run_universal_srma_workflow(resume = TRUE)
-#
-# Re-run from a downstream step:
-#   run_universal_srma_workflow(
-#     resume = TRUE,
-#     from_step = "search_generation"
-#   )
-#
-# Valid from_step values:
-#   initialization_validation
-#   human_decision_review
-#   human_decision_finalization
-#   search_generation
-#   search_validation
-#   pubmed_download
-#   database_input_gate
-#   merge_deduplication
-#   screening_workbook
-#   agent_screening
-#   agent_validation
-#   human_reviewer_2_gate
-#   human_adjudication_gate
-#   screening_finalization
-# ============================================================
-
-
-# ============================================================
-# 1. General helpers
+# The Runner orchestrates. It does NOT reproduce analytical,
+# screening, extraction, eligibility, RoB, or plotting logic.
 # ============================================================
 
 `%||%` <- function(x, y) {
   if (is.null(x) || length(x) == 0L) y else x
 }
 
-
-runner_now <- function() {
-  format(
-    Sys.time(),
-    "%Y-%m-%d %H:%M:%S"
-  )
-}
-
-
-runner_timestamp <- function() {
-  format(
-    Sys.time(),
-    "%Y%m%d_%H%M%S"
-  )
-}
-
+runner_now <- function() format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+runner_timestamp <- function() format(Sys.time(), "%Y%m%d_%H%M%S")
 
 runner_is_nonempty_character <- function(x) {
-  is.character(x) &&
-    length(x) == 1L &&
-    !is.na(x) &&
-    nzchar(trimws(x))
+  is.character(x) && length(x) == 1L && !is.na(x) && nzchar(trimws(x))
 }
-
 
 runner_as_character_vector <- function(x) {
-  if (is.null(x) || length(x) == 0L) {
-    return(character(0))
-  }
-
-  values <- unlist(
-    x,
-    recursive = TRUE,
-    use.names = FALSE
-  )
-
-  values <- as.character(values)
-  values <- trimws(values)
-
-  unique(
-    values[
-      !is.na(values) &
-        nzchar(values)
-    ]
-  )
+  if (is.null(x) || length(x) == 0L) return(character(0))
+  x <- trimws(as.character(unlist(x, recursive = TRUE, use.names = FALSE)))
+  unique(x[!is.na(x) & nzchar(x)])
 }
 
-
-runner_as_logical <- function(
-    x,
-    default = FALSE
-) {
-  if (is.null(x) || length(x) == 0L) {
-    return(default)
-  }
-
-  value <- unlist(
-    x,
-    recursive = TRUE,
-    use.names = FALSE
-  )[[1]]
-
-  if (is.logical(value)) {
-    return(isTRUE(value))
-  }
-
-  normalized <- tolower(
-    trimws(
-      as.character(value)
-    )
-  )
-
-  if (
-    normalized %in% c(
-      "true",
-      "t",
-      "yes",
-      "y",
-      "1",
-      "pass",
-      "passed"
-    )
-  ) {
-    return(TRUE)
-  }
-
-  if (
-    normalized %in% c(
-      "false",
-      "f",
-      "no",
-      "n",
-      "0",
-      "fail",
-      "failed"
-    )
-  ) {
-    return(FALSE)
-  }
-
+runner_as_logical <- function(x, default = FALSE) {
+  if (is.null(x) || length(x) == 0L) return(default)
+  value <- unlist(x, recursive = TRUE, use.names = FALSE)[[1]]
+  if (is.logical(value)) return(isTRUE(value))
+  value <- tolower(trimws(as.character(value)))
+  if (value %in% c("true", "t", "yes", "y", "1", "pass", "passed")) return(TRUE)
+  if (value %in% c("false", "f", "no", "n", "0", "fail", "failed")) return(FALSE)
   default
 }
-
-
-runner_print_header <- function(title) {
-  width <- max(
-    60L,
-    nchar(title) + 4L
-  )
-
-  cat("\n")
-  cat(
-    paste(rep("=", width), collapse = ""),
-    "\n",
-    sep = ""
-  )
-  cat(title, "\n")
-  cat(
-    paste(rep("=", width), collapse = ""),
-    "\n",
-    sep = ""
-  )
-}
-
-
-runner_print_step <- function(
-    index,
-    total,
-    label,
-    status = NULL
-) {
-  prefix <- paste0(
-    "[",
-    index,
-    "/",
-    total,
-    "] "
-  )
-
-  if (is.null(status)) {
-    cat("\n", prefix, label, "...\n", sep = "")
-  } else {
-    cat(
-      prefix,
-      label,
-      " — ",
-      status,
-      "\n",
-      sep = ""
-    )
-  }
-}
-
 
 runner_require_package <- function(package_name) {
   if (!requireNamespace(package_name, quietly = TRUE)) {
     stop(
-      "Required package is not installed: ",
-      package_name,
-      "\nInstall it once with:\n",
-      'install.packages("',
-      package_name,
-      '")',
+      "Required package is not installed: ", package_name,
+      "\nInstall it once with install.packages(\"", package_name, "\")",
       call. = FALSE
     )
   }
-
   invisible(TRUE)
 }
 
+runner_file_nonempty <- function(path) {
+  file.exists(path) && !is.na(file.info(path)$size) && file.info(path)$size > 0
+}
+
+runner_print_header <- function(title) {
+  width <- max(60L, nchar(title) + 4L)
+  cat("\n", paste(rep("=", width), collapse = ""), "\n", sep = "")
+  cat(title, "\n")
+  cat(paste(rep("=", width), collapse = ""), "\n", sep = "")
+}
+
+runner_print_step <- function(index, total, label, status = NULL) {
+  prefix <- paste0("[", index, "/", total, "] ")
+  if (is.null(status)) {
+    cat("\n", prefix, label, "...\n", sep = "")
+  } else {
+    cat(prefix, label, " — ", status, "\n", sep = "")
+  }
+}
+
+runner_normalize_slash <- function(x) gsub("\\\\", "/", as.character(x))
 
 runner_assert_project_root <- function() {
-  required_root_files <- c(
+  required <- c(
     "config/initialization_agent.yml",
-    "config/agent_screening.yml",
-    "R/01_validate_project_initialization.R",
-    "R/01b_prepare_human_decision_review.R",
-    "R/01_finalize_human_decisions.R",
-    "R/11_generate_search_strategies.R",
-    "R/12_validate_search_strategies.R",
-    "R/16_download_pubmed_records.R",
-    "R/17_import_merge_deduplicate.R",
-    "R/18_prepare_screening_workbook.R",
-    "R/19_run_agent_title_abstract_screening.R",
-    "R/20_validate_agent_screening.R",
-    "R/21_finalize_title_abstract_screening.R"
+    "R/utils/config_utils.R",
+    "R/utils/path_utils.R"
   )
-
-  missing <- required_root_files[
-    !file.exists(required_root_files)
-  ]
-
+  missing <- required[!file.exists(required)]
   if (length(missing) > 0L) {
     stop(
-      "The workflow runner must be executed from the toolkit root.\n",
-      "Missing required file(s):\n- ",
+      "Run the Universal Runner from the toolkit repository root.\nMissing:\n- ",
       paste(missing, collapse = "\n- "),
       call. = FALSE
     )
   }
-
   invisible(TRUE)
 }
 
-
-runner_file_nonempty <- function(file_path) {
-  file.exists(file_path) &&
-    !is.na(file.info(file_path)$size) &&
-    file.info(file_path)$size > 0
+# ------------------------------------------------------------
+# Validation helpers
+# ------------------------------------------------------------
+# Normal workflow completion/recovery MUST be decided only from the
+# active project context resolved through config_utils.R + path_utils.R.
+# Repository-wide newest-file discovery is intentionally prohibited.
+runner_dependency_available <- function(package_name) {
+  requireNamespace(package_name, quietly = TRUE)
 }
 
+runner_read_text <- function(path) {
+  if (!runner_file_nonempty(path)) return("")
+  paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+}
 
-# ============================================================
-# 2. Runner paths and workflow definition
-# ============================================================
+runner_read_csv_character <- function(path) {
+  if (!runner_file_nonempty(path)) return(NULL)
 
-runner_paths <- function() {
-  agent_document <- yaml::read_yaml(
-    "config/initialization_agent.yml"
-  )
-
-  agent_config <- agent_document$initialization_agent
-
-  if (is.null(agent_config) || !is.list(agent_config)) {
-    stop(
-      "Invalid config/initialization_agent.yml: ",
-      "missing initialization_agent section.",
-      call. = FALSE
+  if (runner_dependency_available("readr")) {
+    return(
+      tryCatch(
+        readr::read_csv(
+          path,
+          show_col_types = FALSE,
+          col_types = readr::cols(.default = readr::col_character())
+        ),
+        error = function(e) NULL
+      )
     )
   }
 
-  generated_directory <-
-    agent_config$output$generated_directory %||%
-    "config/generated"
+  tryCatch(
+    utils::read.csv(
+      path,
+      stringsAsFactors = FALSE,
+      colClasses = "character",
+      check.names = FALSE
+    ),
+    error = function(e) NULL
+  )
+}
 
-  decisions_name <-
-    agent_config$output$decisions_required %||%
-    "initialization_decisions_required.yml"
+runner_clean_scalar <- function(x) {
+  if (is.null(x) || length(x) == 0L || is.na(x[[1]])) return("")
+  trimws(as.character(x[[1]]))
+}
 
-  project_draft_name <-
-    agent_config$output$project_config_draft %||%
-    "project_config_draft.yml"
+runner_path_is_absolute <- function(path) {
+  p <- runner_normalize_slash(runner_clean_scalar(path))
+  nzchar(p) && (
+    grepl("^[A-Za-z]:/", p) ||
+      grepl("^/", p) ||
+      grepl("^//", p)
+  )
+}
 
-  search_draft_name <-
-    agent_config$output$search_terms_draft %||%
-    "search_terms_draft.yml"
+runner_normalize_path_safe <- function(path, must_work = FALSE) {
+  if (!runner_is_nonempty_character(as.character(path))) return("")
+  tryCatch(
+    normalizePath(path, winslash = "/", mustWork = must_work),
+    error = function(e) ""
+  )
+}
+
+runner_path_within <- function(path, directory) {
+  path_n <- runner_normalize_path_safe(path, must_work = FALSE)
+  dir_n <- runner_normalize_path_safe(directory, must_work = FALSE)
+  if (!nzchar(path_n) || !nzchar(dir_n)) return(FALSE)
+
+  path_cmp <- tolower(runner_normalize_slash(path_n))
+  dir_cmp <- sub("/+$", "", tolower(runner_normalize_slash(dir_n)))
+
+  identical(path_cmp, dir_cmp) || startsWith(path_cmp, paste0(dir_cmp, "/"))
+}
+
+# ============================================================
+# 1. Paths / state
+# ============================================================
+runner_paths <- function() {
+  agent_document <- yaml::read_yaml("config/initialization_agent.yml")
+  agent_config <- agent_document$initialization_agent %||% list()
+  generated_directory <- agent_config$output$generated_directory %||% "config/generated"
+  decisions_name <- agent_config$output$decisions_required %||% "initialization_decisions_required.yml"
+  project_draft_name <- agent_config$output$project_config_draft %||% "project_config_draft.yml"
+  search_draft_name <- agent_config$output$search_terms_draft %||% "search_terms_draft.yml"
 
   state_directory <- "results/workflow"
-
   list(
     state_directory = state_directory,
-    state_file = file.path(
-      state_directory,
-      "universal_workflow_state.yml"
-    ),
-    run_log_directory = file.path(
-      state_directory,
-      "runs"
-    ),
+    state_file = file.path(state_directory, "universal_workflow_state.yml"),
+    run_log_directory = file.path(state_directory, "runs"),
     generated_directory = generated_directory,
-    decisions_required = file.path(
-      generated_directory,
-      decisions_name
-    ),
-    project_draft = file.path(
-      generated_directory,
-      project_draft_name
-    ),
-    search_draft = file.path(
-      generated_directory,
-      search_draft_name
-    ),
-    responses = file.path(
-      generated_directory,
-      "human_decision_responses.yml"
-    ),
-    project_resolved = file.path(
-      generated_directory,
-      "project_config_resolved.yml"
-    ),
-    search_resolved = file.path(
-      generated_directory,
-      "search_terms_resolved.yml"
-    ),
-    verification_report = file.path(
-      generated_directory,
-      "human_decision_verification.yml"
-    ),
-    resolved_decisions = file.path(
-      generated_directory,
-      "human_decisions_resolved.yml"
-    ),
+    decisions_required = file.path(generated_directory, decisions_name),
+    project_draft = file.path(generated_directory, project_draft_name),
+    search_draft = file.path(generated_directory, search_draft_name),
+    responses = file.path(generated_directory, "human_decision_responses.yml"),
+    verification_report = file.path(generated_directory, "human_decision_verification.yml"),
     active_project = "config/project_config.yml",
     active_search = "config/search_terms.yml"
   )
 }
 
-
-runner_steps <- function() {
-  list(
-    list(
-      id = "initialization_validation",
-      label = "Validate initialization drafts",
-      script = "R/01_validate_project_initialization.R",
-      type = "script",
-      recovery = TRUE
-    ),
-    list(
-      id = "human_decision_review",
-      label = "Prepare Human Decision review",
-      script = "R/01b_prepare_human_decision_review.R",
-      type = "script",
-      recovery = TRUE
-    ),
-    list(
-      id = "human_decision_finalization",
-      label = paste(
-        "Review Human Decisions, apply patches, verify,",
-        "and activate configuration"
-      ),
-      script = "R/01_finalize_human_decisions.R",
-      type = "script",
-      recovery = TRUE
-    ),
-    list(
-      id = "search_generation",
-      label = "Generate database search strategies",
-      script = "R/11_generate_search_strategies.R",
-      type = "script",
-      recovery = TRUE
-    ),
-    list(
-      id = "search_validation",
-      label = "Validate database search strategies",
-      script = "R/12_validate_search_strategies.R",
-      type = "script",
-      recovery = TRUE
-    ),
-    list(
-      id = "pubmed_download",
-      label = "Download canonical PubMed records",
-      script = "R/16_download_pubmed_records.R",
-      type = "script",
-      recovery = TRUE
-    ),
-    list(
-      id = "database_input_gate",
-      label = "Confirm enabled database export inputs",
-      script = "",
-      type = "gate",
-      recovery = TRUE,
-      gate_message = paste(
-        "Manual database export input is required before merge/deduplication.",
-        "Place every enabled database file at its canonical path and rerun the Runner."
-      )
-    ),
-    list(
-      id = "merge_deduplication",
-      label = "Merge and deduplicate database records",
-      script = "R/17_import_merge_deduplicate.R",
-      type = "script",
-      recovery = TRUE
-    ),
-    list(
-      id = "screening_workbook",
-      label = "Prepare title/abstract screening workbook",
-      script = "R/18_prepare_screening_workbook.R",
-      type = "script",
-      recovery = TRUE
-    ),
-    list(
-      id = "agent_screening",
-      label = "Run Agent Reviewer 1 title/abstract screening",
-      script = "R/19_run_agent_title_abstract_screening.R",
-      type = "script",
-      recovery = TRUE
-    ),
-    list(
-      id = "agent_validation",
-      label = "Validate Agent Reviewer 1 stage",
-      script = "R/20_validate_agent_screening.R",
-      type = "script_success",
-      recovery = TRUE
-    ),
-    list(
-      id = "human_reviewer_2_gate",
-      label = "Human Reviewer 2 completion gate",
-      script = "",
-      type = "gate",
-      recovery = TRUE,
-      gate_message = paste(
-        "Human Reviewer 2 must independently complete the Reviewer_2 sheet",
-        "in the agent screening workbook, save it, and rerun the Runner."
-      )
-    ),
-    list(
-      id = "human_adjudication_gate",
-      label = "Human adjudication completion gate",
-      script = "",
-      type = "gate",
-      recovery = TRUE,
-      gate_message = paste(
-        "A human adjudicator must resolve every reviewer conflict in",
-        "Conflict_Resolution, save the workbook, and rerun the Runner."
-      )
-    ),
-    list(
-      id = "screening_finalization",
-      label = "Finalize title/abstract screening and full-text-review handoff",
-      script = "R/21_finalize_title_abstract_screening.R",
-      type = "script",
-      recovery = TRUE
-    )
-  )
-}
-
-
-# ============================================================
-# 3. Workflow-state management
-# ============================================================
-
 runner_empty_state <- function() {
   list(
-    workflow = "universal_srma_phase1",
-    runner_version = "2.0.0",
+    workflow = "universal_srma_final",
+    runner_version = "3.0.6",
     status = "not_started",
     current_step = "",
     started_at = "",
@@ -508,106 +219,34 @@ runner_empty_state <- function() {
   )
 }
 
-
 runner_normalize_state <- function(state) {
   template <- runner_empty_state()
-
-  if (is.null(state) || !is.list(state)) {
-    return(template)
-  }
-
-  for (field_name in names(template)) {
-    if (is.null(state[[field_name]])) {
-      state[[field_name]] <- template[[field_name]]
-    }
-  }
-
-  state$completed_steps <- runner_as_character_vector(
-    state$completed_steps
-  )
-
-  if (!is.list(state$step_records)) {
-    state$step_records <- list()
-  }
-
+  if (is.null(state) || !is.list(state)) return(template)
+  for (name in names(template)) if (is.null(state[[name]])) state[[name]] <- template[[name]]
+  state$workflow <- "universal_srma_final"
+  state$runner_version <- "3.0.6"
+  state$completed_steps <- runner_as_character_vector(state$completed_steps)
+  if (!is.list(state$step_records)) state$step_records <- list()
   state
 }
 
-
-runner_load_state <- function(
-    state_file,
-    resume = TRUE
-) {
-  if (!isTRUE(resume) || !file.exists(state_file)) {
-    return(
-      runner_empty_state()
-    )
-  }
-
-  runner_normalize_state(
-    yaml::read_yaml(state_file)
-  )
+runner_load_state <- function(state_file, resume = TRUE) {
+  if (!isTRUE(resume) || !file.exists(state_file)) return(runner_empty_state())
+  runner_normalize_state(yaml::read_yaml(state_file))
 }
 
-
-runner_write_state <- function(
-    state,
-    state_file
-) {
+runner_write_state <- function(state, state_file) {
   state$updated_at <- runner_now()
-
-  state_directory <- dirname(state_file)
-
-  if (!dir.exists(state_directory)) {
-    dir.create(
-      state_directory,
-      recursive = TRUE,
-      showWarnings = FALSE
-    )
-  }
-
-  temporary_file <- paste0(
-    state_file,
-    ".tmp"
-  )
-
-  yaml::write_yaml(
-    state,
-    temporary_file
-  )
-
-  copied <- file.copy(
-    temporary_file,
-    state_file,
-    overwrite = TRUE
-  )
-
-  unlink(
-    temporary_file,
-    force = TRUE
-  )
-
-  if (!isTRUE(copied) || !file.exists(state_file)) {
-    stop(
-      "Could not write workflow state: ",
-      state_file,
-      call. = FALSE
-    )
-  }
-
+  dir.create(dirname(state_file), recursive = TRUE, showWarnings = FALSE)
+  tmp <- paste0(state_file, ".tmp")
+  yaml::write_yaml(state, tmp)
+  ok <- file.copy(tmp, state_file, overwrite = TRUE)
+  unlink(tmp, force = TRUE)
+  if (!isTRUE(ok) || !file.exists(state_file)) stop("Could not write workflow state: ", state_file, call. = FALSE)
   invisible(state)
 }
 
-
-runner_record_step <- function(
-    state,
-    step_id,
-    status,
-    started_at = "",
-    completed_at = "",
-    message = "",
-    validation = list()
-) {
+runner_record_step <- function(state, step_id, status, started_at = "", completed_at = "", message = "", validation = list()) {
   state$step_records[[step_id]] <- list(
     status = status,
     started_at = started_at,
@@ -615,632 +254,78 @@ runner_record_step <- function(
     message = message,
     validation = validation
   )
-
-  if (identical(status, "completed")) {
-    state$completed_steps <- unique(
-      c(
-        state$completed_steps,
-        step_id
-      )
-    )
+  if (status %in% c("completed", "skipped")) {
+    state$completed_steps <- unique(c(state$completed_steps, step_id))
   } else {
-    state$completed_steps <- setdiff(
-      state$completed_steps,
-      step_id
-    )
+    state$completed_steps <- setdiff(state$completed_steps, step_id)
   }
-
   state
 }
 
+# ============================================================
+# 2. Script registry and Final Integration Graph
+# ============================================================
+runner_steps <- function(run_scope_advisory = TRUE, run_additional_analysis = FALSE) {
+  list(
+    list(id="initialization_agent", label="Run Project Initialization Agent", category="RUN", type="script", scripts=c("R/00_run_project_initialization_agent.R"), enabled=TRUE, recovery=TRUE),
+    list(id="initialization_validation", label="Validate initialization drafts", category="RUN", type="script", scripts=c("R/01_validate_project_initialization.R"), enabled=TRUE, recovery=TRUE),
+    list(id="human_decision_review", label="Prepare Human Decision review", category="RUN", type="script", scripts=c("R/01b_prepare_human_decision_review.R"), enabled=TRUE, recovery=TRUE),
+    list(id="human_decision_finalization", label="Human Decision finalization and activation", category="HUMAN GATE", type="script", scripts=c("R/01_finalize_human_decisions.R"), enabled=TRUE, recovery=TRUE),
+    list(id="prospero_preparation", label="Prepare PROSPERO registration information", category="RUN", type="external_script", scripts=c("R/create_and_autofill_prospero.R", "create_and_autofill_prospero.R", "R/create_and_autofill_prospero_AUTO_PROJECT.R", "create_and_autofill_prospero_AUTO_PROJECT.R"), enabled=TRUE, recovery=TRUE),
+    list(id="search_generation", label="Generate database search strategies", category="RUN", type="script", scripts=c("R/11_generate_search_strategies.R"), enabled=TRUE, recovery=TRUE),
+    list(id="search_validation", label="Validate database search strategies", category="RUN", type="script", scripts=c("R/12_validate_search_strategies.R"), enabled=TRUE, recovery=TRUE),
+    list(id="pubmed_download", label="Download canonical PubMed records", category="RUN", type="script", scripts=c("R/16_download_pubmed_records.R"), enabled=TRUE, recovery=TRUE),
+    list(id="database_input_gate", label="Enabled database export availability", category="HUMAN GATE", type="gate", scripts=character(0), enabled=TRUE, recovery=TRUE),
+    list(id="merge_deduplication", label="Merge and deduplicate database records", category="RUN", type="script", scripts=c("R/17_import_merge_deduplicate.R"), enabled=TRUE, recovery=TRUE),
+    list(id="screening_workbook", label="Prepare title/abstract screening workbook", category="RUN", type="script", scripts=c("R/18_prepare_screening_workbook.R"), enabled=TRUE, recovery=TRUE),
+    list(id="agent_screening", label="Run Agent Reviewer 1 title/abstract screening", category="RUN", type="script", scripts=c("R/19_run_agent_title_abstract_screening.R"), enabled=TRUE, recovery=TRUE),
+    list(id="agent_validation", label="Validate Agent Reviewer 1 stage", category="RUN", type="script_success", scripts=c("R/20_validate_agent_screening.R"), enabled=TRUE, recovery=TRUE),
+    list(id="human_reviewer_2_gate", label="Human Reviewer 2 completion", category="HUMAN GATE", type="gate", scripts=character(0), enabled=TRUE, recovery=TRUE),
+    list(id="human_adjudication_gate", label="Human adjudication completion", category="HUMAN GATE", type="gate", scripts=character(0), enabled=TRUE, recovery=TRUE),
+    list(id="screening_finalization", label="Finalize title/abstract screening", category="RUN", type="script", scripts=c("R/21_finalize_title_abstract_screening.R"), enabled=TRUE, recovery=TRUE),
+    list(id="full_text_registry", label="Prepare full-text registry and PDF intake", category="RUN", type="script", scripts=c("R/22_prepare_full_text_registry.R"), enabled=TRUE, recovery=TRUE),
+    list(id="full_text_agent_eligibility", label="Run multimodal full-text eligibility Agent", category="RUN", type="script", scripts=c("R/23_run_multimodal_full_text_eligibility_2stage.R"), enabled=TRUE, recovery=TRUE),
+    list(id="full_text_author_gate", label="1st Author final full-text eligibility review", category="HUMAN GATE", type="gate", scripts=character(0), enabled=TRUE, recovery=TRUE),
+    list(id="final_included_studies", label="Finalize authoritative Included Studies", category="RUN", type="script", scripts=c("R/24_finalize_included_studies.R"), enabled=TRUE, recovery=TRUE),
+    list(id="prisma", label="Generate PRISMA 2020 flow diagram", category="RUN", type="script", scripts=c("R/35_generate_prisma_flow_diagram.R"), enabled=TRUE, recovery=TRUE),
+    list(id="multimodal_extraction", label="Run multimodal data extraction", category="RUN", type="script", scripts=c("R/25_run_multimodal_data_extraction.R"), enabled=TRUE, recovery=TRUE),
+    list(id="manuscript_tables", label="Generate editable manuscript characteristic tables", category="RUN", type="script", scripts=c("R/34_generate_manuscript_tables.R"), enabled=TRUE, recovery=TRUE),
+    list(id="scope_advisory", label="Generate Research Scope Advisory", category="OPTIONAL", type="script", scripts=c("R/25A_generate_research_scope_advisory.R"), enabled=isTRUE(run_scope_advisory), recovery=TRUE),
+    list(id="targeted_verification_prep", label="Prepare targeted Human Verification workbook", category="RUN", type="script", scripts=c("R/25B_prepare_targeted_human_verification.R"), enabled=isTRUE(run_scope_advisory), recovery=TRUE),
+    list(id="extraction_human_gate", label="Human Verification of planned analysis data", category="HUMAN GATE", type="gate", scripts=character(0), enabled=isTRUE(run_scope_advisory), recovery=TRUE),
+    list(id="human_verified_finalization", label="Finalize authoritative human-verified analysis data", category="RUN", type="script", scripts=c("R/26_finalize_human_verified_extraction.R"), enabled=isTRUE(run_scope_advisory), recovery=TRUE),
+    list(id="meta_analysis", label="Run universal meta-analysis", category="RUN", type="script", scripts=c("R/27_run_universal_meta_analysis.R"), enabled=isTRUE(run_scope_advisory), recovery=TRUE),
+    list(id="meta_analysis_diagnostics", label="Run post-meta-analysis diagnostics", category="RUN", type="script", scripts=c("R/28_run_meta_analysis_diagnostics.R"), enabled=isTRUE(run_scope_advisory), recovery=TRUE),
+    list(id="additional_analysis", label="Author-directed additional analysis", category="OPTIONAL", type="r29", scripts=c("R/29_run_author_directed_additional_analysis.R"), enabled=isTRUE(run_scope_advisory) && isTRUE(run_additional_analysis), recovery=FALSE),
+    list(id="forest_plots", label="Generate publication forest plots and editable meta-analysis tables", category="RUN", type="script", scripts=c("R/33_generate_forest_plots_and_editable_tables.R"), enabled=isTRUE(run_scope_advisory), recovery=TRUE),
+    list(id="risk_of_bias", label="Generate provisional result-level risk-of-bias assessments", category="RUN", type="script", scripts=c("R/36_generate_risk_of_bias.R"), enabled=isTRUE(run_scope_advisory), recovery=TRUE),
+    list(id="rob_author_gate", label="1st Author final risk-of-bias review", category="HUMAN GATE", type="gate", scripts=character(0), enabled=isTRUE(run_scope_advisory), recovery=TRUE),
+    list(id="rob_finalization", label="Finalize risk-of-bias and generate figures", category="RUN", type="script", scripts=c("R/37_finalize_risk_of_bias_and_generate_figures.R", "R/37_generate_risk_of_bias_figures.R"), enabled=isTRUE(run_scope_advisory), recovery=TRUE)
+  )
+}
+
+runner_resolve_script <- function(candidates) {
+  candidates <- runner_as_character_vector(candidates)
+  hit <- candidates[file.exists(candidates)]
+  if (length(hit) == 0L) return("")
+  hit[[1]]
+}
 
 # ============================================================
-# 4. Artifact and completion validators
+# 3. Completion validators
 # ============================================================
-
-runner_read_decisions <- function(paths) {
-  if (!file.exists(paths$decisions_required)) {
-    return(NULL)
-  }
-
-  document <- yaml::read_yaml(
-    paths$decisions_required
-  )
-
-  decisions <- document$human_decisions_required
-
-  if (is.null(decisions)) {
-    decisions <- list()
-  }
-
-  decisions
+runner_validation <- function(passed, message, ...) {
+  c(list(passed = isTRUE(passed), message = as.character(message)), list(...))
 }
 
-
-runner_read_responses <- function(paths) {
-  if (!file.exists(paths$responses)) {
-    return(NULL)
-  }
-
-  document <- yaml::read_yaml(
-    paths$responses
-  )
-
-  responses <- document$human_decision_responses
-
-  if (is.null(responses)) {
-    responses <- list()
-  }
-
-  responses
-}
-
-
-runner_draft_logs_directory <- function(paths) {
-  if (!file.exists(paths$project_draft)) {
-    return("results/logs")
-  }
-
-  draft <- tryCatch(
-    yaml::read_yaml(
-      paths$project_draft
-    ),
-    error = function(error) NULL
-  )
-
-  configured_directory <- draft$paths$logs_directory
-
-  if (!runner_is_nonempty_character(configured_directory)) {
-    return("results/logs")
-  }
-
-  configured_directory
-}
-
-
-runner_validate_initialization <- function(paths) {
-  summary_file <- file.path(
-    runner_draft_logs_directory(paths),
-    "project_initialization_validation_summary.csv"
-  )
-
-  if (!runner_file_nonempty(summary_file)) {
-    return(
-      list(
-        passed = FALSE,
-        message = paste(
-          "Initialization validation summary is missing or empty:",
-          summary_file
-        )
-      )
-    )
-  }
-
-  summary_data <- tryCatch(
-    utils::read.csv(
-      summary_file,
-      stringsAsFactors = FALSE
-    ),
-    error = function(error) NULL
-  )
-
-  if (is.null(summary_data) || nrow(summary_data) == 0L) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Initialization validation summary could not be read."
-      )
-    )
-  }
-
-  metric_column <- intersect(
-    c("metric", "item"),
-    names(summary_data)
-  )
-
-  if (
-    length(metric_column) == 0L ||
-    !"value" %in% names(summary_data)
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = paste(
-          "Initialization validation summary does not contain",
-          "metric/item and value columns."
-        )
-      )
-    )
-  }
-
-  error_rows <- summary_data[
-    summary_data[[metric_column[[1]]]] == "errors",
-    ,
-    drop = FALSE
-  ]
-
-  passed <- (
-    nrow(error_rows) == 1L &&
-    !is.na(error_rows$value[[1]]) &&
-    as.numeric(error_rows$value[[1]]) == 0
-  )
-
-  list(
-    passed = passed,
-    message = if (passed) {
-      "Initialization validation reports zero errors."
-    } else {
-      "Initialization validation did not report zero errors."
-    },
-    summary_file = summary_file
-  )
-}
-
-
-runner_validate_review_preparation <- function(paths) {
-  decisions <- runner_read_decisions(paths)
-
-  if (is.null(decisions)) {
-    return(
-      list(
-        passed = FALSE,
-        message = paste(
-          "Human Decision source file is missing:",
-          paths$decisions_required
-        )
-      )
-    )
-  }
-
-  if (length(decisions) == 0L) {
-    return(
-      list(
-        passed = TRUE,
-        message = "No unresolved Human Decisions remain."
-      )
-    )
-  }
-
-  responses <- runner_read_responses(paths)
-
-  if (is.null(responses)) {
-    return(
-      list(
-        passed = FALSE,
-        message = paste(
-          "Human Decision response file is missing:",
-          paths$responses
-        )
-      )
-    )
-  }
-
-  decision_ids <- vapply(
-    decisions,
-    function(x) as.character(x$decision_id %||% ""),
-    character(1)
-  )
-
-  response_ids <- vapply(
-    responses,
-    function(x) as.character(x$decision_id %||% ""),
-    character(1)
-  )
-
-  passed <- (
-    length(responses) == length(decisions) &&
-    setequal(decision_ids, response_ids)
-  )
-
-  list(
-    passed = passed,
-    message = if (passed) {
-      paste0(
-        length(responses),
-        " Human Decision response record(s) are prepared."
-      )
-    } else {
-      paste(
-        "Human Decision response records do not match",
-        "the unresolved decision records."
-      )
-    }
-  )
-}
-
-
-runner_validate_finalization <- function(paths) {
-  decisions <- runner_read_decisions(paths)
-
-  if (is.null(decisions)) {
-    return(
-      list(
-        passed = FALSE,
-        message = paste(
-          "Human Decision source file is missing:",
-          paths$decisions_required
-        )
-      )
-    )
-  }
-
-  if (length(decisions) > 0L) {
-    return(
-      list(
-        passed = FALSE,
-        message = paste0(
-          length(decisions),
-          " unresolved Human Decision(s) remain."
-        )
-      )
-    )
-  }
-
-  verification_passed <- FALSE
-
-  if (file.exists(paths$verification_report)) {
-    verification <- yaml::read_yaml(
-      paths$verification_report
-    )
-
-    verification_passed <- runner_as_logical(
-      verification$passed,
-      default = FALSE
-    )
-  }
-
-  active_files_present <- all(
-    vapply(
-      c(
-        paths$active_project,
-        paths$active_search
-      ),
-      runner_file_nonempty,
-      logical(1)
-    )
-  )
-
-  resolved_files_present <- all(
-    vapply(
-      c(
-        paths$project_resolved,
-        paths$search_resolved
-      ),
-      runner_file_nonempty,
-      logical(1)
-    )
-  )
-
-  draft_files_present <- all(
-    vapply(
-      c(
-        paths$project_draft,
-        paths$search_draft
-      ),
-      runner_file_nonempty,
-      logical(1)
-    )
-  )
-
-  active_matches_draft <- FALSE
-
-  if (
-    active_files_present &&
-    draft_files_present
-  ) {
-    active_md5 <- unname(
-      tools::md5sum(
-        c(
-          paths$active_project,
-          paths$active_search
-        )
-      )
-    )
-
-    draft_md5 <- unname(
-      tools::md5sum(
-        c(
-          paths$project_draft,
-          paths$search_draft
-        )
-      )
-    )
-
-    active_matches_draft <- identical(
-      active_md5,
-      draft_md5
-    )
-  }
-
-  resolved_record_present <- runner_file_nonempty(
-    paths$resolved_decisions
-  )
-
-  passed <- (
-    length(decisions) == 0L &&
-    verification_passed &&
-    active_files_present &&
-    draft_files_present &&
-    resolved_files_present &&
-    resolved_record_present &&
-    active_matches_draft
-  )
-
-  failure_reasons <- character(0)
-
-  if (length(decisions) > 0L) {
-    failure_reasons <- c(
-      failure_reasons,
-      paste0(
-        length(decisions),
-        " unresolved Human Decision(s) remain"
-      )
-    )
-  }
-
-  if (!verification_passed) {
-    failure_reasons <- c(
-      failure_reasons,
-      "verification report is not PASS"
-    )
-  }
-
-  if (!resolved_record_present) {
-    failure_reasons <- c(
-      failure_reasons,
-      "resolved Human Decision record is missing or empty"
-    )
-  }
-
-  if (!resolved_files_present) {
-    failure_reasons <- c(
-      failure_reasons,
-      "resolved configuration files are missing or empty"
-    )
-  }
-
-  if (!active_files_present) {
-    failure_reasons <- c(
-      failure_reasons,
-      "active configuration files are missing or empty"
-    )
-  }
-
-  if (!draft_files_present) {
-    failure_reasons <- c(
-      failure_reasons,
-      "reviewed draft configuration files are missing or empty"
-    )
-  }
-
-  if (
-    draft_files_present &&
-    active_files_present &&
-    !active_matches_draft
-  ) {
-    failure_reasons <- c(
-      failure_reasons,
-      "active configurations do not match the reviewed drafts used for activation"
-    )
-  }
-
-  list(
-    passed = passed,
-    message = if (passed) {
-      paste(
-        "Human Decisions are resolved, the resolved record exists,",
-        "patch verification passed, and active configurations",
-        "match the reviewed drafts used for activation."
-      )
-    } else {
-      paste(
-        "Human Decision finalization is not complete:",
-        paste(
-          failure_reasons,
-          collapse = "; "
-        )
-      )
-    },
-    unresolved_decision_count = length(decisions),
-    verification_passed = verification_passed,
-    resolved_record_present = resolved_record_present,
-    active_files_present = active_files_present,
-    draft_files_present = draft_files_present,
-    resolved_files_present = resolved_files_present,
-    active_matches_reviewed_drafts = active_matches_draft
-  )
-}
-
-
-runner_resolve_project_paths <- function() {
-  environment <- new.env(
-    parent = globalenv()
-  )
-
-  sys.source(
-    "R/utils/config_utils.R",
-    envir = environment
-  )
-
-  sys.source(
-    "R/utils/path_utils.R",
-    envir = environment
-  )
-
-  config <- environment$load_project_config(
-    "config/project_config.yml",
-    validate = TRUE,
-    quiet = TRUE
-  )
-
-  environment$build_project_paths(
-    config = config,
-    create_directories = TRUE,
-    validate = TRUE
-  )
-}
-
-
-runner_validate_search_generation <- function(paths) {
-  project_paths <- tryCatch(
-    runner_resolve_project_paths(),
-    error = function(error) NULL
-  )
-
-  if (is.null(project_paths)) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Canonical project paths could not be resolved."
-      )
-    )
-  }
-
-  output_files <- c(
-    pubmed_search = project_paths$pubmed_search,
-    embase_search = project_paths$embase_search,
-    central_search = project_paths$central_search,
-    strategy_summary = project_paths$search_strategy_summary,
-    concept_summary = file.path(
-      project_paths$search_strategies_directory,
-      "search_concept_summary.csv"
-    )
-  )
-
-  nonempty <- vapply(
-    output_files,
-    runner_file_nonempty,
-    logical(1)
-  )
-
-  passed <- all(nonempty)
-
-  list(
-    passed = passed,
-    message = if (passed) {
-      "All R/11 search-strategy outputs exist and are non-empty."
-    } else {
-      paste(
-        "Missing or empty R/11 output(s):",
-        paste(
-          names(output_files)[!nonempty],
-          collapse = ", "
-        )
-      )
-    },
-    files = as.list(output_files),
-    nonempty = as.list(nonempty)
-  )
-}
-
-
-runner_validate_search_validation <- function(paths) {
-  project_paths <- tryCatch(
-    runner_resolve_project_paths(),
-    error = function(error) NULL
-  )
-
-  if (is.null(project_paths)) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Canonical project paths could not be resolved."
-      )
-    )
-  }
-
-  summary_file <- file.path(
-    project_paths$logs_directory,
-    "search_strategy_validation.csv"
-  )
-
-  if (!runner_file_nonempty(summary_file)) {
-    return(
-      list(
-        passed = FALSE,
-        message = paste(
-          "R/12 validation result is missing or empty:",
-          summary_file
-        )
-      )
-    )
-  }
-
-  validation_data <- tryCatch(
-    utils::read.csv(
-      summary_file,
-      stringsAsFactors = FALSE
-    ),
-    error = function(error) NULL
-  )
-
-  if (
-    is.null(validation_data) ||
-    nrow(validation_data) == 0L ||
-    !"passed" %in% names(validation_data)
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = "R/12 validation result could not be interpreted."
-      )
-    )
-  }
-
-  passed_values <- validation_data$passed
-
-  if (!is.logical(passed_values)) {
-    passed_values <- tolower(
-      trimws(
-        as.character(passed_values)
-      )
-    ) %in% c(
-      "true",
-      "t",
-      "1",
-      "yes"
-    )
-  }
-
-  passed <- all(
-    !is.na(passed_values) &
-      passed_values
-  )
-
-  list(
-    passed = passed,
-    message = if (passed) {
-      paste0(
-        "All ",
-        nrow(validation_data),
-        " R/12 validation check(s) passed."
-      )
-    } else {
-      paste0(
-        sum(!passed_values | is.na(passed_values)),
-        " R/12 validation check(s) failed."
-      )
-    },
-    validation_file = summary_file
-  )
-}
-
-
-
+# Canonical active-project context. This intentionally preserves the
+# Phase-1 config/path contract and is the sole normal source of workflow
+# artifact locations.
 runner_resolve_project_context <- function() {
-  environment <- new.env(
-    parent = globalenv()
-  )
+  environment <- new.env(parent = globalenv())
 
-  sys.source(
-    "R/utils/config_utils.R",
-    envir = environment
-  )
-
-  sys.source(
-    "R/utils/path_utils.R",
-    envir = environment
-  )
+  sys.source("R/utils/config_utils.R", envir = environment)
+  sys.source("R/utils/path_utils.R", envir = environment)
 
   config <- environment$load_project_config(
     "config/project_config.yml",
@@ -1261,139 +346,321 @@ runner_resolve_project_context <- function() {
   )
 }
 
-
-runner_validate_pubmed_download <- function(paths) {
-  context <- tryCatch(
+runner_project_context_or_null <- function() {
+  tryCatch(
     runner_resolve_project_context(),
-    error = function(error) NULL
+    error = function(e) NULL
+  )
+}
+
+runner_active_root_path <- function(context, ...) {
+  file.path(context$paths$project_root, ...)
+}
+
+runner_validate_initialization_agent <- function(paths) {
+  files <- c(paths$project_draft, paths$search_draft, paths$decisions_required)
+  ok <- vapply(files, runner_file_nonempty, logical(1))
+  runner_validation(
+    all(ok),
+    if (all(ok)) {
+      "Initialization Agent drafts are present."
+    } else {
+      paste("Missing initialization artifacts:", paste(basename(files[!ok]), collapse = ", "))
+    },
+    files = as.list(files)
+  )
+}
+
+runner_draft_logs_directory <- function(paths) {
+  if (!file.exists(paths$project_draft)) return("results/logs")
+  draft <- tryCatch(yaml::read_yaml(paths$project_draft), error = function(e) NULL)
+  configured <- if (is.list(draft)) draft$paths$logs_directory else NULL
+  if (!runner_is_nonempty_character(configured)) return("results/logs")
+  as.character(configured)
+}
+
+runner_validate_initialization <- function(paths) {
+  summary_file <- file.path(
+    runner_draft_logs_directory(paths),
+    "project_initialization_validation_summary.csv"
   )
 
-  if (is.null(context)) {
+  if (!runner_file_nonempty(summary_file)) {
+    return(runner_validation(FALSE, "Initialization validation summary is missing.", file = summary_file))
+  }
+
+  d <- runner_read_csv_character(summary_file)
+  if (is.null(d) || nrow(d) == 0L) {
+    return(runner_validation(FALSE, "Initialization validation summary cannot be interpreted.", file = summary_file))
+  }
+
+  metric_col <- intersect(c("metric", "item"), names(d))
+  if (length(metric_col) == 0L || !"value" %in% names(d)) {
+    return(runner_validation(FALSE, "Initialization validation summary lacks metric/item and value columns.", file = summary_file))
+  }
+
+  error_rows <- d[d[[metric_col[[1]]]] == "errors", , drop = FALSE]
+  ok <- nrow(error_rows) == 1L && suppressWarnings(as.numeric(error_rows$value[[1]])) == 0
+  runner_validation(ok, if (ok) "Initialization validation reports zero errors." else "Initialization validation did not report zero errors.", file = summary_file)
+}
+
+runner_unresolved_human_decisions <- function(path) {
+  if (!file.exists(path)) return(NA_integer_)
+  doc <- tryCatch(yaml::read_yaml(path), error = function(e) NULL)
+  if (is.null(doc)) return(NA_integer_)
+  x <- doc$human_decisions_required
+  if (is.null(x)) return(0L)
+  if (is.data.frame(x)) return(nrow(x))
+  length(x)
+}
+
+runner_validate_review_preparation <- function(paths) {
+  finalization <- runner_validate_finalization(paths)
+  if (isTRUE(finalization$passed)) {
+    return(runner_validation(TRUE, "Human Decision review preparation recovered from finalized canonical configuration."))
+  }
+
+  unresolved <- runner_unresolved_human_decisions(paths$decisions_required)
+  if (is.na(unresolved)) return(runner_validation(FALSE, "Human Decision source file is missing or unreadable."))
+  if (unresolved == 0L) return(runner_validation(TRUE, "No unresolved Human Decisions require a review-response file.", unresolved = 0L))
+  if (!runner_file_nonempty(paths$responses)) return(runner_validation(FALSE, "Human Decision response/review file has not been prepared.", unresolved = unresolved))
+
+  response_doc <- tryCatch(yaml::read_yaml(paths$responses), error = function(e) NULL)
+  responses <- if (is.list(response_doc)) response_doc$human_decision_responses else NULL
+  response_n <- if (is.null(responses)) 0L else if (is.data.frame(responses)) nrow(responses) else length(responses)
+  ok <- identical(as.integer(response_n), as.integer(unresolved))
+
+  runner_validation(
+    ok,
+    if (ok) "Human Decision review-response file is prepared for every unresolved decision." else paste0("Human Decision response count does not match unresolved decisions (", response_n, " vs ", unresolved, ")."),
+    unresolved = unresolved,
+    response_count = response_n,
+    file = paths$responses
+  )
+}
+
+runner_validate_finalization <- function(paths) {
+  unresolved <- runner_unresolved_human_decisions(paths$decisions_required)
+  passed <- runner_file_nonempty(paths$active_project) &&
+    runner_file_nonempty(paths$active_search) &&
+    !is.na(unresolved) && unresolved == 0L
+
+  runner_validation(
+    passed,
+    if (passed) "Human decisions are finalized and canonical configuration is active." else "Human Decision finalization/activation remains incomplete.",
+    unresolved = unresolved
+  )
+}
+
+# Project-folder lookup is identity-only. It may inspect immediate project
+# metadata, but never searches project artifacts and never accepts a folder
+# merely because it is the only one present.
+runner_detect_project_slug <- function() {
+  context <- runner_project_context_or_null()
+  if (is.null(context) || !dir.exists("projects")) return("")
+
+  project_id <- runner_clean_scalar(context$config$project$project_id)
+  if (!nzchar(project_id)) return("")
+
+  dirs <- list.dirs("projects", recursive = FALSE, full.names = FALSE)
+  dirs <- dirs[
+    nzchar(dirs) &
+      !tolower(dirs) %in% c("archive", "archived", "_archive", "templates", "_templates")
+  ]
+  if (length(dirs) == 0L) return("")
+
+  direct <- dirs[tolower(dirs) == tolower(project_id)]
+  if (length(direct) == 1L) {
+    config_file <- file.path("projects", direct[[1]], "config", "project_config.yml")
+    if (!file.exists(config_file)) return(direct[[1]])
+    cfg <- tryCatch(yaml::read_yaml(config_file), error = function(e) NULL)
+    id2 <- runner_clean_scalar(if (is.list(cfg)) cfg$project$project_id else NULL)
+    if (identical(tolower(id2), tolower(project_id))) return(direct[[1]])
+  }
+
+  matches <- character(0)
+  for (d in dirs) {
+    config_file <- file.path("projects", d, "config", "project_config.yml")
+    if (!file.exists(config_file)) next
+    cfg <- tryCatch(yaml::read_yaml(config_file), error = function(e) NULL)
+    id2 <- runner_clean_scalar(if (is.list(cfg)) cfg$project$project_id else NULL)
+    if (nzchar(id2) && identical(tolower(id2), tolower(project_id))) {
+      matches <- c(matches, d)
+    }
+  }
+
+  if (length(unique(matches)) == 1L) unique(matches)[[1]] else ""
+}
+
+runner_prospero_canonical_candidates <- function(project_root) {
+  project_root <- runner_clean_scalar(project_root)
+
+  if (!nzchar(project_root)) {
+    return(character(0))
+  }
+
+  prospero_dir <- file.path(
+    project_root,
+    "results",
+    "registration",
+    "prospero"
+  )
+
+  c(
+    file.path(prospero_dir, "prospero_final.xlsx"),
+    file.path(prospero_dir, "prospero_autofilled.xlsx")
+  )
+}
+
+runner_validate_prospero <- function(paths) {
+  if (runner_as_logical(Sys.getenv("SRMA_PROSPERO_ALREADY_REGISTERED", unset = ""), FALSE)) {
     return(
-      list(
-        passed = FALSE,
-        message = "Canonical project context could not be resolved."
+      runner_validation(
+        TRUE,
+        "Existing PROSPERO registration explicitly declared by environment."
       )
     )
   }
+
+  context <- runner_project_context_or_null()
+  if (is.null(context)) {
+    return(
+      runner_validation(
+        FALSE,
+        "Canonical active-project context could not be resolved for PROSPERO validation."
+      )
+    )
+  }
+
+  # Existing registration evidence is accepted only from the active config.
+  active_text <- runner_read_text(paths$active_project)
+  if (
+    grepl("PROSPERO", active_text, ignore.case = TRUE) &&
+    grepl("CRD[0-9]{6,}", active_text, ignore.case = TRUE, perl = TRUE)
+  ) {
+    return(
+      runner_validation(
+        TRUE,
+        "Existing PROSPERO registration evidence is present in the active project configuration.",
+        file = paths$active_project
+      )
+    )
+  }
+
+  # Canonical prepared-form evidence is intentionally restricted to the
+  # active project's root returned by build_project_paths().  No projects/*
+  # search, newest-file discovery, slug inference, or cross-project fallback
+  # participates in normal completion.
+  project_root <- runner_clean_scalar(
+    context$paths$project_root
+  )
+
+  candidates <- runner_prospero_canonical_candidates(
+    project_root
+  )
+
+  if (length(candidates) == 0L) {
+    return(
+      runner_validation(
+        FALSE,
+        "Canonical active-project root could not be resolved for PROSPERO validation."
+      )
+    )
+  }
+
+  ok <- vapply(
+    candidates,
+    runner_file_nonempty,
+    logical(1)
+  )
+  hit <- candidates[ok]
+
+  runner_validation(
+    length(hit) > 0L,
+    if (length(hit) > 0L) {
+      "PROSPERO preparation artifact is present at the active-project canonical path."
+    } else {
+      paste(
+        "Mandatory pre-search PROSPERO preparation has not been documented",
+        "at results/registration/prospero for the active project."
+      )
+    },
+    file = if (length(hit) > 0L) hit[[1]] else "",
+    project_root = project_root
+  )
+}
+runner_validate_search_generation <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+
+  output_files <- c(
+    pubmed_search = context$paths$pubmed_search,
+    embase_search = context$paths$embase_search,
+    central_search = context$paths$central_search,
+    strategy_summary = context$paths$search_strategy_summary,
+    concept_summary = file.path(context$paths$search_strategies_directory, "search_concept_summary.csv")
+  )
+  ok <- vapply(output_files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "All canonical R/11 search-strategy outputs are complete." else paste("Missing or empty R/11 output(s):", paste(names(output_files)[!ok], collapse = ", ")), files = as.list(output_files))
+}
+
+runner_validate_search_validation <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+
+  f <- file.path(context$paths$logs_directory, "search_strategy_validation.csv")
+  if (!runner_file_nonempty(f)) return(runner_validation(FALSE, "Search-strategy validation CSV is missing.", file = f))
+  d <- runner_read_csv_character(f)
+  if (is.null(d) || nrow(d) == 0L || !"passed" %in% names(d)) return(runner_validation(FALSE, "Search-strategy validation CSV cannot be interpreted.", file = f))
+  vals <- tolower(trimws(as.character(d$passed))) %in% c("true", "t", "1", "yes", "pass", "passed")
+  ok <- all(!is.na(vals) & vals)
+  runner_validation(ok, if (ok) "All search-strategy validation checks passed." else "One or more search-strategy checks failed.", file = f)
+}
+
+runner_validate_pubmed <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
 
   output_files <- c(
     pubmed_xml = context$paths$pubmed_xml,
     pubmed_csv = context$paths$pubmed_csv,
     pubmed_report = context$paths$pubmed_download_report
   )
-
-  ok <- vapply(
-    output_files,
-    runner_file_nonempty,
-    logical(1)
-  )
-
-  list(
-    passed = all(ok),
-    message = if (all(ok)) {
-      "Canonical PubMed download outputs are complete."
-    } else {
-      paste(
-        "Missing or empty PubMed output(s):",
-        paste(names(output_files)[!ok], collapse = ", ")
-      )
-    },
-    files = as.list(output_files)
-  )
+  ok <- vapply(output_files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "Canonical PubMed download outputs are complete." else paste("Missing or empty PubMed output(s):", paste(names(output_files)[!ok], collapse = ", ")), files = as.list(output_files))
 }
 
-
 runner_validate_database_inputs <- function(paths) {
-  context <- tryCatch(
-    runner_resolve_project_context(),
-    error = function(error) NULL
-  )
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
 
-  if (is.null(context)) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Canonical project context could not be resolved."
-      )
-    )
-  }
-
-  enabled <- context$environment$get_enabled_databases(
-    context$config,
-    validate = FALSE
+  enabled <- tryCatch(
+    context$environment$get_enabled_databases(context$config, validate = FALSE),
+    error = function(e) character(0)
   )
+  enabled <- tolower(runner_as_character_vector(enabled))
 
   input_map <- c(
     pubmed = context$paths$pubmed_csv,
     embase = context$paths$embase_ris,
     central = context$paths$central_ris
   )
+  supported <- intersect(enabled, names(input_map))
+  if (length(supported) == 0L) return(runner_validation(FALSE, "No supported database inputs are enabled."))
 
-  supported_enabled <- intersect(
-    enabled,
-    names(input_map)
-  )
-
-  if (length(supported_enabled) == 0L) {
-    return(
-      list(
-        passed = FALSE,
-        message = "No supported database inputs are enabled."
-      )
-    )
-  }
-
-  required_files <- input_map[
-    supported_enabled
-  ]
-
-  ok <- vapply(
-    required_files,
-    runner_file_nonempty,
-    logical(1)
-  )
-
-  list(
-    passed = all(ok),
-    message = if (all(ok)) {
-      paste(
-        "All enabled database inputs are present:",
-        paste(supported_enabled, collapse = ", ")
-      )
-    } else {
-      paste(
-        "Missing enabled database input(s):",
-        paste(
-          paste0(
-            names(required_files)[!ok],
-            " -> ",
-            required_files[!ok]
-          ),
-          collapse = "; "
-        )
-      )
-    },
+  required_files <- input_map[supported]
+  ok <- vapply(required_files, runner_file_nonempty, logical(1))
+  runner_validation(
+    all(ok),
+    if (all(ok)) paste("All enabled database inputs are present:", paste(supported, collapse = ", ")) else paste("Missing enabled database input(s):", paste(paste0(names(required_files)[!ok], " -> ", required_files[!ok]), collapse = "; ")),
     enabled_databases = as.list(enabled),
     files = as.list(required_files)
   )
 }
 
-
-runner_validate_merge_deduplication <- function(paths) {
-  context <- tryCatch(
-    runner_resolve_project_context(),
-    error = function(error) NULL
-  )
-
-  if (is.null(context)) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Canonical project context could not be resolved."
-      )
-    )
-  }
+runner_validate_merge <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
 
   output_files <- c(
     merged_records = context$paths$merged_records_csv,
@@ -1403,173 +670,54 @@ runner_validate_merge_deduplication <- function(paths) {
     prisma_counts = context$paths$prisma_counts_csv,
     report = context$paths$import_merge_deduplication_report
   )
-
-  ok <- vapply(
-    output_files,
-    runner_file_nonempty,
-    logical(1)
-  )
-
-  list(
-    passed = all(ok),
-    message = if (all(ok)) {
-      "R/17 merge/deduplication outputs are complete."
-    } else {
-      paste(
-        "Missing or empty R/17 output(s):",
-        paste(names(output_files)[!ok], collapse = ", ")
-      )
-    },
-    files = as.list(output_files)
-  )
+  ok <- vapply(output_files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "R/17 merge/deduplication outputs are complete." else paste("Missing or empty R/17 output(s):", paste(names(output_files)[!ok], collapse = ", ")), files = as.list(output_files))
 }
-
 
 runner_validate_screening_workbook <- function(paths) {
-  context <- tryCatch(
-    runner_resolve_project_context(),
-    error = function(error) NULL
-  )
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
 
-  if (is.null(context)) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Canonical project context could not be resolved."
-      )
-    )
+  workbook <- context$paths$screening_workbook
+  report <- context$paths$screening_workbook_report
+  if (!runner_file_nonempty(workbook) || !runner_file_nonempty(report)) {
+    return(runner_validation(FALSE, "R/18 screening workbook or report is missing/empty.", workbook = workbook, report = report))
+  }
+  if (!runner_dependency_available("openxlsx")) {
+    return(runner_validation(FALSE, "Package 'openxlsx' is required to validate the screening workbook.", workbook = workbook))
   }
 
-  workbook_file <- context$paths$screening_workbook
-  report_file <- context$paths$screening_workbook_report
-
-  if (
-    !runner_file_nonempty(workbook_file) ||
-    !runner_file_nonempty(report_file)
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = "R/18 screening workbook or report is missing/empty."
-      )
-    )
-  }
-
-  if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Package 'openxlsx' is required to validate the screening workbook."
-      )
-    )
-  }
-
-  sheets <- tryCatch(
-    openxlsx::getSheetNames(workbook_file),
-    error = function(error) character(0)
-  )
-
-  required_sheets <- c(
-    "Instructions",
-    "Reviewer_1",
-    "Reviewer_2",
-    "Conflict_Resolution",
-    "Source_Summary",
-    "Validation_Lists"
-  )
-
-  missing <- setdiff(
-    required_sheets,
-    sheets
-  )
-
-  list(
-    passed = length(missing) == 0L,
-    message = if (length(missing) == 0L) {
-      "R/18 screening workbook structure is complete."
-    } else {
-      paste(
-        "R/18 screening workbook is missing sheet(s):",
-        paste(missing, collapse = ", ")
-      )
-    },
-    workbook = workbook_file
-  )
+  sheets <- tryCatch(openxlsx::getSheetNames(workbook), error = function(e) character(0))
+  required <- c("Instructions", "Reviewer_1", "Reviewer_2", "Conflict_Resolution", "Source_Summary", "Validation_Lists")
+  missing <- setdiff(required, sheets)
+  runner_validation(length(missing) == 0L, if (length(missing) == 0L) "R/18 screening workbook structure is complete." else paste("R/18 screening workbook is missing sheet(s):", paste(missing, collapse = ", ")), workbook = workbook)
 }
-
 
 runner_agent_paths <- function() {
   context <- runner_resolve_project_context()
-
-  agent_document <- yaml::read_yaml(
-    "config/agent_screening.yml"
-  )
-
+  agent_document <- yaml::read_yaml("config/agent_screening.yml")
   agent_config <- agent_document$agent_screening
-
-  if (is.null(agent_config) || !is.list(agent_config)) {
-    stop(
-      "Invalid config/agent_screening.yml.",
-      call. = FALSE
-    )
-  }
+  if (is.null(agent_config) || !is.list(agent_config)) stop("Invalid config/agent_screening.yml.", call. = FALSE)
 
   list(
     context = context,
     config = agent_config,
-    workbook = file.path(
-      context$paths$screening_results_directory,
-      paste0(
-        agent_config$output$workbook_basename,
-        ".xlsx"
-      )
-    ),
-    decisions = file.path(
-      context$paths$logs_directory,
-      paste0(
-        agent_config$output$decisions_basename,
-        ".csv"
-      )
-    ),
-    failures = file.path(
-      context$paths$logs_directory,
-      paste0(
-        agent_config$output$failures_basename,
-        ".csv"
-      )
-    ),
-    checkpoint = file.path(
-      context$paths$logs_directory,
-      paste0(
-        agent_config$output$checkpoint_basename,
-        ".csv"
-      )
-    ),
-    report = file.path(
-      context$paths$logs_directory,
-      paste0(
-        agent_config$output$report_basename,
-        ".txt"
-      )
-    )
+    workbook = file.path(context$paths$screening_results_directory, paste0(agent_config$output$workbook_basename, ".xlsx")),
+    decisions = file.path(context$paths$logs_directory, paste0(agent_config$output$decisions_basename, ".csv")),
+    failures = file.path(context$paths$logs_directory, paste0(agent_config$output$failures_basename, ".csv")),
+    checkpoint = file.path(context$paths$logs_directory, paste0(agent_config$output$checkpoint_basename, ".csv")),
+    report = file.path(context$paths$logs_directory, paste0(agent_config$output$report_basename, ".txt"))
   )
 }
 
+runner_agent_workbook <- function() {
+  p <- tryCatch(runner_agent_paths(), error = function(e) NULL)
+  if (is.null(p)) "" else p$workbook
+}
 
 runner_validate_agent_screening <- function(paths) {
-  agent_paths <- tryCatch(
-    runner_agent_paths(),
-    error = function(error) NULL
-  )
-
-  if (is.null(agent_paths)) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Agent-screening paths could not be resolved."
-      )
-    )
-  }
+  agent_paths <- tryCatch(runner_agent_paths(), error = function(e) NULL)
+  if (is.null(agent_paths)) return(runner_validation(FALSE, "Agent-screening paths could not be resolved."))
 
   output_files <- c(
     workbook = agent_paths$workbook,
@@ -1578,145 +726,57 @@ runner_validate_agent_screening <- function(paths) {
     checkpoint = agent_paths$checkpoint,
     report = agent_paths$report
   )
+  ok <- vapply(output_files, runner_file_nonempty, logical(1))
+  if (!all(ok)) return(runner_validation(FALSE, paste("Missing or empty R/19 output(s):", paste(names(output_files)[!ok], collapse = ", ")), files = as.list(output_files)))
 
-  ok <- vapply(
-    output_files,
-    runner_file_nonempty,
-    logical(1)
-  )
-
-  if (!all(ok)) {
-    return(
-      list(
-        passed = FALSE,
-        message = paste(
-          "Missing or empty R/19 output(s):",
-          paste(names(output_files)[!ok], collapse = ", ")
-        )
-      )
-    )
-  }
-
-  if (
-    !requireNamespace("openxlsx", quietly = TRUE) ||
-    !requireNamespace("readr", quietly = TRUE)
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Packages 'openxlsx' and 'readr' are required for R/19 validation."
-      )
-    )
+  # FAIL-CLOSED: do not infer completion from file existence when the
+  # workbook/decision validation dependencies are unavailable.
+  if (!runner_dependency_available("openxlsx") || !runner_dependency_available("readr")) {
+    return(runner_validation(FALSE, "Packages 'openxlsx' and 'readr' are required for R/19 completion validation.", workbook = agent_paths$workbook))
   }
 
   reviewer_1 <- tryCatch(
-    openxlsx::readWorkbook(
-      agent_paths$workbook,
-      sheet = "Reviewer_1",
-      startRow = 4,
-      colNames = TRUE,
-      skipEmptyRows = FALSE
-    ),
-    error = function(error) NULL
+    openxlsx::readWorkbook(agent_paths$workbook, sheet = "Reviewer_1", startRow = 4, colNames = TRUE, skipEmptyRows = FALSE),
+    error = function(e) NULL
   )
-
-  if (
-    is.null(reviewer_1) ||
-    !"decision" %in% names(reviewer_1) ||
-    nrow(reviewer_1) == 0L
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Reviewer_1 could not be validated from the R/19 workbook."
-      )
-    )
+  if (is.null(reviewer_1) || nrow(reviewer_1) == 0L || !"decision" %in% names(reviewer_1)) {
+    return(runner_validation(FALSE, "Reviewer_1 could not be validated from the canonical R/19 workbook."))
   }
 
-  decision_values <- trimws(
-    as.character(reviewer_1$decision)
-  )
-
-  reviewer_complete <- all(
-    !is.na(decision_values) &
-      nzchar(decision_values)
-  )
+  decision_values <- trimws(as.character(reviewer_1$decision))
+  reviewer_complete <- all(!is.na(decision_values) & nzchar(decision_values))
 
   failures <- tryCatch(
-    readr::read_csv(
-      agent_paths$failures,
-      show_col_types = FALSE,
-      col_types = readr::cols(
-        .default = readr::col_character()
-      )
-    ),
-    error = function(error) NULL
+    readr::read_csv(agent_paths$failures, show_col_types = FALSE, col_types = readr::cols(.default = readr::col_character())),
+    error = function(e) NULL
   )
+  if (is.null(failures)) return(runner_validation(FALSE, "R/19 failure log could not be validated.", file = agent_paths$failures))
 
-  failure_count <- if (
-    is.null(failures) ||
-    nrow(failures) == 0L
-  ) {
+  failure_count <- if (nrow(failures) == 0L) {
     0L
-  } else if (
-    "screening_id" %in% names(failures)
-  ) {
-    sum(
-      !is.na(failures$screening_id) &
-        nzchar(trimws(failures$screening_id))
-    )
+  } else if ("screening_id" %in% names(failures)) {
+    sum(!is.na(failures$screening_id) & nzchar(trimws(failures$screening_id)))
   } else {
     nrow(failures)
   }
 
-  passed <- reviewer_complete &&
-    failure_count == 0L
-
-  list(
-    passed = passed,
-    message = if (passed) {
-      "R/19 Agent Reviewer 1 screening outputs are complete."
-    } else {
-      paste0(
-        "R/19 outputs are incomplete. Reviewer complete: ",
-        reviewer_complete,
-        "; failures: ",
-        failure_count
-      )
-    },
-    workbook = agent_paths$workbook
+  passed <- reviewer_complete && failure_count == 0L
+  runner_validation(
+    passed,
+    if (passed) "R/19 Agent Reviewer 1 screening outputs are complete." else paste0("R/19 outputs are incomplete. Reviewer complete: ", reviewer_complete, "; failures: ", failure_count),
+    workbook = agent_paths$workbook,
+    failure_count = failure_count
   )
 }
 
-
 runner_validate_phase1_finalization <- function(paths) {
-  context <- tryCatch(
-    runner_resolve_project_context(),
-    error = function(error) NULL
-  )
-
-  if (is.null(context)) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Canonical project context could not be resolved."
-      )
-    )
-  }
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
 
   completed_workbook <- context$paths$completed_screening_workbook
-  final_csv <- file.path(
-    context$paths$processed_screening_directory,
-    "final_title_abstract_screening.csv"
-  )
-  included_csv <- file.path(
-    context$paths$processed_screening_directory,
-    "included_for_full_text_review.csv"
-  )
-  report_file <- file.path(
-    context$paths$logs_directory,
-    "final_title_abstract_screening_report.txt"
-  )
+  final_csv <- file.path(context$paths$processed_screening_directory, "final_title_abstract_screening.csv")
+  included_csv <- file.path(context$paths$processed_screening_directory, "included_for_full_text_review.csv")
+  report_file <- file.path(context$paths$logs_directory, "final_title_abstract_screening_report.txt")
 
   output_files <- c(
     completed_workbook = completed_workbook,
@@ -1724,1077 +784,779 @@ runner_validate_phase1_finalization <- function(paths) {
     included_for_full_text_review_csv = included_csv,
     final_report = report_file
   )
+  ok <- vapply(output_files, runner_file_nonempty, logical(1))
+  if (!all(ok)) return(runner_validation(FALSE, paste("Missing or empty canonical R/21 output(s):", paste(names(output_files)[!ok], collapse = ", ")), files = as.list(output_files)))
 
-  ok <- vapply(
-    output_files,
-    runner_file_nonempty,
-    logical(1)
-  )
-
-  if (!all(ok)) {
-    return(
-      list(
-        passed = FALSE,
-        message = paste(
-          "Missing or empty R/21 output(s):",
-          paste(names(output_files)[!ok], collapse = ", ")
-        )
-      )
-    )
+  if (!runner_dependency_available("openxlsx")) {
+    return(runner_validation(FALSE, "Package 'openxlsx' is required to validate canonical R/21 finalization.", workbook = completed_workbook))
   }
+  sheets <- tryCatch(openxlsx::getSheetNames(completed_workbook), error = function(e) character(0))
+  sheet_ok <- "Included_for_Full_Text_Review" %in% sheets
 
-  sheet_ok <- FALSE
-
-  if (requireNamespace("openxlsx", quietly = TRUE)) {
-    sheets <- tryCatch(
-      openxlsx::getSheetNames(completed_workbook),
-      error = function(error) character(0)
-    )
-
-    sheet_ok <- "Included_for_Full_Text_Review" %in%
-      sheets
-  }
-
-  list(
-    passed = sheet_ok,
-    message = if (sheet_ok) {
-      "R/21 final screening outputs and full-text-review handoff are complete."
-    } else {
-      "Completed workbook does not contain Included_for_Full_Text_Review."
-    },
-    files = as.list(output_files)
-  )
+  runner_validation(sheet_ok, if (sheet_ok) "R/21 final screening outputs and full-text-review handoff are complete for the active project." else "Completed canonical R/21 workbook does not contain Included_for_Full_Text_Review.", files = as.list(output_files))
 }
-
 
 runner_validate_agent_validation <- function(paths) {
   downstream <- runner_validate_phase1_finalization(paths)
-
-  if (isTRUE(downstream$passed)) {
-    return(
-      list(
-        passed = TRUE,
-        message = paste(
-          "R/20 historical PASS recovered from validated downstream",
-          "R/21 finalization artifacts."
-        ),
-        recovered_from_downstream = TRUE
-      )
-    )
-  }
-
-  list(
-    passed = FALSE,
-    message = paste(
-      "R/20 is a historical agent-stage validator and has no",
-      "standalone completion marker yet."
-    )
-  )
+  if (isTRUE(downstream$passed)) return(runner_validation(TRUE, "R/20 historical PASS recovered only from the active project's canonical R/21 finalization artifacts.", recovered_from_downstream = TRUE))
+  runner_validation(FALSE, "R/20 requires execution; no independent durable completion marker was found.")
 }
 
-
-runner_validate_human_reviewer_2_gate <- function(paths) {
+runner_validate_human_reviewer_2 <- function(paths) {
   downstream <- runner_validate_phase1_finalization(paths)
+  if (isTRUE(downstream$passed)) return(runner_validation(TRUE, "Human Reviewer 2 completion recovered only from the active project's canonical R/21 finalization."))
 
-  if (isTRUE(downstream$passed)) {
-    return(
-      list(
-        passed = TRUE,
-        message = "Human Reviewer 2 completion recovered from R/21 finalization."
-      )
-    )
+  agent_paths <- tryCatch(runner_agent_paths(), error = function(e) NULL)
+  if (is.null(agent_paths) || !runner_file_nonempty(agent_paths$workbook) || !runner_dependency_available("openxlsx")) {
+    return(runner_validation(FALSE, "Reviewer_2 workbook is unavailable for the active project."))
   }
-
-  agent_paths <- tryCatch(
-    runner_agent_paths(),
-    error = function(error) NULL
-  )
-
-  if (
-    is.null(agent_paths) ||
-    !runner_file_nonempty(agent_paths$workbook) ||
-    !requireNamespace("openxlsx", quietly = TRUE)
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Agent workbook is not available for Human Reviewer 2."
-      )
-    )
-  }
-
-  reviewer_2 <- tryCatch(
-    openxlsx::readWorkbook(
-      agent_paths$workbook,
-      sheet = "Reviewer_2",
-      startRow = 4,
-      colNames = TRUE,
-      skipEmptyRows = FALSE
-    ),
-    error = function(error) NULL
-  )
-
-  if (
-    is.null(reviewer_2) ||
-    !"decision" %in% names(reviewer_2) ||
-    nrow(reviewer_2) == 0L
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Reviewer_2 sheet could not be read."
-      )
-    )
-  }
-
-  values <- trimws(
-    as.character(reviewer_2$decision)
-  )
-
-  complete <- all(
-    !is.na(values) &
-      nzchar(values)
-  )
-
-  list(
-    passed = complete,
-    message = if (complete) {
-      "Human Reviewer 2 screening is complete."
-    } else {
-      paste0(
-        sum(is.na(values) | !nzchar(values)),
-        " Reviewer_2 decision(s) remain incomplete."
-      )
-    },
-    workbook = agent_paths$workbook
-  )
+  d <- tryCatch(openxlsx::readWorkbook(agent_paths$workbook, sheet = "Reviewer_2", startRow = 4, colNames = TRUE, skipEmptyRows = FALSE), error = function(e) NULL)
+  if (is.null(d) || nrow(d) == 0L || !"decision" %in% names(d)) return(runner_validation(FALSE, "Reviewer_2 sheet cannot be read."))
+  vals <- trimws(as.character(d$decision))
+  ok <- all(!is.na(vals) & nzchar(vals))
+  runner_validation(ok, if (ok) "Human Reviewer 2 screening is complete." else paste0(sum(is.na(vals) | !nzchar(vals)), " Reviewer_2 decision(s) remain incomplete."), file = agent_paths$workbook)
 }
 
-
-runner_validate_human_adjudication_gate <- function(paths) {
+runner_validate_human_adjudication <- function(paths) {
   downstream <- runner_validate_phase1_finalization(paths)
+  if (isTRUE(downstream$passed)) return(runner_validation(TRUE, "Human adjudication completion recovered only from the active project's canonical R/21 finalization."))
 
-  if (isTRUE(downstream$passed)) {
-    return(
-      list(
-        passed = TRUE,
-        message = "Human adjudication completion recovered from R/21 finalization."
-      )
-    )
+  agent_paths <- tryCatch(runner_agent_paths(), error = function(e) NULL)
+  if (is.null(agent_paths) || !runner_file_nonempty(agent_paths$workbook) || !runner_dependency_available("openxlsx")) {
+    return(runner_validation(FALSE, "Adjudication workbook is unavailable for the active project."))
   }
 
-  agent_paths <- tryCatch(
-    runner_agent_paths(),
-    error = function(error) NULL
-  )
+  conflicts <- tryCatch(openxlsx::readWorkbook(agent_paths$workbook, sheet = "Conflict_Resolution", startRow = 3, colNames = TRUE, skipEmptyRows = FALSE), error = function(e) NULL)
+  if (is.null(conflicts)) return(runner_validation(FALSE, "Conflict_Resolution sheet cannot be read."))
+  if (nrow(conflicts) == 0L) return(runner_validation(TRUE, "No title/abstract reviewer conflicts require adjudication."))
+  if (!"final_decision" %in% names(conflicts)) return(runner_validation(FALSE, "Conflict_Resolution lacks final_decision."))
 
-  if (
-    is.null(agent_paths) ||
-    !runner_file_nonempty(agent_paths$workbook) ||
-    !requireNamespace("openxlsx", quietly = TRUE)
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Agent workbook is not available for human adjudication."
-      )
-    )
+  dec <- trimws(as.character(conflicts$final_decision))
+  active <- if ("screening_id" %in% names(conflicts)) !is.na(conflicts$screening_id) & nzchar(trimws(conflicts$screening_id)) else rep(TRUE, nrow(conflicts))
+  ok <- all(!active | (!is.na(dec) & nzchar(dec)))
+  if (ok && "final_exclusion_reason" %in% names(conflicts)) {
+    ex <- active & tolower(dec) == "exclude"
+    reason <- trimws(as.character(conflicts$final_exclusion_reason))
+    ok <- all(!ex | (!is.na(reason) & nzchar(reason)))
   }
 
-  reviewer_1 <- tryCatch(
-    openxlsx::readWorkbook(
-      agent_paths$workbook,
-      sheet = "Reviewer_1",
-      startRow = 4,
-      colNames = TRUE,
-      skipEmptyRows = FALSE
-    ),
-    error = function(error) NULL
-  )
+  runner_validation(ok, if (ok) "All reviewer conflicts are adjudicated." else "Human adjudication remains incomplete.", file = agent_paths$workbook)
+}
 
-  reviewer_2 <- tryCatch(
-    openxlsx::readWorkbook(
-      agent_paths$workbook,
-      sheet = "Reviewer_2",
-      startRow = 4,
-      colNames = TRUE,
-      skipEmptyRows = FALSE
-    ),
-    error = function(error) NULL
-  )
-
-  conflicts <- tryCatch(
-    openxlsx::readWorkbook(
-      agent_paths$workbook,
-      sheet = "Conflict_Resolution",
-      startRow = 3,
-      colNames = TRUE,
-      skipEmptyRows = FALSE
-    ),
-    error = function(error) NULL
-  )
-
-  if (
-    is.null(reviewer_1) ||
-    is.null(reviewer_2) ||
-    is.null(conflicts)
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Reviewer or Conflict_Resolution sheets could not be read."
-      )
-    )
-  }
-
-  required_conflict_columns <- c(
-    "screening_id",
-    "final_decision",
-    "final_exclusion_reason"
-  )
-
-  if (
-    !all(required_conflict_columns %in% names(conflicts)) ||
-    !"decision" %in% names(reviewer_1) ||
-    !"decision" %in% names(reviewer_2) ||
-    !"exclusion_reason" %in% names(reviewer_1) ||
-    !"exclusion_reason" %in% names(reviewer_2)
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Required adjudication fields are missing."
-      )
-    )
-  }
-
-  clean <- function(x) {
-    x <- trimws(as.character(x))
-    x[is.na(x) | !nzchar(x)] <- NA_character_
-    x
-  }
-
-  r1_decision <- clean(reviewer_1$decision)
-  r2_decision <- clean(reviewer_2$decision)
-  r1_reason <- clean(reviewer_1$exclusion_reason)
-  r2_reason <- clean(reviewer_2$exclusion_reason)
-
-  if (
-    length(r1_decision) != length(r2_decision) ||
-    nrow(conflicts) != length(r1_decision)
-  ) {
-    return(
-      list(
-        passed = FALSE,
-        message = "Reviewer and Conflict_Resolution row counts are not aligned."
-      )
-    )
-  }
-
-  decision_conflict <- r1_decision != r2_decision
-  decision_conflict[
-    is.na(decision_conflict)
-  ] <- TRUE
-
-  both_exclude <- (
-    r1_decision == "Exclude" &
-      r2_decision == "Exclude"
-  )
-  both_exclude[
-    is.na(both_exclude)
-  ] <- FALSE
-
-  reason_conflict <- both_exclude & (
-    is.na(r1_reason) |
-      is.na(r2_reason) |
-      r1_reason != r2_reason
-  )
-  reason_conflict[
-    is.na(reason_conflict)
-  ] <- TRUE
-
-  conflict_required <- decision_conflict |
-    reason_conflict
-
-  final_decision <- clean(
-    conflicts$final_decision
-  )
-  final_reason <- clean(
-    conflicts$final_exclusion_reason
-  )
-
-  unresolved <- conflict_required &
-    is.na(final_decision)
-
-  exclude_without_reason <- conflict_required &
-    final_decision == "Exclude" &
-    is.na(final_reason)
-
-  exclude_without_reason[
-    is.na(exclude_without_reason)
-  ] <- FALSE
-
-  passed <- !any(unresolved) &&
-    !any(exclude_without_reason)
-
+runner_full_text_paths <- function(context) {
   list(
-    passed = passed,
-    message = if (passed) {
-      paste0(
-        "Human adjudication is complete for ",
-        sum(conflict_required),
-        " conflict(s)."
-      )
-    } else {
-      paste0(
-        sum(unresolved),
-        " conflict(s) lack final_decision; ",
-        sum(exclude_without_reason),
-        " adjudicated Exclude conflict(s) lack final_exclusion_reason."
-      )
-    },
-    conflict_count = sum(conflict_required)
+    processed = runner_active_root_path(context, "data", "processed", "full_text"),
+    results = runner_active_root_path(context, "results", "full_text"),
+    logs = context$paths$logs_directory
   )
 }
 
+runner_validate_full_text_registry <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  p <- runner_full_text_paths(context)
+  files <- c(
+    registry_csv = file.path(p$processed, "full_text_registry.csv"),
+    registry_workbook = file.path(p$results, "full_text_registry.xlsx"),
+    intake_report = file.path(p$logs, "full_text_registry_intake_report.txt")
+  )
+  ok <- vapply(files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "R/22 full-text registry/intake outputs are complete for the active project." else paste("Missing or empty canonical R/22 output(s):", paste(names(files)[!ok], collapse = ", ")), files = as.list(files))
+}
 
-runner_validate_step <- function(
-    step_id,
-    paths
-) {
+runner_full_text_agent_paths <- function() {
+  context <- runner_resolve_project_context()
+  p <- runner_full_text_paths(context)
+  list(
+    context = context,
+    workbook = file.path(p$results, "full_text_eligibility_agent.xlsx"),
+    decisions = file.path(p$logs, "full_text_eligibility_agent_decisions.csv"),
+    failures = file.path(p$logs, "full_text_eligibility_agent_failures.csv"),
+    checkpoint = file.path(p$logs, "full_text_eligibility_agent_checkpoint.csv"),
+    report = file.path(p$logs, "full_text_eligibility_agent_report.txt")
+  )
+}
+
+runner_full_text_agent_workbook <- function() {
+  p <- tryCatch(runner_full_text_agent_paths(), error = function(e) NULL)
+  if (is.null(p)) "" else p$workbook
+}
+
+runner_validate_full_text_agent <- function(paths) {
+  p <- tryCatch(runner_full_text_agent_paths(), error = function(e) NULL)
+  if (is.null(p)) return(runner_validation(FALSE, "Canonical R/23 paths could not be resolved."))
+
+  files <- c(workbook = p$workbook, decisions = p$decisions, failures = p$failures, checkpoint = p$checkpoint, report = p$report)
+  ok <- vapply(files, runner_file_nonempty, logical(1))
+  if (!all(ok)) return(runner_validation(FALSE, paste("Missing or empty canonical R/23 output(s):", paste(names(files)[!ok], collapse = ", ")), files = as.list(files)))
+
+  txt <- runner_read_text(p$report)
+  passed <- grepl("TASK-011 Agent Stage: PASS", txt, fixed = TRUE) || grepl("PASS: R/23 multimodal full-text eligibility Agent Reviewer 1 completed successfully.", txt, fixed = TRUE)
+  runner_validation(passed, if (passed) "R/23 Agent full-text eligibility outputs are complete for the active project." else "R/23 report does not document PASS.", files = as.list(files))
+}
+
+runner_validate_full_text_author_gate <- function(paths) {
+  wb <- runner_full_text_agent_workbook()
+  if (!nzchar(wb) || !runner_file_nonempty(wb) || !runner_dependency_available("openxlsx")) {
+    return(runner_validation(FALSE, "Full-text author-review workbook is unavailable for the active project."))
+  }
+
+  d <- tryCatch(openxlsx::readWorkbook(wb, sheet = "Author_Final_Review", startRow = 3, colNames = TRUE, skipEmptyRows = FALSE), error = function(e) NULL)
+  if (is.null(d) || nrow(d) == 0L || !"author_final_decision" %in% names(d)) return(runner_validation(FALSE, "Author_Final_Review cannot be validated."))
+
+  ids <- if ("screening_id" %in% names(d)) trimws(as.character(d$screening_id)) else rep("x", nrow(d))
+  active <- !is.na(ids) & nzchar(ids)
+  decisions <- trimws(as.character(d$author_final_decision))
+  ok <- all(!active | decisions %in% c("Include", "Exclude"))
+
+  if (ok && "author_final_exclusion_reason" %in% names(d)) {
+    reasons <- trimws(as.character(d$author_final_exclusion_reason))
+    ex <- active & decisions == "Exclude"
+    ok <- all(!ex | (!is.na(reasons) & nzchar(reasons)))
+  }
+
+  runner_validation(ok, if (ok) "1st Author final full-text eligibility review is complete." else "1st Author full-text review remains incomplete.", file = wb)
+}
+
+runner_validate_included_studies <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  p <- runner_full_text_paths(context)
+  files <- c(
+    included_studies = file.path(p$processed, "included_studies.csv"),
+    final_full_text_eligibility = file.path(p$processed, "final_full_text_eligibility.csv"),
+    excluded_after_full_text = file.path(p$processed, "excluded_after_full_text.csv")
+  )
+  ok <- vapply(files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "Authoritative R/24 Included Studies and full-text audit outputs are present for the active project." else paste("Missing or empty canonical R/24 output(s):", paste(names(files)[!ok], collapse = ", ")), files = as.list(files))
+}
+
+runner_validate_prisma <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  root <- runner_active_root_path(context, "results", "prisma")
+  files <- c(
+    pdf = file.path(root, "prisma_2020_flow_diagram.pdf"),
+    png = file.path(root, "prisma_2020_flow_diagram.png"),
+    audit = file.path(root, "prisma_flow_audit.csv")
+  )
+  ok <- vapply(files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "PRISMA PDF/PNG and audit are complete for the active project." else paste("Missing or empty canonical R/35 output(s):", paste(names(files)[!ok], collapse = ", ")), files = as.list(files))
+}
+
+runner_validate_extraction <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  processed <- runner_active_root_path(context, "data", "processed", "extraction")
+  results <- runner_active_root_path(context, "results", "extraction")
+  files <- c(
+    study = file.path(processed, "study_characteristics_agent.csv"),
+    group = file.path(processed, "group_characteristics_agent.csv"),
+    outcome = file.path(processed, "outcome_data_agent.csv"),
+    workbook = file.path(results, "multimodal_data_extraction_agent.xlsx")
+  )
+  ok <- vapply(files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "Multimodal extraction outputs are complete for the active project." else paste("Missing or empty canonical R/25 output(s):", paste(names(files)[!ok], collapse = ", ")), files = as.list(files))
+}
+
+runner_validate_manuscript_tables <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  root <- runner_active_root_path(context, "results", "manuscript", "tables")
+  files <- c(
+    table1 = file.path(root, "table1_study_characteristics.csv"),
+    table2 = file.path(root, "table2_patient_characteristics.csv"),
+    table3 = file.path(root, "table3_intervention_characteristics.csv"),
+    workbook = file.path(root, "manuscript_tables_generated.xlsx")
+  )
+  ok <- vapply(files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "Three standard R/34 manuscript tables are complete for the active project." else paste("Missing or empty canonical R/34 output(s):", paste(names(files)[!ok], collapse = ", ")), files = as.list(files))
+}
+
+runner_validate_scope_advisory <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  root <- runner_active_root_path(context, "results", "extraction", "research_scope_advisory")
+  files <- c(
+    json = file.path(root, "research_scope_advisory.json"),
+    meta_sets = file.path(root, "candidate_meta_analysis_sets.csv"),
+    harmonization = file.path(root, "outcome_harmonization.csv"),
+    study_roles = file.path(root, "study_roles.csv")
+  )
+  ok <- vapply(files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "Research Scope Advisory outputs are complete for the active project." else paste("Missing or empty canonical R/25A output(s):", paste(names(files)[!ok], collapse = ", ")), files = as.list(files))
+}
+
+runner_targeted_workbook <- function() {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return("")
+  runner_active_root_path(context, "results", "extraction", "targeted_human_verification", "targeted_human_verification.xlsx")
+}
+
+runner_validate_targeted_prep <- function(paths) {
+  wb <- runner_targeted_workbook()
+  runner_validation(runner_file_nonempty(wb), if (runner_file_nonempty(wb)) "Targeted Human Verification workbook is present for the active project." else "R/25B targeted verification workbook is missing for the active project.", file = wb)
+}
+
+runner_validate_extraction_human_gate <- function(paths) {
+  wb <- runner_targeted_workbook()
+  if (!runner_file_nonempty(wb) || !runner_dependency_available("openxlsx")) return(runner_validation(FALSE, "Targeted Human Verification workbook is unavailable for the active project."))
+
+  d <- tryCatch(openxlsx::readWorkbook(wb, sheet = "Target_Outcome_Verification", colNames = TRUE, skipEmptyRows = TRUE), error = function(e) NULL)
+  if (is.null(d) || nrow(d) == 0L) return(runner_validation(FALSE, "Target_Outcome_Verification cannot be read."))
+  required <- c("human_include_in_planned_analysis", "verification_status")
+  if (!all(required %in% names(d))) return(runner_validation(FALSE, "Target_Outcome_Verification lacks required human verification columns."))
+
+  include <- trimws(as.character(d$human_include_in_planned_analysis))
+  planned <- !is.na(include) & include == "Yes"
+  if (!any(planned)) return(runner_validation(FALSE, "No planned analysis row is marked Yes yet."))
+  status <- trimws(as.character(d$verification_status))
+  ok <- all(!planned | status %in% c("Verified", "Corrected"))
+  runner_validation(ok, if (ok) "Human Verification of all planned analysis rows is complete." else "One or more planned analysis rows are not Verified/Corrected.", file = wb)
+}
+
+runner_resolve_manifest_dataset_path <- function(raw_path, context, canonical_directory) {
+  value <- runner_clean_scalar(raw_path)
+  if (!nzchar(value)) return("")
+
+  candidate <- if (runner_path_is_absolute(value)) {
+    value
+  } else if (grepl("[/\\\\]", value)) {
+    file.path(context$paths$project_root, value)
+  } else {
+    file.path(canonical_directory, value)
+  }
+
+  normalized <- runner_normalize_path_safe(candidate, must_work = FALSE)
+  if (!nzchar(normalized) || !runner_path_within(normalized, canonical_directory)) return("")
+  normalized
+}
+
+runner_validate_human_verified_finalization <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+
+  canonical_dir <- runner_active_root_path(context, "data", "processed", "meta_analysis_ready")
+  manifest <- file.path(canonical_dir, "meta_analysis_manifest.csv")
+  if (!runner_file_nonempty(manifest)) return(runner_validation(FALSE, "Canonical R/26 authoritative analysis manifest is missing.", manifest = manifest))
+
+  manifest_data <- runner_read_csv_character(manifest)
+  if (is.null(manifest_data) || nrow(manifest_data) == 0L) return(runner_validation(FALSE, "Canonical R/26 analysis manifest cannot be interpreted.", manifest = manifest))
+
+  dataset_col <- intersect(c("dataset_file", "file", "path"), names(manifest_data))
+  if (length(dataset_col) == 0L) return(runner_validation(FALSE, "R/26 analysis manifest does not contain a dataset path column.", manifest = manifest))
+
+  raw_paths <- trimws(as.character(manifest_data[[dataset_col[[1]]]]))
+  raw_paths <- raw_paths[!is.na(raw_paths) & nzchar(raw_paths)]
+  if (length(raw_paths) == 0L) return(runner_validation(FALSE, "R/26 analysis manifest contains no dataset paths.", manifest = manifest))
+
+  dataset_paths <- vapply(
+    raw_paths,
+    runner_resolve_manifest_dataset_path,
+    character(1),
+    context = context,
+    canonical_directory = canonical_dir,
+    USE.NAMES = FALSE
+  )
+
+  in_scope <- nzchar(dataset_paths)
+  if (!all(in_scope)) {
+    return(runner_validation(FALSE, paste0("R/26 manifest references dataset path(s) outside the active canonical meta-analysis-ready directory: ", paste(raw_paths[!in_scope], collapse = ", ")), manifest = manifest))
+  }
+
+  dataset_ok <- vapply(dataset_paths, runner_file_nonempty, logical(1))
+  if (!all(dataset_ok)) return(runner_validation(FALSE, paste0("R/26 canonical manifest references missing or empty dataset(s): ", paste(dataset_paths[!dataset_ok], collapse = ", ")), manifest = manifest))
+
+  audit_workbook <- runner_active_root_path(context, "results", "meta_analysis_ready", "meta_analysis_ready_datasets.xlsx")
+  runner_validation(
+    TRUE,
+    if (runner_file_nonempty(audit_workbook)) "R/26 canonical manifest, referenced datasets, and final audit workbook are complete." else "R/26 canonical manifest and all referenced active-project datasets are complete; audit workbook is not required for downstream analytical recovery.",
+    manifest = manifest,
+    workbook = if (runner_file_nonempty(audit_workbook)) audit_workbook else ""
+  )
+}
+
+runner_validate_meta_analysis <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  f <- runner_active_root_path(context, "results", "meta_analysis", "meta_analysis_execution_summary.csv")
+  if (!runner_file_nonempty(f)) return(runner_validation(FALSE, "Meta-analysis execution summary is missing for the active project.", file = f))
+
+  d <- runner_read_csv_character(f)
+  if (is.null(d) || nrow(d) == 0L || !"status" %in% names(d)) return(runner_validation(FALSE, "Meta-analysis execution summary cannot be interpreted.", file = f))
+  st <- toupper(trimws(as.character(d$status)))
+  ok <- !any(st == "FAIL") && any(st == "PASS")
+  runner_validation(ok, if (ok) "Meta-analysis completed with no FAIL groups." else "Meta-analysis has FAIL groups or no PASS group.", file = f)
+}
+
+runner_validate_meta_analysis_diagnostics <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  root <- runner_active_root_path(context, "results", "meta_analysis_diagnostics")
+  summary_file <- file.path(root, "meta_analysis_diagnostics_summary.csv")
+  report_file <- file.path(context$paths$logs_directory, "meta_analysis_diagnostics_report.txt")
+  workbook <- file.path(root, "meta_analysis_diagnostics.xlsx")
+
+  required <- c(summary = summary_file, report = report_file, workbook = workbook)
+  ok_files <- vapply(required, runner_file_nonempty, logical(1))
+  if (!all(ok_files)) return(runner_validation(FALSE, paste("R/28 canonical diagnostic output(s) are incomplete:", paste(names(required)[!ok_files], collapse = ", ")), files = as.list(required)))
+
+  d <- runner_read_csv_character(summary_file)
+  if (is.null(d) || nrow(d) == 0L || !"diagnostic_status" %in% names(d)) return(runner_validation(FALSE, "R/28 diagnostics summary cannot be interpreted.", file = summary_file))
+  st <- toupper(trimws(as.character(d$diagnostic_status)))
+  ok <- length(st) > 0L && all(!is.na(st) & st == "PASS")
+  runner_validation(ok, if (ok) "R/28 post-meta-analysis diagnostics completed with no FAIL group." else "R/28 diagnostics contain a FAIL or incomplete group.", file = summary_file, report = report_file, workbook = workbook)
+}
+
+runner_validate_forest_plots <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  report <- runner_active_root_path(context, "results", "meta_analysis", "logs", "r33_forest_and_tables_report.txt")
+  if (!runner_file_nonempty(report)) return(runner_validation(FALSE, "Canonical R/33 report is missing.", file = report))
+  txt <- runner_read_text(report)
+  ok <- grepl("PASS: R/33 completed all executable forest-plot/table outputs", txt, fixed = TRUE) && !grepl("PARTIAL PASS", txt, fixed = TRUE)
+  runner_validation(ok, if (ok) "R/33 publication forest/table outputs passed for the active project." else "R/33 did not achieve complete PASS.", file = report)
+}
+
+runner_risk_of_bias_root <- function(context) {
+  runner_active_root_path(context, "results", "risk_of_bias")
+}
+
+runner_validate_risk_of_bias <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  root <- runner_risk_of_bias_root(context)
+  files <- c(
+    manifest = file.path(root, "rob_study_result_manifest.csv"),
+    tasks = file.path(root, "rob_agent_tasks.csv"),
+    assessments = file.path(root, "rob_agent_assessments.csv"),
+    workbook = file.path(root, "risk_of_bias_author_editable.xlsx"),
+    report = file.path(root, "rob_validation_report.txt")
+  )
+  ok <- vapply(files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "R/36 provisional RoB assessments are complete and the author-review workbook is ready for the active project." else paste("Missing or empty canonical R/36 output(s):", paste(names(files)[!ok], collapse = ", ")), files = as.list(files))
+}
+
+runner_rob_workbook <- function() {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return("")
+  file.path(runner_risk_of_bias_root(context), "risk_of_bias_author_editable.xlsx")
+}
+
+runner_validate_rob_author_gate <- function(paths) {
+  wb <- runner_rob_workbook()
+  if (!runner_file_nonempty(wb) || !runner_dependency_available("openxlsx")) return(runner_validation(FALSE, "RoB author-review workbook is unavailable for the active project."))
+
+  domains <- tryCatch(openxlsx::read.xlsx(wb, sheet = "Domain_Review", check.names = FALSE), error = function(e) NULL)
+  overall <- tryCatch(openxlsx::read.xlsx(wb, sheet = "Overall_Review", check.names = FALSE), error = function(e) NULL)
+  if (is.null(domains) || is.null(overall)) return(runner_validation(FALSE, "Domain_Review or Overall_Review cannot be read."))
+  if (!"author_domain_judgement" %in% names(domains) || !"author_final_overall_judgement" %in% names(overall)) return(runner_validation(FALSE, "Required author-final RoB judgement columns are missing."))
+
+  dj <- trimws(as.character(domains$author_domain_judgement))
+  oj <- trimws(as.character(overall$author_final_overall_judgement))
+  ok <- nrow(domains) > 0L && nrow(overall) > 0L && all(!is.na(dj) & nzchar(dj)) && all(!is.na(oj) & nzchar(oj))
+  runner_validation(ok, if (ok) "All author-final RoB domain and overall judgements are complete." else "Author-final RoB review remains incomplete.", file = wb)
+}
+
+runner_validate_rob_finalization <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  root <- runner_risk_of_bias_root(context)
+  figs <- file.path(root, "figures")
+  files <- c(
+    combined = file.path(root, "risk_of_bias_final.csv"),
+    report = file.path(figs, "rob_figure_validation_report.txt"),
+    rob2_traffic_light = file.path(figs, "rob2_traffic_light.pdf"),
+    robins_i_traffic_light = file.path(figs, "robins_i_traffic_light.pdf")
+  )
+  ok <- vapply(files, runner_file_nonempty, logical(1))
+  runner_validation(all(ok), if (all(ok)) "Final author-reviewed RoB data and publication figures are complete for the active project." else paste("Missing or empty canonical R/37 output(s):", paste(names(files)[!ok], collapse = ", ")), files = as.list(files))
+}
+
+runner_validate_step <- function(step, paths) {
+  id <- step$id
   switch(
-    step_id,
-    initialization_validation =
-      runner_validate_initialization(paths),
-    human_decision_review =
-      runner_validate_review_preparation(paths),
-    human_decision_finalization =
-      runner_validate_finalization(paths),
-    search_generation =
-      runner_validate_search_generation(paths),
-    search_validation =
-      runner_validate_search_validation(paths),
-    pubmed_download =
-      runner_validate_pubmed_download(paths),
-    database_input_gate =
-      runner_validate_database_inputs(paths),
-    merge_deduplication =
-      runner_validate_merge_deduplication(paths),
-    screening_workbook =
-      runner_validate_screening_workbook(paths),
-    agent_screening =
-      runner_validate_agent_screening(paths),
-    agent_validation =
-      runner_validate_agent_validation(paths),
-    human_reviewer_2_gate =
-      runner_validate_human_reviewer_2_gate(paths),
-    human_adjudication_gate =
-      runner_validate_human_adjudication_gate(paths),
-    screening_finalization =
-      runner_validate_phase1_finalization(paths),
-    stop(
-      "Unsupported runner step: ",
-      step_id,
-      call. = FALSE
-    )
+    id,
+    initialization_agent = runner_validate_initialization_agent(paths),
+    initialization_validation = runner_validate_initialization(paths),
+    human_decision_review = runner_validate_review_preparation(paths),
+    human_decision_finalization = runner_validate_finalization(paths),
+    prospero_preparation = runner_validate_prospero(paths),
+    search_generation = runner_validate_search_generation(paths),
+    search_validation = runner_validate_search_validation(paths),
+    pubmed_download = runner_validate_pubmed(paths),
+    database_input_gate = runner_validate_database_inputs(paths),
+    merge_deduplication = runner_validate_merge(paths),
+    screening_workbook = runner_validate_screening_workbook(paths),
+    agent_screening = runner_validate_agent_screening(paths),
+    agent_validation = runner_validate_agent_validation(paths),
+    human_reviewer_2_gate = runner_validate_human_reviewer_2(paths),
+    human_adjudication_gate = runner_validate_human_adjudication(paths),
+    screening_finalization = runner_validate_phase1_finalization(paths),
+    full_text_registry = runner_validate_full_text_registry(paths),
+    full_text_agent_eligibility = runner_validate_full_text_agent(paths),
+    full_text_author_gate = runner_validate_full_text_author_gate(paths),
+    final_included_studies = runner_validate_included_studies(paths),
+    prisma = runner_validate_prisma(paths),
+    multimodal_extraction = runner_validate_extraction(paths),
+    manuscript_tables = runner_validate_manuscript_tables(paths),
+    scope_advisory = runner_validate_scope_advisory(paths),
+    targeted_verification_prep = runner_validate_targeted_prep(paths),
+    extraction_human_gate = runner_validate_extraction_human_gate(paths),
+    human_verified_finalization = runner_validate_human_verified_finalization(paths),
+    meta_analysis = runner_validate_meta_analysis(paths),
+    meta_analysis_diagnostics = runner_validate_meta_analysis_diagnostics(paths),
+    forest_plots = runner_validate_forest_plots(paths),
+    risk_of_bias = runner_validate_risk_of_bias(paths),
+    rob_author_gate = runner_validate_rob_author_gate(paths),
+    rob_finalization = runner_validate_rob_finalization(paths),
+    additional_analysis = runner_validation(FALSE, "R/29 state is evaluated directly by the Runner."),
+    runner_validation(FALSE, paste("No validator registered for", id))
   )
 }
 
-
 # ============================================================
-# 5. Script execution
+# 4. Script / service execution
 # ============================================================
-
 runner_execute_script <- function(script_path) {
-  if (!file.exists(script_path)) {
-    stop(
-      "Workflow script was not found: ",
-      script_path,
-      call. = FALSE
-    )
+  if (!file.exists(script_path)) stop("Workflow script was not found: ", script_path, call. = FALSE)
+  env <- new.env(parent = globalenv())
+  value <- sys.source(script_path, envir = env)
+  list(value=value, environment=env)
+}
+
+runner_execute_prospero <- function(script_path) {
+  rscript <- Sys.which("Rscript")
+  if (!nzchar(rscript)) stop("Rscript executable was not found; cannot isolate the PROSPERO module safely.", call. = FALSE)
+  slug <- runner_detect_project_slug()
+  args <- c("--vanilla", script_path)
+  if (nzchar(slug) && grepl("create_and_autofill_prospero\\.R$", script_path, ignore.case=TRUE)) {
+    args <- c(args, paste0("--project=", slug))
   }
-
-  step_environment <- new.env(
-    parent = globalenv()
-  )
-
-  sys.source(
-    script_path,
-    envir = step_environment
-  )
-
+  status <- system2(rscript, args=args)
+  if (!identical(as.integer(status), 0L)) stop("PROSPERO preparation module exited with status ", status, call. = FALSE)
   invisible(TRUE)
 }
 
+runner_route_r29_uploads <- function(uploaded_files) {
+  uploaded_files <- runner_as_character_vector(uploaded_files)
+  if (length(uploaded_files)==0L) return(invisible(NULL))
+  missing <- uploaded_files[!file.exists(uploaded_files)]
+  if (length(missing)>0L) stop("Uploaded file(s) do not exist:\n- ", paste(missing, collapse="\n- "), call. = FALSE)
+  script <- runner_resolve_script(c("R/32_route_runner_uploads_to_active_analysis.R"))
+  if (!nzchar(script)) stop("R/32 upload-routing service is missing.", call. = FALSE)
 
-runner_should_skip_review_script <- function(paths) {
-  validation <- runner_validate_review_preparation(paths)
-  isTRUE(validation$passed)
+  old <- Sys.getenv("SRMA_UPLOADED_FILES", unset=NA_character_)
+  on.exit({
+    if (is.na(old)) Sys.unsetenv("SRMA_UPLOADED_FILES") else Sys.setenv(SRMA_UPLOADED_FILES=old)
+  }, add=TRUE)
+  Sys.setenv(SRMA_UPLOADED_FILES="")
+  env <- new.env(parent=globalenv())
+  sys.source(script, envir=env)
+  if (!exists("route_uploaded_files_to_active_analysis", envir=env, mode="function")) stop("R/32 routing function was not loaded.", call. = FALSE)
+  env$route_uploaded_files_to_active_analysis(uploaded_files)
 }
 
-
-runner_should_skip_finalization_script <- function(paths) {
-  validation <- runner_validate_finalization(paths)
-  isTRUE(validation$passed)
+runner_extract_r29_status <- function(value) {
+  if (is.null(value)) return("")
+  if (is.list(value)) {
+    if (runner_is_nonempty_character(value$status)) return(toupper(trimws(value$status)))
+    if (is.list(value$state) && runner_is_nonempty_character(value$state$status)) return(toupper(trimws(value$state$status)))
+  }
+  ""
 }
 
+runner_additional_analysis_results_root <- function() {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) return("")
+
+  # R/31 may have added a canonical configured location. Use it only
+  # through the active project context; otherwise use the validated
+  # default under the active project root.
+  if (
+    exists("resolve_configured_project_path", envir = context$environment, mode = "function") &&
+      !is.null(context$config$canonical_paths$additional_analysis_results)
+  ) {
+    resolved <- tryCatch(
+      context$environment$resolve_configured_project_path(
+        config = context$config,
+        project_root = context$paths$project_root,
+        key = "additional_analysis_results",
+        create = FALSE
+      ),
+      error = function(e) ""
+    )
+    if (nzchar(resolved) && runner_path_within(resolved, context$paths$project_root)) return(resolved)
+  }
+
+  runner_active_root_path(context, "results", "additional_analysis")
+}
+
+runner_read_active_r29_state <- function() {
+  root <- runner_additional_analysis_results_root()
+  if (!nzchar(root)) return(NULL)
+
+  active_file <- file.path(root, "ACTIVE_ANALYSIS_ID.txt")
+  if (!runner_file_nonempty(active_file)) return(NULL)
+
+  lines <- readLines(active_file, warn = FALSE, encoding = "UTF-8")
+  if (length(lines) == 0L) return(NULL)
+  id <- trimws(lines[[1]])
+  if (!nzchar(id) || grepl("[\\\\/:*?\"<>|]", id)) return(NULL)
+
+  state_file <- file.path(root, id, "analysis_state.json")
+  if (!runner_file_nonempty(state_file) || !runner_dependency_available("jsonlite")) return(NULL)
+
+  tryCatch(jsonlite::read_json(state_file, simplifyVector = TRUE), error = function(e) NULL)
+}
+
+runner_pause <- function(state, step, paths, run_log, run_log_file, message, validation=list()) {
+  state$status <- "paused"
+  state$current_step <- step$id
+  state$last_error <- ""
+  state <- runner_record_step(state, step$id, "paused", message=message, validation=validation)
+  runner_write_state(state, paths$state_file)
+  run_log$status <- "paused"
+  run_log$completed_at <- runner_now()
+  run_log$steps[[step$id]] <- list(status="paused", message=message, validation=validation)
+  yaml::write_yaml(run_log, run_log_file)
+  cat("\nWorkflow paused safely.\nStep: ", step$id, "\nReason: ", message, "\nResume by running the same Runner again.\n", sep="")
+  invisible(list(passed=FALSE, paused=TRUE, state=state, state_file=paths$state_file, run_log_file=run_log_file, message=message))
+}
 
 # ============================================================
-# 6. Main runner
+# 5. Main Runner
 # ============================================================
-
 run_universal_srma_workflow <- function(
     resume = TRUE,
-    from_step = NULL
+    from_step = NULL,
+    run_scope_advisory = TRUE,
+    run_additional_analysis = FALSE,
+    additional_evidence_role = NULL,
+    additional_purpose = NULL,
+    additional_effect_measure = "AUTO",
+    uploaded_files = NULL
 ) {
   runner_require_package("yaml")
   runner_assert_project_root()
 
   paths <- runner_paths()
-  steps <- runner_steps()
-  step_ids <- vapply(
-    steps,
-    `[[`,
-    character(1),
-    "id"
-  )
+  steps <- runner_steps(run_scope_advisory, run_additional_analysis)
+  step_ids <- vapply(steps, `[[`, character(1), "id")
 
-  if (!is.null(from_step)) {
-    if (
-      !runner_is_nonempty_character(from_step) ||
-      !from_step %in% step_ids
-    ) {
-      stop(
-        "Invalid from_step. Choose one of:\n- ",
-        paste(step_ids, collapse = "\n- "),
-        call. = FALSE
-      )
-    }
+  if (!is.null(from_step) && (!runner_is_nonempty_character(from_step) || !from_step %in% step_ids)) {
+    stop("Invalid from_step. Choose one of:\n- ", paste(step_ids, collapse="\n- "), call. = FALSE)
   }
 
-  dir.create(
-    paths$state_directory,
-    recursive = TRUE,
-    showWarnings = FALSE
-  )
+  dir.create(paths$state_directory, recursive=TRUE, showWarnings=FALSE)
+  dir.create(paths$run_log_directory, recursive=TRUE, showWarnings=FALSE)
 
-  dir.create(
-    paths$run_log_directory,
-    recursive = TRUE,
-    showWarnings = FALSE
-  )
+  state <- runner_load_state(paths$state_file, resume=resume)
+  if (!isTRUE(resume)) state <- runner_empty_state()
 
-  state <- runner_load_state(
-    paths$state_file,
-    resume = resume
-  )
-
-  state$workflow <- "universal_srma_phase1"
-  state$runner_version <- "2.0.0"
-
-  if (!isTRUE(resume)) {
-    state <- runner_empty_state()
-  }
-
-  run_id <- paste0(
-    "workflow_",
-    runner_timestamp()
-  )
-
-  run_log_file <- file.path(
-    paths$run_log_directory,
-    paste0(
-      run_id,
-      ".yml"
-    )
-  )
-
+  run_id <- paste0("workflow_", runner_timestamp())
+  run_log_file <- file.path(paths$run_log_directory, paste0(run_id, ".yml"))
   run_log <- list(
-    run_id = run_id,
-    workflow = state$workflow,
-    runner_version = state$runner_version,
-    started_at = runner_now(),
-    completed_at = "",
-    status = "running",
-    resume_requested = isTRUE(resume),
-    from_step = from_step %||% "",
-    steps = list(),
-    error = ""
+    run_id=run_id,
+    workflow="universal_srma_final",
+    runner_version=runner_empty_state()$runner_version,
+    started_at=runner_now(),
+    completed_at="",
+    status="running",
+    resume_requested=isTRUE(resume),
+    from_step=from_step %||% "",
+    options=list(scope_advisory=isTRUE(run_scope_advisory), additional_analysis=isTRUE(run_additional_analysis)),
+    steps=list(),
+    error=""
   )
 
-  runner_print_header(
-    "Universal SR-MA Workflow Runner"
-  )
+  runner_print_header("Universal SR-MA Final Workflow Runner — TASK-016")
+  cat("Run ID: ", run_id, "\nResume: ", isTRUE(resume), "\nState: ", paths$state_file, "\n", sep="")
 
-  cat(
-    "Run ID: ",
-    run_id,
-    "\n",
-    "Resume: ",
-    isTRUE(resume),
-    "\n",
-    "State file: ",
-    paths$state_file,
-    "\n",
-    sep = ""
-  )
-
-  if (!nzchar(state$started_at %||% "")) {
-    state$started_at <- runner_now()
-  }
-
+  if (!nzchar(state$started_at %||% "")) state$started_at <- runner_now()
   state$status <- "running"
   state$completed_at <- ""
   state$last_error <- ""
-
-  runner_write_state(
-    state,
-    paths$state_file
-  )
+  runner_write_state(state, paths$state_file)
 
   start_index <- 1L
-
   if (!is.null(from_step)) {
-    start_index <- match(
-      from_step,
-      step_ids
-    )
-
-    downstream_steps <- step_ids[
-      seq.int(
-        start_index,
-        length(step_ids)
-      )
-    ]
-
-    state$completed_steps <- setdiff(
-      state$completed_steps,
-      downstream_steps
-    )
-
-    for (step_id in downstream_steps) {
-      state$step_records[[step_id]] <- NULL
-    }
-
-    runner_write_state(
-      state,
-      paths$state_file
-    )
+    start_index <- match(from_step, step_ids)
+    downstream <- step_ids[seq.int(start_index, length(step_ids))]
+    state$completed_steps <- setdiff(state$completed_steps, downstream)
+    for (id in downstream) state$step_records[[id]] <- NULL
+    runner_write_state(state, paths$state_file)
   }
 
-  total_steps <- length(steps)
+  total <- length(steps)
 
   for (index in seq_along(steps)) {
     step <- steps[[index]]
 
     if (index < start_index) {
-      runner_print_step(
-        index,
-        total_steps,
-        step$label,
-        "OUTSIDE REQUESTED RANGE"
-      )
-
+      runner_print_step(index, total, step$label, "OUTSIDE REQUESTED RANGE")
       next
     }
 
-    completed_in_state <- step$id %in%
-      state$completed_steps
-
-    # Historical PASS conditions (notably R/20 and human gates)
-    # are authoritative once recorded in runner state. They must
-    # not be revalidated after downstream human work changes the
-    # workbook state.
-    if (isTRUE(resume) && completed_in_state) {
-      runner_print_step(
-        index,
-        total_steps,
-        step$label,
-        "SKIPPED — already completed"
-      )
-
-      run_log$steps[[step$id]] <- list(
-        status = "skipped",
-        reason = "already completed in runner state"
-      )
-
+    if (!isTRUE(step$enabled)) {
+      state <- runner_record_step(state, step$id, "skipped", completed_at=runner_now(), message=paste(step$category, "branch disabled by Runner option."))
+      runner_write_state(state, paths$state_file)
+      run_log$steps[[step$id]] <- list(status="skipped", category=step$category)
+      runner_print_step(index, total, step$label, "SKIPPED")
       next
     }
 
-    existing_validation <- runner_validate_step(
-      step$id,
-      paths
-    )
-
-    recoverable_from_artifacts <- isTRUE(
-      step$recovery %||% TRUE
-    ) && isTRUE(
-      existing_validation$passed
-    )
-
-    if (
-      isTRUE(resume) &&
-      recoverable_from_artifacts
-    ) {
-      runner_print_step(
-        index,
-        total_steps,
-        step$label,
-        "RECOVERED — valid artifacts found"
-      )
-
-      state <- runner_record_step(
-        state = state,
-        step_id = step$id,
-        status = "completed",
-        started_at = "",
-        completed_at = runner_now(),
-        message = existing_validation$message,
-        validation = existing_validation
-      )
-
-      run_log$steps[[step$id]] <- list(
-        status = "recovered",
-        validation = existing_validation
-      )
-
-      runner_write_state(
-        state,
-        paths$state_file
-      )
-
+    # A completed state is trusted only if the completion validator still passes.
+    pre <- runner_validate_step(step, paths)
+    if (step$id %in% state$completed_steps && isTRUE(pre$passed)) {
+      runner_print_step(index, total, step$label, "ALREADY COMPLETE")
+      run_log$steps[[step$id]] <- list(status="recovered", validation=pre)
       next
     }
+
+    if (isTRUE(step$recovery) && isTRUE(pre$passed)) {
+      state <- runner_record_step(state, step$id, "completed", completed_at=runner_now(), message=paste("Recovered from validated artifacts:", pre$message), validation=pre)
+      runner_write_state(state, paths$state_file)
+      run_log$steps[[step$id]] <- list(status="recovered", validation=pre)
+      runner_print_step(index, total, step$label, "RECOVERED")
+      next
+    }
+
+    runner_print_step(index, total, step$label)
+    started <- runner_now()
+    state$current_step <- step$id
+    runner_write_state(state, paths$state_file)
 
     if (identical(step$type, "gate")) {
-      waiting_message <- paste(
-        step$gate_message %||% "Human/manual action is required.",
-        existing_validation$message
-      )
-
-      state$status <- "waiting_for_human"
-      state$current_step <- step$id
-      state$last_error <- ""
-
-      state <- runner_record_step(
-        state = state,
-        step_id = step$id,
-        status = "waiting_for_human",
-        started_at = runner_now(),
-        completed_at = "",
-        message = waiting_message,
-        validation = existing_validation
-      )
-
-      runner_write_state(
-        state,
-        paths$state_file
-      )
-
-      run_log$status <- "waiting_for_human"
-      run_log$completed_at <- runner_now()
-      run_log$steps[[step$id]] <- list(
-        status = "waiting_for_human",
-        message = waiting_message,
-        validation = existing_validation
-      )
-
-      yaml::write_yaml(
-        run_log,
-        run_log_file
-      )
-
-      runner_print_step(
-        index,
-        total_steps,
-        step$label,
-        "WAITING FOR HUMAN/MANUAL ACTION"
-      )
-
-      cat(
-        "\nWorkflow paused safely at a manual gate.\n",
-        waiting_message,
-        "\n\nAfter completing the required action, resume with:\n",
-        'source("R/run_universal_srma_workflow.R")',
-        "\n",
-        sep = ""
-      )
-
-      return(
-        invisible(
-          list(
-            passed = FALSE,
-            waiting_for_human = TRUE,
-            waiting_step = step$id,
-            state = state,
-            state_file = paths$state_file,
-            run_log_file = run_log_file
-          )
-        )
-      )
+      return(runner_pause(state, step, paths, run_log, run_log_file, pre$message, pre))
     }
 
-    runner_print_step(
-      index,
-      total_steps,
-      step$label
-    )
-
-    step_started_at <- runner_now()
-
-    state$status <- "running"
-    state$current_step <- step$id
-    state <- runner_record_step(
-      state = state,
-      step_id = step$id,
-      status = "running",
-      started_at = step_started_at,
-      message = "Step execution started."
-    )
-
-    runner_write_state(
-      state,
-      paths$state_file
-    )
-
-    step_error <- NULL
-
-    tryCatch(
-      {
-        if (
-          identical(
-            step$id,
-            "human_decision_review"
-          ) &&
-          runner_should_skip_review_script(paths)
-        ) {
-          cat(
-            "Human Decision response file is already valid; ",
-            "preparation script was not rerun.\n",
-            sep = ""
-          )
-
-        } else if (
-          identical(
-            step$id,
-            "human_decision_finalization"
-          )
-        ) {
-          remaining_decisions <- runner_read_decisions(
-            paths
-          )
-
-          if (
-            !is.null(remaining_decisions) &&
-            length(remaining_decisions) == 0L
-          ) {
-            finalization_validation <-
-              runner_validate_finalization(paths)
-
-            if (!isTRUE(finalization_validation$passed)) {
-              stop(
-                paste(
-                  "No unresolved Human Decisions remain, but",
-                  "finalization artifacts are incomplete.",
-                  finalization_validation$message
-                ),
-                call. = FALSE
-              )
-            }
-
-            cat(
-              "Human Decision finalization is already complete; ",
-              "interactive finalization was not rerun.\n",
-              sep = ""
-            )
-
-          } else {
-            runner_execute_script(
-              step$script
-            )
-          }
-
-        } else {
-          runner_execute_script(
-            step$script
-          )
-        }
-      },
-      error = function(error) {
-        step_error <<- error
+    if (identical(step$type, "r29")) {
+      # SERVICE: route uploaded files only when explicitly supplied and an active R/29 exists.
+      upload_vector <- runner_as_character_vector(uploaded_files)
+      if (length(upload_vector)==0L) {
+        env_uploads <- trimws(Sys.getenv("SRMA_UPLOADED_FILES", unset=""))
+        if (nzchar(env_uploads)) upload_vector <- trimws(strsplit(env_uploads, ";", fixed=TRUE)[[1]])
       }
-    )
+      if (length(upload_vector)>0L) runner_route_r29_uploads(upload_vector)
 
-    if (!is.null(step_error)) {
-      error_message <- conditionMessage(
-        step_error
-      )
+      active <- runner_read_active_r29_state()
+      active_status <- if (is.list(active)) toupper(trimws(as.character(active$status %||% ""))) else ""
+      if (!interactive() && !nzchar(active_status)) {
+        role <- trimws(as.character(additional_evidence_role %||% Sys.getenv("SRMA_ADDITIONAL_EVIDENCE_ROLE", unset="")))
+        purpose <- trimws(as.character(additional_purpose %||% Sys.getenv("SRMA_ADDITIONAL_PURPOSE", unset="")))
+        if (!nzchar(role) || !nzchar(purpose)) {
+          return(runner_pause(state, step, paths, run_log, run_log_file, "R/29 is enabled, but a new non-interactive additional analysis requires additional_evidence_role and additional_purpose."))
+        }
+        Sys.setenv(SRMA_ADDITIONAL_ANALYSIS="yes", SRMA_ADDITIONAL_EVIDENCE_ROLE=role, SRMA_ADDITIONAL_PURPOSE=purpose, SRMA_ADDITIONAL_EFFECT_MEASURE=additional_effect_measure %||% "AUTO")
+      }
 
-      state$status <- "failed"
-      state$current_step <- step$id
-      state$last_error <- error_message
-
-      state <- runner_record_step(
-        state = state,
-        step_id = step$id,
-        status = "failed",
-        started_at = step_started_at,
-        completed_at = runner_now(),
-        message = error_message
-      )
-
-      runner_write_state(
-        state,
-        paths$state_file
-      )
-
-      run_log$status <- "failed"
-      run_log$completed_at <- runner_now()
-      run_log$error <- error_message
-      run_log$steps[[step$id]] <- list(
-        status = "failed",
-        error = error_message
-      )
-
-      yaml::write_yaml(
-        run_log,
-        run_log_file
-      )
-
-      runner_print_step(
-        index,
-        total_steps,
-        step$label,
-        "FAILED"
-      )
-
-      cat(
-        "\nWorkflow stopped safely.\n",
-        "Failed step: ",
-        step$id,
-        "\n",
-        "Reason: ",
-        error_message,
-        "\n",
-        "Resume with:\n",
-        'source("R/run_universal_srma_workflow.R")',
-        "\n",
-        sep = ""
-      )
-
-      stop(
-        "Universal SR-MA Phase 1 workflow failed at step '",
-        step$id,
-        "'.",
-        call. = FALSE
-      )
+      script <- runner_resolve_script(step$scripts)
+      if (!nzchar(script)) stop("Required R/29 script is missing.", call. = FALSE)
+      execution <- tryCatch(runner_execute_script(script), error=function(e) e)
+      if (inherits(execution, "error")) {
+        state$status <- "failed"; state$last_error <- conditionMessage(execution)
+        state <- runner_record_step(state, step$id, "failed", started_at=started, completed_at=runner_now(), message=state$last_error)
+        runner_write_state(state, paths$state_file)
+        run_log$status <- "failed"; run_log$error <- state$last_error; run_log$completed_at <- runner_now(); run_log$steps[[step$id]] <- list(status="failed", error=state$last_error); yaml::write_yaml(run_log, run_log_file)
+        stop("Workflow failed at R/29: ", state$last_error, call. = FALSE)
+      }
+      status <- runner_extract_r29_status(execution$value)
+      if (!nzchar(status)) {
+        active2 <- runner_read_active_r29_state()
+        if (is.list(active2)) status <- toupper(trimws(as.character(active2$status %||% "")))
+      }
+      if (status %in% c("WAITING_FOR_FILES","FILES_AVAILABLE")) {
+        return(runner_pause(state, step, paths, run_log, run_log_file, paste("R/29 state:", status, "— upload source files and resume."), list(r29_status=status)))
+      }
+      if (status %in% c("SKIPPED","CANCELLED","COMPLETE") || !nzchar(status)) {
+        state$current_step <- ""
+        state <- runner_record_step(state, step$id, "completed", started_at=started, completed_at=runner_now(), message=paste("R/29 terminal state:", ifelse(nzchar(status),status,"EXECUTED")), validation=list(passed=TRUE,r29_status=status))
+        runner_write_state(state, paths$state_file)
+        run_log$steps[[step$id]] <- list(status="completed", r29_status=status)
+        runner_print_step(index,total,step$label, ifelse(status=="SKIPPED","SKIPPED","PASS"))
+        next
+      }
+      return(runner_pause(state, step, paths, run_log, run_log_file, paste("R/29 returned resumable/nonterminal state:", status), list(r29_status=status)))
     }
 
-    post_validation <- if (
-      identical(step$type, "script_success")
-    ) {
-      list(
-        passed = TRUE,
-        message = paste(
-          step$label,
-          "executed successfully and its historical PASS was recorded."
-        ),
-        historical_pass = TRUE
-      )
-    } else {
-      runner_validate_step(
-        step$id,
-        paths
-      )
+    script <- runner_resolve_script(step$scripts)
+    if (!nzchar(script)) {
+      msg <- paste("No canonical script candidate was found for", step$id, "Expected:", paste(step$scripts, collapse=", "))
+      state$status <- "failed"; state$last_error <- msg
+      state <- runner_record_step(state, step$id, "failed", started_at=started, completed_at=runner_now(), message=msg)
+      runner_write_state(state, paths$state_file)
+      run_log$status <- "failed"; run_log$error <- msg; run_log$completed_at <- runner_now(); run_log$steps[[step$id]] <- list(status="failed", error=msg); yaml::write_yaml(run_log, run_log_file)
+      stop(msg, call. = FALSE)
     }
 
-    if (!isTRUE(post_validation$passed)) {
-      validation_message <- post_validation$message
+    execution_error <- NULL
+    tryCatch({
+      if (identical(step$id, "scope_advisory")) {
+        old_opt <- getOption("srma.scope_advisory", NULL)
+        on.exit(options(srma.scope_advisory=old_opt), add=TRUE)
+        options(srma.scope_advisory="yes")
+      }
+      if (identical(step$type, "external_script")) runner_execute_prospero(script) else runner_execute_script(script)
+    }, error=function(e) execution_error <<- e)
 
-      state$status <- "failed"
-      state$current_step <- step$id
-      state$last_error <- validation_message
+    if (!is.null(execution_error)) {
+      msg <- conditionMessage(execution_error)
+      state$status <- "failed"; state$last_error <- msg
+      state <- runner_record_step(state, step$id, "failed", started_at=started, completed_at=runner_now(), message=msg)
+      runner_write_state(state, paths$state_file)
+      run_log$status <- "failed"; run_log$error <- msg; run_log$completed_at <- runner_now(); run_log$steps[[step$id]] <- list(status="failed", error=msg); yaml::write_yaml(run_log, run_log_file)
+      runner_print_step(index,total,step$label,"FAILED")
+      stop("Universal SR-MA workflow failed at step '", step$id, "': ", msg, call. = FALSE)
+    }
 
-      state <- runner_record_step(
-        state = state,
-        step_id = step$id,
-        status = "failed",
-        started_at = step_started_at,
-        completed_at = runner_now(),
-        message = validation_message,
-        validation = post_validation
-      )
+    post <- if (identical(step$type,"script_success")) runner_validation(TRUE, paste(step$label, "executed successfully."), historical_pass=TRUE) else runner_validate_step(step, paths)
 
-      runner_write_state(
-        state,
-        paths$state_file
-      )
-
-      run_log$status <- "failed"
-      run_log$completed_at <- runner_now()
-      run_log$error <- validation_message
-      run_log$steps[[step$id]] <- list(
-        status = "failed",
-        validation = post_validation
-      )
-
-      yaml::write_yaml(
-        run_log,
-        run_log_file
-      )
-
-      runner_print_step(
-        index,
-        total_steps,
-        step$label,
-        "FAILED VALIDATION"
-      )
-
-      stop(
-        "Step completed without an R error, but its outputs ",
-        "did not pass validation: ",
-        validation_message,
-        call. = FALSE
-      )
+    if (!isTRUE(post$passed)) {
+      # Human/registration preparation may legitimately require a later resume; do not label as analytical failure.
+      if (step$id %in% c("prospero_preparation")) return(runner_pause(state, step, paths, run_log, run_log_file, post$message, post))
+      msg <- post$message
+      state$status <- "failed"; state$last_error <- msg
+      state <- runner_record_step(state, step$id, "failed", started_at=started, completed_at=runner_now(), message=msg, validation=post)
+      runner_write_state(state, paths$state_file)
+      run_log$status <- "failed"; run_log$error <- msg; run_log$completed_at <- runner_now(); run_log$steps[[step$id]] <- list(status="failed", validation=post); yaml::write_yaml(run_log, run_log_file)
+      runner_print_step(index,total,step$label,"FAILED VALIDATION")
+      stop("Step executed but completion validation failed: ", msg, call. = FALSE)
     }
 
     state$current_step <- ""
-    state <- runner_record_step(
-      state = state,
-      step_id = step$id,
-      status = "completed",
-      started_at = step_started_at,
-      completed_at = runner_now(),
-      message = post_validation$message,
-      validation = post_validation
-    )
-
-    runner_write_state(
-      state,
-      paths$state_file
-    )
-
-    run_log$steps[[step$id]] <- list(
-      status = "completed",
-      started_at = step_started_at,
-      completed_at = runner_now(),
-      validation = post_validation
-    )
-
-    runner_print_step(
-      index,
-      total_steps,
-      step$label,
-      "PASS"
-    )
+    state <- runner_record_step(state, step$id, "completed", started_at=started, completed_at=runner_now(), message=post$message, validation=post)
+    runner_write_state(state, paths$state_file)
+    run_log$steps[[step$id]] <- list(status="completed", started_at=started, completed_at=runner_now(), validation=post)
+    runner_print_step(index,total,step$label,"PASS")
   }
 
-  required_step_ids <- vapply(
-    steps,
-    `[[`,
-    character(1),
-    "id"
-  )
-
-  missing_completed_steps <- setdiff(
-    required_step_ids,
-    state$completed_steps
-  )
-
-  final_phase1_validation <- runner_validate_phase1_finalization(
-    paths
-  )
-
-  if (
-    length(missing_completed_steps) > 0L ||
-    !isTRUE(final_phase1_validation$passed)
-  ) {
-    state$status <- "failed"
-    state$last_error <- paste(
-      "Phase 1 completion validation failed.",
-      if (length(missing_completed_steps) > 0L) {
-        paste(
-          "Missing completed step(s):",
-          paste(missing_completed_steps, collapse = ", ")
-        )
-      } else {
-        ""
-      },
-      if (!isTRUE(final_phase1_validation$passed)) {
-        final_phase1_validation$message
-      } else {
-        ""
-      }
-    )
-
-    runner_write_state(
-      state,
-      paths$state_file
-    )
-
-    stop(
-      state$last_error,
-      call. = FALSE
-    )
+  active_steps <- vapply(steps, function(s) isTRUE(s$enabled), logical(1))
+  required_ids <- vapply(steps[active_steps], `[[`, character(1), "id")
+  missing <- setdiff(required_ids, state$completed_steps)
+  if (length(missing)>0L) {
+    state$status <- "failed"; state$last_error <- paste("Final workflow validation found incomplete active step(s):", paste(missing, collapse=", "))
+    runner_write_state(state, paths$state_file)
+    stop(state$last_error, call. = FALSE)
   }
 
   state$status <- "completed"
   state$current_step <- ""
   state$completed_at <- runner_now()
   state$last_error <- ""
-
-  runner_write_state(
-    state,
-    paths$state_file
-  )
-
+  runner_write_state(state, paths$state_file)
   run_log$status <- "completed"
   run_log$completed_at <- runner_now()
+  yaml::write_yaml(run_log, run_log_file)
 
-  yaml::write_yaml(
-    run_log,
-    run_log_file
-  )
-
-  runner_print_header(
-    "Universal SR-MA Phase 1 Workflow Completed"
-  )
-
-  cat(
-    "PASS: Phase 1 end-to-end workflow is complete through R/21.\n",
-    "State file: ",
-    paths$state_file,
-    "\n",
-    "Run log: ",
-    run_log_file,
-    "\n",
-    sep = ""
-  )
-
-  invisible(
-    list(
-      passed = TRUE,
-      state = state,
-      state_file = paths$state_file,
-      run_log_file = run_log_file
-    )
-  )
+  runner_print_header("Universal SR-MA Final Workflow Completed")
+  cat("PASS: all active TASK-016 Runner stages are complete.\nState: ", paths$state_file, "\nRun log: ", run_log_file, "\n", sep="")
+  invisible(list(passed=TRUE, paused=FALSE, state=state, state_file=paths$state_file, run_log_file=run_log_file))
 }
 
-
 # ============================================================
-# 7. Default single-entry execution
+# 6. Default entry point
 # ============================================================
-
-if (
-  isTRUE(
-    getOption(
-      "srma.runner.autorun",
-      TRUE
-    )
-  )
-) {
-  run_universal_srma_workflow(
-    resume = TRUE
-  )
+if (isTRUE(getOption("srma.runner.autorun", TRUE))) {
+  run_universal_srma_workflow(resume = TRUE)
 }

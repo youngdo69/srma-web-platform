@@ -1,10 +1,10 @@
-workflow: universal_srma_phase1
-runner_version: 2.0.0
+workflow: universal_srma_final
+runner_version: 3.0.6
 status: completed
 current_step: ''
 started_at: 2026-08-05 23:36:25
-updated_at: 2026-08-09 16:14:52
-completed_at: 2026-08-09 16:14:52
+updated_at: 2026-08-18 21:44:08
+completed_at: 2026-08-18 21:44:08
 last_error: ''
 completed_steps:
 - initialization_validation
@@ -21,6 +21,26 @@ completed_steps:
 - human_reviewer_2_gate
 - human_adjudication_gate
 - screening_finalization
+- initialization_agent
+- prospero_preparation
+- full_text_registry
+- full_text_agent_eligibility
+- full_text_author_gate
+- final_included_studies
+- prisma
+- multimodal_extraction
+- manuscript_tables
+- scope_advisory
+- targeted_verification_prep
+- extraction_human_gate
+- human_verified_finalization
+- meta_analysis
+- meta_analysis_diagnostics
+- additional_analysis
+- forest_plots
+- risk_of_bias
+- rob_author_gate
+- rob_finalization
 step_records:
   initialization_validation:
     status: completed
@@ -186,3 +206,248 @@ step_records:
         final_screening_csv: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/screening/final_title_abstract_screening.csv
         included_for_full_text_review_csv: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/screening/included_for_full_text_review.csv
         final_report: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/final_title_abstract_screening_report.txt
+  initialization_agent:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:43:56
+    message: 'Recovered from validated artifacts: Initialization Agent drafts are
+      present.'
+    validation:
+      passed: yes
+      message: Initialization Agent drafts are present.
+      files:
+      - config/generated/project_config_draft.yml
+      - config/generated/search_terms_draft.yml
+      - config/generated/initialization_decisions_required.yml
+  prospero_preparation:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:43:57
+    message: 'Recovered from validated artifacts: PROSPERO preparation artifact is
+      present at the active-project canonical path.'
+    validation:
+      passed: yes
+      message: PROSPERO preparation artifact is present at the active-project canonical
+        path.
+      file: C:/Users/Jason/Projects/srma-agent-toolkit/results/registration/prospero/prospero_final.xlsx
+      project_root: C:/Users/Jason/Projects/srma-agent-toolkit
+  full_text_registry:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:00
+    message: 'Recovered from validated artifacts: R/22 full-text registry/intake outputs
+      are complete for the active project.'
+    validation:
+      passed: yes
+      message: R/22 full-text registry/intake outputs are complete for the active
+        project.
+      files:
+        registry_csv: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/full_text/full_text_registry.csv
+        registry_workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/full_text/full_text_registry.xlsx
+        intake_report: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/full_text_registry_intake_report.txt
+  full_text_agent_eligibility:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:00
+    message: 'Recovered from validated artifacts: R/23 Agent full-text eligibility
+      outputs are complete for the active project.'
+    validation:
+      passed: yes
+      message: R/23 Agent full-text eligibility outputs are complete for the active
+        project.
+      files:
+        workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/full_text/full_text_eligibility_agent.xlsx
+        decisions: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/full_text_eligibility_agent_decisions.csv
+        failures: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/full_text_eligibility_agent_failures.csv
+        checkpoint: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/full_text_eligibility_agent_checkpoint.csv
+        report: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/full_text_eligibility_agent_report.txt
+  full_text_author_gate:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:00
+    message: 'Recovered from validated artifacts: 1st Author final full-text eligibility
+      review is complete.'
+    validation:
+      passed: yes
+      message: 1st Author final full-text eligibility review is complete.
+      file: C:/Users/Jason/Projects/srma-agent-toolkit/results/full_text/full_text_eligibility_agent.xlsx
+  final_included_studies:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:00
+    message: 'Recovered from validated artifacts: Authoritative R/24 Included Studies
+      and full-text audit outputs are present for the active project.'
+    validation:
+      passed: yes
+      message: Authoritative R/24 Included Studies and full-text audit outputs are
+        present for the active project.
+      files:
+        included_studies: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/full_text/included_studies.csv
+        final_full_text_eligibility: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/full_text/final_full_text_eligibility.csv
+        excluded_after_full_text: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/full_text/excluded_after_full_text.csv
+  prisma:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:00
+    message: 'Recovered from validated artifacts: PRISMA PDF/PNG and audit are complete
+      for the active project.'
+    validation:
+      passed: yes
+      message: PRISMA PDF/PNG and audit are complete for the active project.
+      files:
+        pdf: C:/Users/Jason/Projects/srma-agent-toolkit/results/prisma/prisma_2020_flow_diagram.pdf
+        png: C:/Users/Jason/Projects/srma-agent-toolkit/results/prisma/prisma_2020_flow_diagram.png
+        audit: C:/Users/Jason/Projects/srma-agent-toolkit/results/prisma/prisma_flow_audit.csv
+  multimodal_extraction:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:00
+    message: 'Recovered from validated artifacts: Multimodal extraction outputs are
+      complete for the active project.'
+    validation:
+      passed: yes
+      message: Multimodal extraction outputs are complete for the active project.
+      files:
+        study: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/extraction/study_characteristics_agent.csv
+        group: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/extraction/group_characteristics_agent.csv
+        outcome: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/extraction/outcome_data_agent.csv
+        workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/multimodal_data_extraction_agent.xlsx
+  manuscript_tables:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:00
+    message: 'Recovered from validated artifacts: Three standard R/34 manuscript tables
+      are complete for the active project.'
+    validation:
+      passed: yes
+      message: Three standard R/34 manuscript tables are complete for the active project.
+      files:
+        table1: C:/Users/Jason/Projects/srma-agent-toolkit/results/manuscript/tables/table1_study_characteristics.csv
+        table2: C:/Users/Jason/Projects/srma-agent-toolkit/results/manuscript/tables/table2_patient_characteristics.csv
+        table3: C:/Users/Jason/Projects/srma-agent-toolkit/results/manuscript/tables/table3_intervention_characteristics.csv
+        workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/manuscript/tables/manuscript_tables_generated.xlsx
+  scope_advisory:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:00
+    message: 'Recovered from validated artifacts: Research Scope Advisory outputs
+      are complete for the active project.'
+    validation:
+      passed: yes
+      message: Research Scope Advisory outputs are complete for the active project.
+      files:
+        json: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/research_scope_advisory/research_scope_advisory.json
+        meta_sets: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/research_scope_advisory/candidate_meta_analysis_sets.csv
+        harmonization: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/research_scope_advisory/outcome_harmonization.csv
+        study_roles: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/research_scope_advisory/study_roles.csv
+  targeted_verification_prep:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:00
+    message: 'Recovered from validated artifacts: Targeted Human Verification workbook
+      is present for the active project.'
+    validation:
+      passed: yes
+      message: Targeted Human Verification workbook is present for the active project.
+      file: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/targeted_human_verification/targeted_human_verification.xlsx
+  extraction_human_gate:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:01
+    message: 'Recovered from validated artifacts: Human Verification of all planned
+      analysis rows is complete.'
+    validation:
+      passed: yes
+      message: Human Verification of all planned analysis rows is complete.
+      file: C:/Users/Jason/Projects/srma-agent-toolkit/results/extraction/targeted_human_verification/targeted_human_verification.xlsx
+  human_verified_finalization:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:01
+    message: 'Recovered from validated artifacts: R/26 canonical manifest, referenced
+      datasets, and final audit workbook are complete.'
+    validation:
+      passed: yes
+      message: R/26 canonical manifest, referenced datasets, and final audit workbook
+        are complete.
+      manifest: C:/Users/Jason/Projects/srma-agent-toolkit/data/processed/meta_analysis_ready/meta_analysis_manifest.csv
+      workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/meta_analysis_ready/meta_analysis_ready_datasets.xlsx
+  meta_analysis:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:01
+    message: 'Recovered from validated artifacts: Meta-analysis completed with no
+      FAIL groups.'
+    validation:
+      passed: yes
+      message: Meta-analysis completed with no FAIL groups.
+      file: C:/Users/Jason/Projects/srma-agent-toolkit/results/meta_analysis/meta_analysis_execution_summary.csv
+  meta_analysis_diagnostics:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:01
+    message: 'Recovered from validated artifacts: R/28 post-meta-analysis diagnostics
+      completed with no FAIL group.'
+    validation:
+      passed: yes
+      message: R/28 post-meta-analysis diagnostics completed with no FAIL group.
+      file: C:/Users/Jason/Projects/srma-agent-toolkit/results/meta_analysis_diagnostics/meta_analysis_diagnostics_summary.csv
+      report: C:/Users/Jason/Projects/srma-agent-toolkit/results/logs/meta_analysis_diagnostics_report.txt
+      workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/meta_analysis_diagnostics/meta_analysis_diagnostics.xlsx
+  additional_analysis:
+    status: skipped
+    started_at: ''
+    completed_at: 2026-08-18 21:44:08
+    message: OPTIONAL branch disabled by Runner option.
+    validation: []
+  forest_plots:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:01
+    message: 'Recovered from validated artifacts: R/33 publication forest/table outputs
+      passed for the active project.'
+    validation:
+      passed: yes
+      message: R/33 publication forest/table outputs passed for the active project.
+      file: C:/Users/Jason/Projects/srma-agent-toolkit/results/meta_analysis/logs/r33_forest_and_tables_report.txt
+  risk_of_bias:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:01
+    message: 'Recovered from validated artifacts: R/36 provisional RoB assessments
+      are complete and the author-review workbook is ready for the active project.'
+    validation:
+      passed: yes
+      message: R/36 provisional RoB assessments are complete and the author-review
+        workbook is ready for the active project.
+      files:
+        manifest: C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/rob_study_result_manifest.csv
+        tasks: C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/rob_agent_tasks.csv
+        assessments: C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/rob_agent_assessments.csv
+        workbook: C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/risk_of_bias_author_editable.xlsx
+        report: C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/rob_validation_report.txt
+  rob_author_gate:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:01
+    message: 'Recovered from validated artifacts: All author-final RoB domain and
+      overall judgements are complete.'
+    validation:
+      passed: yes
+      message: All author-final RoB domain and overall judgements are complete.
+      file: C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/risk_of_bias_author_editable.xlsx
+  rob_finalization:
+    status: completed
+    started_at: ''
+    completed_at: 2026-08-18 21:44:02
+    message: 'Recovered from validated artifacts: Final author-reviewed RoB data and
+      publication figures are complete for the active project.'
+    validation:
+      passed: yes
+      message: Final author-reviewed RoB data and publication figures are complete
+        for the active project.
+      files:
+        combined: C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/risk_of_bias_final.csv
+        report: C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/figures/rob_figure_validation_report.txt
+        rob2_traffic_light: C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/figures/rob2_traffic_light.pdf
+        robins_i_traffic_light: C:/Users/Jason/Projects/srma-agent-toolkit/results/risk_of_bias/figures/robins_i_traffic_light.pdf
