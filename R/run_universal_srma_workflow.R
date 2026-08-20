@@ -1512,17 +1512,79 @@ run_universal_srma_workflow <- function(
 
     post <- if (identical(step$type,"script_success")) runner_validation(TRUE, paste(step$label, "executed successfully."), historical_pass=TRUE) else runner_validate_step(step, paths)
 
-    if (!isTRUE(post$passed)) {
-      # Human/registration preparation may legitimately require a later resume; do not label as analytical failure.
-      if (step$id %in% c("prospero_preparation")) return(runner_pause(state, step, paths, run_log, run_log_file, post$message, post))
-      msg <- post$message
-      state$status <- "failed"; state$last_error <- msg
-      state <- runner_record_step(state, step$id, "failed", started_at=started, completed_at=runner_now(), message=msg, validation=post)
-      runner_write_state(state, paths$state_file)
-      run_log$status <- "failed"; run_log$error <- msg; run_log$completed_at <- runner_now(); run_log$steps[[step$id]] <- list(status="failed", validation=post); yaml::write_yaml(run_log, run_log_file)
-      runner_print_step(index,total,step$label,"FAILED VALIDATION")
-      stop("Step executed but completion validation failed: ", msg, call. = FALSE)
-    }
+  if (!isTRUE(post$passed)) {
+  # Human Decision finalization is an interactive Human Gate.
+  # If finalization remains incomplete after the script returns normally
+  # (for example, because the user cancelled approval), pause safely
+  # instead of treating the workflow as failed.
+  if (identical(step$id, "human_decision_finalization")) {
+    return(
+      runner_pause(
+        state,
+        step,
+        paths,
+        run_log,
+        run_log_file,
+        post$message,
+        post
+      )
+    )
+  }
+
+  # Registration preparation may legitimately require a later resume;
+  # do not label it as an analytical failure.
+  if (identical(step$id, "prospero_preparation")) {
+    return(
+      runner_pause(
+        state,
+        step,
+        paths,
+        run_log,
+        run_log_file,
+        post$message,
+        post
+      )
+    )
+  }
+
+  msg <- post$message
+  state$status <- "failed"
+  state$last_error <- msg
+
+  state <- runner_record_step(
+    state,
+    step$id,
+    "failed",
+    started_at = started,
+    completed_at = runner_now(),
+    message = msg,
+    validation = post
+  )
+
+  runner_write_state(state, paths$state_file)
+
+  run_log$status <- "failed"
+  run_log$error <- msg
+  run_log$completed_at <- runner_now()
+  run_log$steps[[step$id]] <- list(
+    status = "failed",
+    validation = post
+  )
+  yaml::write_yaml(run_log, run_log_file)
+
+  runner_print_step(
+    index,
+    total,
+    step$label,
+    "FAILED VALIDATION"
+  )
+
+  stop(
+    "Step executed but completion validation failed: ",
+    msg,
+    call. = FALSE
+  )
+}
 
     state$current_step <- ""
     state <- runner_record_step(state, step$id, "completed", started_at=started, completed_at=runner_now(), message=post$message, validation=post)
