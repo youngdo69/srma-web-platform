@@ -90,6 +90,100 @@ extract_openai_output_text <- function(response_body) {
   stop("No output_text item was found in the OpenAI response.")
 }
 
+
+sanitize_json_control_characters <- function(x) {
+  if (is.null(x) || length(x) == 0L) return(x)
+
+  if (!is.character(x)) {
+    x <- as.character(x)
+  }
+
+  vapply(
+    x,
+    function(value) {
+      if (is.na(value)) return(NA_character_)
+
+      # Normalize to UTF-8 first. Invalid byte sequences are dropped rather
+      # than propagated into downstream JSON parsing.
+      value <- iconv(value, from = "", to = "UTF-8", sub = "")
+      if (is.na(value)) value <- ""
+
+      bytes <- charToRaw(value)
+      ints <- as.integer(bytes)
+
+      # RFC 8259 permits SP, HTAB, LF and CR as unescaped whitespace.
+      # Remove all other C0 control bytes plus DEL. This guards against
+      # model-output artifacts such as 0x13 appearing inside strings.
+      keep <- !(
+        (ints < 32L & !(ints %in% c(9L, 10L, 13L))) |
+          ints == 127L
+      )
+
+      rawToChar(bytes[keep], multiple = FALSE)
+    },
+    FUN.VALUE = character(1),
+    USE.NAMES = FALSE
+  )
+}
+
+parse_openai_structured_output_json <- function(output_text) {
+  if (!is.character(output_text) || length(output_text) != 1L || is.na(output_text)) {
+    stop("OpenAI output_text must be one non-missing character string.")
+  }
+
+  # First parse the exact model output unchanged. This preserves strict
+  # behavior for normal responses and uses sanitization only as a fallback.
+  parsed <- tryCatch(
+    jsonlite::fromJSON(
+      output_text,
+      simplifyVector = FALSE
+    ),
+    error = function(e) e
+  )
+
+  if (!inherits(parsed, "error")) {
+    return(parsed)
+  }
+
+  sanitized <- sanitize_json_control_characters(output_text)
+
+  # If sanitization made no change, retain the original parse error because
+  # the failure is not attributable to removable control characters.
+  if (identical(sanitized, output_text)) {
+    stop(
+      "Failed to parse OpenAI structured output JSON: ",
+      conditionMessage(parsed),
+      call. = FALSE
+    )
+  }
+
+  reparsed <- tryCatch(
+    jsonlite::fromJSON(
+      sanitized,
+      simplifyVector = FALSE
+    ),
+    error = function(e) e
+  )
+
+  if (inherits(reparsed, "error")) {
+    stop(
+      "Failed to parse OpenAI structured output JSON after removing invalid ",
+      "control characters. Original error: ", conditionMessage(parsed),
+      "\nSanitized parse error: ", conditionMessage(reparsed),
+      call. = FALSE
+    )
+  }
+
+  warning(
+    "OpenAI structured output contained invalid control character(s); ",
+    "they were removed before JSON parsing. The exact raw model output ",
+    "remains available in raw_output_text.",
+    call. = FALSE
+  )
+
+  reparsed
+}
+
 call_openai_structured_screening <- function(
     prompt,
     model,
@@ -165,10 +259,9 @@ call_openai_structured_screening <- function(
   output_text <- extract_openai_output_text(response_body)
 
   # Preserve nested schema records (e.g., option_patches) exactly.
-  parsed <- jsonlite::fromJSON(
-    output_text,
-    simplifyVector = FALSE
-  )
+  # Parse the exact model output first; if JSON parsing fails solely because
+  # of invalid control bytes, sanitize those bytes and retry once.
+  parsed <- parse_openai_structured_output_json(output_text)
 
   list(
     parsed = parsed,
