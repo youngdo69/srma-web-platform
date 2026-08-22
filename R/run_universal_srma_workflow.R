@@ -1424,12 +1424,37 @@ run_universal_srma_workflow <- function(
 
     runner_print_step(index, total, step$label)
     started <- runner_now()
-    state$current_step <- step$id
-    runner_write_state(state, paths$state_file)
+  state$current_step <- step$id
+  runner_write_state(state, paths$state_file)
 
-    if (identical(step$type, "gate")) {
-      return(runner_pause(state, step, paths, run_log, run_log_file, pre$message, pre))
-    }
+  # PROSPERO preparation requires genuine interactive terminal input.
+  # Do not launch it as a child Rscript process from inside the Runner,
+  # because stdin may not be available and readline() can loop indefinitely.
+  # A prepared canonical artifact or existing-registration evidence is
+  # recovered above before this point.
+  if (identical(step$id, "prospero_preparation")) {
+    return(
+      runner_pause(
+        state,
+        step,
+        paths,
+        run_log,
+        run_log_file,
+        paste(
+          pre$message,
+          "PROSPERO preparation requires interactive user input.",
+          "From the repository root, run:",
+          "Rscript --vanilla R/create_and_autofill_prospero.R",
+          "Then rerun the same Universal Runner."
+        ),
+        pre
+      )
+    )
+  }
+
+  if (identical(step$type, "gate")) {
+    return(runner_pause(state, step, paths, run_log, run_log_file, pre$message, pre))
+  }
 
     if (identical(step$type, "r29")) {
       # SERVICE: route uploaded files only when explicitly supplied and an active R/29 exists.

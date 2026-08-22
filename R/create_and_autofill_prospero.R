@@ -462,7 +462,12 @@ if (!ask_yes_no("[Yes/No]: ")) {
 }
 
 template_path <- file.path(repo_root,"templates","registration","Universal_PROSPERO_Form_Template.xlsx")
-out_dir <- file.path(project_dir,"registration","prospero")
+out_dir <- file.path(
+  repo_root,
+  "results",
+  "registration",
+  "prospero"
+)
 dir.create(out_dir,recursive=TRUE,showWarnings=FALSE)
 autofilled_path <- file.path(out_dir,"prospero_autofilled.xlsx")
 final_path <- file.path(out_dir,"prospero_final.xlsx")
