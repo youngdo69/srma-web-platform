@@ -43,3 +43,28 @@ data/raw_confidential/
 
 # Generated large outputs
 outputs/cache/
+
+# BEGIN SRMA UNIVERSAL RUNTIME IGNORE
+# Secrets
+.env
+!.env.example
+
+# Active-project configuration generated during use
+config/project_config.yml
+config/search_terms.yml
+config/generated/
+config/archive/
+config/generated_schema_v2_archive/
+
+# Project/runtime artifacts generated during use
+data/
+results/
+projects/
+search_strategies/
+
+# Generated release/test artifacts
+dist/
+.task017_backups/
+# END SRMA UNIVERSAL RUNTIME IGNORE
+
+Projects/

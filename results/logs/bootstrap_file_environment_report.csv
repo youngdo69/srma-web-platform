@@ -1,9 +1,0 @@
-"file","exists"
-"config/project_seed.yml",TRUE
-"config/initialization_agent.yml",TRUE
-"prompts/project_initialization_prompt.md",TRUE
-"R/00_run_project_initialization_agent.R",TRUE
-"R/01_validate_project_initialization.R",TRUE
-"R/02_activate_project_configuration.R",TRUE
-"R/utils/initialization_prompt_utils.R",TRUE
-"R/utils/llm_provider_utils.R",TRUE

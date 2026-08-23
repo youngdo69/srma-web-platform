@@ -1,9 +1,0 @@
-screening_id,verification_tier,meta_analysis_role
-SCR_000083,Tier 1,Primary meta-analysis
-SCR_000024,Tier 1,Primary meta-analysis
-SCR_000012,Tier 1,Primary meta-analysis
-SCR_000098,Tier 1,Primary meta-analysis
-SCR_000118,Tier 3,Observational secondary analysis
-SCR_000096,Tier 3,Observational secondary analysis
-SCR_000113,Tier 3,Observational secondary analysis
-SCR_000003,Audit,Overlap / duplicate-cohort audit only

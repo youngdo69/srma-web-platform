@@ -1,3 +1,0 @@
-database,platform,search_file,test_date,record_count,request_successful,query_translation_available,api_key_used,email_supplied,response_file,notes,searcher
-PubMed,NCBI PubMed,search_strategies/pubmed_search.txt,2026-07-29 22:54:46.151718,131,TRUE,TRUE,FALSE,FALSE,results/logs/pubmed_esearch_response.json,The search was accepted by PubMed.,
-CENTRAL,Cochrane Library,search_strategies/central_search.txt,2026-07-30 01:27:06,53,TRUE,FALSE,FALSE,FALSE,results/logs/central_live_search_test.txt,The search was accepted by the CENTRAL interface.,Jason
