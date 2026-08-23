@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-cat("PROSPERO MODULE VERSION: 2026-08-15-AUTO-PROJECT-v2\n")
+cat("PROSPERO MODULE VERSION: 2026-08-22-UNIVERSAL-HARDENED-v1\n")
 
 suppressPackageStartupMessages({
   library(openxlsx)
@@ -9,94 +9,136 @@ suppressPackageStartupMessages({
 
 find_repo_root <- function(start = getwd()) {
   current <- normalizePath(start, winslash = "/", mustWork = TRUE)
+
   repeat {
-    if (dir.exists(file.path(current, "templates")) &&
-        dir.exists(file.path(current, "projects"))) return(current)
+    markers_ok <- all(file.exists(c(
+      file.path(current, "R", "run_universal_srma_workflow.R"),
+      file.path(current, "R", "utils", "config_utils.R"),
+      file.path(current, "R", "utils", "path_utils.R")
+    )))
+
+    directories_ok <- dir.exists(file.path(current, "config")) &&
+      dir.exists(file.path(current, "templates"))
+
+    if (markers_ok && directories_ok) return(current)
+
     parent <- dirname(current)
-    if (identical(parent, current)) stop("Could not find toolkit root.")
+    if (identical(parent, current)) {
+      stop(
+        "Could not find the Universal SR-MA Toolkit root.
+",
+        "Run this module from inside the repository.",
+        call. = FALSE
+      )
+    }
+
     current <- parent
   }
 }
 
 ask_yes_no <- function(prompt) {
+  if (!interactive()) {
+    stop(
+      "PROSPERO preparation requires an interactive R/RStudio console.\n",
+      'From the repository root run: source("R/create_and_autofill_prospero.R")',
+      call. = FALSE
+    )
+  }
+
+  prompt <- trimws(prompt)
+  prompt <- sub("\\s*\\[Yes/No\\]:?\\s*$", "", prompt, ignore.case = TRUE)
+
+  if (nzchar(prompt)) {
+    cat("\n", prompt, "\n", sep = "")
+  }
+
   repeat {
-    ans <- trimws(tolower(readline(prompt)))
-    if (ans %in% c("y","yes","예","네")) return(TRUE)
-    if (ans %in% c("n","no","아니오","아니요")) return(FALSE)
+    ans <- trimws(tolower(readline("Response [Yes/No]: ")))
+
+    if (ans %in% c("y", "yes", "예", "네")) return(TRUE)
+    if (ans %in% c("n", "no", "아니오", "아니요")) return(FALSE)
+
     cat("Please enter Yes or No.\n")
   }
 }
 
 detect_project <- function(repo_root) {
-  projects_root <- file.path(repo_root, "projects")
-  wd <- normalizePath(getwd(), winslash = "/", mustWork = TRUE)
-  pr <- normalizePath(projects_root, winslash = "/", mustWork = TRUE)
+  config_path <- file.path(repo_root, "config", "project_config.yml")
 
-  # 1. Current working directory is inside projects/<project>
-  prefix <- paste0(pr, "/")
-  if (startsWith(wd, prefix)) {
-    rel <- substring(wd, nchar(prefix) + 1)
-    parts <- strsplit(rel, "/", fixed = TRUE)[[1]]
-    if (length(parts) >= 1 && nzchar(parts[[1]])) {
-      cand <- parts[[1]]
-      if (dir.exists(file.path(projects_root, cand))) {
-        cat("Project detected from working directory: ", cand, "\n", sep = "")
-        return(cand)
+  if (!file.exists(config_path)) {
+    stop(
+      "Canonical active project configuration was not found: ",
+      config_path,
+      call. = FALSE
+    )
+  }
+
+  cfg <- yaml::read_yaml(config_path)
+  project_id <- ""
+
+  candidates <- list(
+    cfg$project$project_id,
+    cfg$project$id,
+    cfg$project_id,
+    cfg$id
+  )
+
+  for (candidate in candidates) {
+    if (!is.null(candidate) && length(candidate) > 0L) {
+      value <- trimws(as.character(candidate[[1]]))
+      if (nzchar(value)) {
+        project_id <- value
+        break
       }
     }
   }
 
-  # 2. Enumerate project folders
-  entries <- list.dirs(projects_root, full.names = FALSE, recursive = FALSE)
-  entries <- entries[nzchar(entries)]
-  entries <- entries[!tolower(entries) %in% c(
-    "archive","archived","_archive","_templates","template","templates"
-  )]
-
-  if (length(entries) == 0) stop("No project folders found under projects/.")
-
-  if (length(entries) == 1) {
-    cat("Project detected: ", entries[[1]], "\n", sep = "")
-    return(entries[[1]])
-  }
-
-  cat("\nAvailable SR-MA projects:\n\n")
-  for (i in seq_along(entries)) {
-    cat(sprintf("  %d. %s\n", i, entries[[i]]))
-  }
-
-  repeat {
-    ans <- trimws(readline(sprintf("\nSelect project [1-%d]: ", length(entries))))
-    idx <- suppressWarnings(as.integer(ans))
-    if (!is.na(idx) && idx >= 1 && idx <= length(entries)) {
-      cat("Selected project: ", entries[[idx]], "\n", sep = "")
-      return(entries[[idx]])
-    }
-    cat("Please enter one of the project numbers shown above.\n")
-  }
+  if (!nzchar(project_id)) project_id <- "active_project"
+  project_id
 }
 
 # --- Load the full module from previous canonical implementation if present ---
 # To keep this file self-contained, the rest of the functions are defined below.
 
+sanitize_prospero_text <- function(x) {
+  if (is.null(x) || length(x) == 0L) return("")
+
+  x <- paste(as.character(x), collapse = " ")
+  x <- iconv(x, from = "", to = "UTF-8", sub = " ")
+  if (is.na(x)) x <- ""
+
+  # Replace invalid C0/DEL controls before trimws(), nchar(), regex, or Excel I/O.
+  x <- gsub(
+    "[\\x01-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]",
+    " ",
+    x,
+    perl = TRUE
+  )
+
+  x <- gsub("[\t\r\n]+", " ", x, perl = TRUE)
+  x <- gsub(" {2,}", " ", x, perl = TRUE)
+  trimws(x)
+}
+
 is_blank <- function(x) {
-  is.null(x) || length(x) == 0 || all(is.na(x)) ||
-    !nzchar(trimws(paste(x, collapse = "")))
+  !nzchar(sanitize_prospero_text(x))
 }
 
 value_to_text <- function(x) {
-  if (is_blank(x)) return("")
-  if (is.atomic(x) && length(x) == 1) return(as.character(x))
+  if (is.null(x) || length(x) == 0L) return("")
+
   if (is.atomic(x)) {
     x <- x[!is.na(x)]
-    return(paste(as.character(x), collapse = "; "))
+    return(sanitize_prospero_text(x))
   }
+
   if (is.list(x)) {
     flat <- unlist(x, recursive = TRUE, use.names = FALSE)
     flat <- flat[!is.na(flat)]
-    return(paste(as.character(flat), collapse = "; "))
+    return(sanitize_prospero_text(flat))
   }
-  as.character(x)
+
+  sanitize_prospero_text(as.character(x))
 }
 
 get_nested_value <- function(x, dotted_path) {
@@ -123,40 +165,120 @@ parse_sheet_cell <- function(ref) {
 cell_row <- function(cell) as.integer(gsub("[^0-9]", "", cell))
 cell_col <- function(cell) openxlsx::convertFromExcelRef(gsub("[^A-Za-z]", "", cell))
 
-read_project_config <- function(repo_root, project_slug) {
-  candidates <- c(
-    file.path(repo_root, "projects", project_slug, "config", "project_config.yml"),
-    file.path(repo_root, "config", "project_config.yml")
+read_project_config <- function(repo_root, project_slug = NULL) {
+  config_path <- file.path(repo_root, "config", "project_config.yml")
+
+  if (!file.exists(config_path)) {
+    stop(
+      "Canonical active project_config.yml was not found: ",
+      config_path,
+      call. = FALSE
+    )
+  }
+
+  cat(
+    "Using canonical active config: ",
+    normalizePath(config_path, winslash = "/", mustWork = TRUE),
+    "
+",
+    sep = ""
   )
-  hits <- candidates[file.exists(candidates)]
-  if (length(hits) == 0) stop("project_config.yml was not found.")
-  config_path <- hits[[1]]
-  cat("Using config: ", normalizePath(config_path, winslash="/", mustWork=TRUE), "\n", sep="")
-  list(path=config_path, data=yaml::read_yaml(config_path))
+
+  list(
+    path = config_path,
+    data = yaml::read_yaml(config_path)
+  )
 }
 
-read_text_safely <- function(path, max_chars=30000) {
-  txt <- tryCatch(paste(readLines(path, warn=FALSE, encoding="UTF-8"), collapse="\n"),
-                  error=function(e) "")
-  substr(txt, 1, min(nchar(txt), max_chars))
+read_text_safely <- function(path, max_chars = 30000) {
+  lines <- tryCatch(
+    readLines(
+      path,
+      warn = FALSE,
+      encoding = "UTF-8",
+      skipNul = TRUE
+    ),
+    error = function(e) character(0)
+  )
+
+  if (length(lines) == 0L) return("")
+
+  # Normalize every line before nchar()/substr()/trimws().
+  lines <- iconv(lines, from = "UTF-8", to = "UTF-8", sub = " ")
+  lines[is.na(lines)] <- ""
+
+  txt <- sanitize_prospero_text(paste(lines, collapse = "
+"))
+
+  n <- nchar(txt, type = "chars", allowNA = TRUE, keepNA = FALSE)
+  if (!is.finite(n)) n <- 0L
+
+  if (n > max_chars) txt <- substr(txt, 1L, max_chars)
+  txt
 }
 
 collect_project_text <- function(project_dir) {
-  dirs <- c(project_dir, file.path(project_dir,"protocol"),
-            file.path(project_dir,"plans"), file.path(project_dir,"search"),
-            file.path(project_dir,"config"))
-  dirs <- dirs[dir.exists(dirs)]
-  files <- unique(unlist(lapply(dirs, function(d)
-    list.files(d, pattern="\\.(md|txt|yml|yaml)$", recursive=TRUE,
-               full.names=TRUE, ignore.case=TRUE))))
-  files <- files[!grepl("[/\\\\]registration[/\\\\]prospero[/\\\\]", files, ignore.case=TRUE)]
-  if (!length(files)) return("")
-  paste(vapply(files, function(f)
-    paste0("\n### FILE: ", basename(f), "\n", read_text_safely(f)),
-    character(1)), collapse="\n")
+  # Automation context is deliberately bounded to the ACTIVE project root.
+  # Never recurse through data/, results/, projects/, tasks/, reviews/, or archives.
+  directory_candidates <- c(
+    file.path(project_dir, "protocol"),
+    file.path(project_dir, "plans")
+  )
+
+  directory_candidates <- directory_candidates[
+    dir.exists(directory_candidates)
+  ]
+
+  files <- character(0)
+
+  if (length(directory_candidates) > 0L) {
+    files <- unique(unlist(lapply(
+      directory_candidates,
+      function(d) {
+        list.files(
+          d,
+          pattern = "\\.(md|txt|yml|yaml)$",
+          recursive = TRUE,
+          full.names = TRUE,
+          ignore.case = TRUE
+        )
+      }
+    )))
+  }
+
+  root_candidates <- file.path(
+    project_dir,
+    c(
+      "README.md",
+      "PROTOCOL.md",
+      "protocol.md",
+      "config/project_seed.yml"
+    )
+  )
+
+  files <- unique(c(files, root_candidates[file.exists(root_candidates)]))
+
+  if (length(files) == 0L) return("")
+
+  blocks <- vapply(
+    files,
+    function(f) {
+      txt <- read_text_safely(f)
+      if (!nzchar(txt)) return("")
+      paste0("
+### FILE: ", basename(f), "
+", txt)
+    },
+    character(1)
+  )
+
+  paste(blocks[nzchar(blocks)], collapse = "
+")
 }
 
 extract_after_label <- function(text, labels, max_chars=2500) {
+  text <- sanitize_prospero_text(text)
+  labels <- vapply(labels, sanitize_prospero_text, character(1))
   if (!nzchar(text)) return("")
   lines <- unlist(strsplit(text, "\n", fixed=TRUE))
   low <- tolower(lines)
@@ -432,7 +554,8 @@ autofill_prospero <- function(template_path, output_path, info) {
       txt <- value_to_text(info[[key]])
     }
 
-    status <- if (nzchar(txt) && !grepl("^AUTHOR CHECK REQUIRED:",txt)) "AUTO" else "USER REQUIRED"
+    txt <- sanitize_prospero_text(txt)
+    status <- if (nzchar(txt) && !grepl("^AUTHOR CHECK REQUIRED:", txt)) "AUTO" else "USER REQUIRED"
 
     if (nzchar(txt)) {
       writeData(wb,ref$sheet,txt,startCol=cell_col(ref$cell),startRow=cell_row(ref$cell),
@@ -449,54 +572,172 @@ autofill_prospero <- function(template_path, output_path, info) {
 }
 
 # MAIN
-repo_root <- find_repo_root()
-project_slug <- detect_project(repo_root)
-project_dir <- file.path(repo_root,"projects",project_slug)
+run_prospero_preparation <- function() {
+  repo_root <- find_repo_root()
 
-cat("\nPROSPERO 등록을 먼저 하는 것이 순서입니다. 등록에 필요한 정보 준비를 진행하시겠습니까? ",
-    "만약 이미 https://www.crd.york.ac.uk/prospero/ 에 등록을 진행하셨다면 No 를 선택하세요.\n", sep="")
+  old_wd <- getwd()
+  on.exit(setwd(old_wd), add = TRUE)
+  setwd(repo_root)
 
-if (!ask_yes_no("[Yes/No]: ")) {
-  cat("PROSPERO preparation skipped. You may continue to the search step.\n")
-  quit(save="no",status=0)
-}
+  source("R/utils/config_utils.R")
+  source("R/utils/path_utils.R")
 
-template_path <- file.path(repo_root,"templates","registration","Universal_PROSPERO_Form_Template.xlsx")
-out_dir <- file.path(
-  repo_root,
-  "results",
-  "registration",
-  "prospero"
-)
-dir.create(out_dir,recursive=TRUE,showWarnings=FALSE)
-autofilled_path <- file.path(out_dir,"prospero_autofilled.xlsx")
-final_path <- file.path(out_dir,"prospero_final.xlsx")
+  config <- load_project_config(
+    "config/project_config.yml",
+    validate = TRUE,
+    quiet = FALSE
+  )
 
-cat("\nCreating canonical PROSPERO template...\n")
-create_prospero_template(template_path)
-cat("PASS: template created and re-opened successfully.\n")
+  paths <- build_project_paths(
+    config = config,
+    create_directories = TRUE,
+    validate = TRUE
+  )
 
-cfg <- read_project_config(repo_root,project_slug)
-project_text <- collect_project_text(project_dir)
-info <- infer_project_information(cfg$data,project_text)
+  project_slug <- get_project_id(config)
+  project_dir <- paths$project_root
 
-cat("Creating near-complete PROSPERO draft...\n")
-summary <- autofill_prospero(template_path,autofilled_path,info)
+  cat(
+    "\nActive project: ",
+    project_slug,
+    "\nProject root: ",
+    project_dir,
+    "\n",
+    sep = ""
+  )
 
-cat("\nPROSPERO AUTO-FILL SUMMARY\n")
-cat("Project: ",project_slug,"\n",sep="")
-cat("AUTO: ",summary$auto,"\n",sep="")
-cat("USER REQUIRED: ",summary$user_required,"\n",sep="")
-cat("SYSTEM OUTPUT: ",summary$system_output,"\n",sep="")
-cat("Created: ",normalizePath(autofilled_path,winslash="/",mustWork=TRUE),"\n",sep="")
+  cat(
+    "\nPROSPERO 등록을 먼저 하는 것이 순서입니다. ",
+    "등록에 필요한 정보 준비를 진행하시겠습니까? ",
+    "만약 이미 PROSPERO 등록을 진행하셨다면 No 를 선택하세요.\n",
+    sep = ""
+  )
 
-cat("\nPlease review the draft. If you edit an AUTO answer, change its status to 'AUTO + EDITED'.\n")
+  if (!ask_yes_no("[Yes/No]: ")) {
+    cat(
+      "PROSPERO preparation not regenerated. ",
+      "If registration already exists, record its CRD identifier in the canonical active config.\n",
+      sep = ""
+    )
+    return(invisible(FALSE))
+  }
 
-if (ask_yes_no("\n이 내용을 실제 PROSPERO 등록에 사용할 최종 양식으로 확정하시겠습니까? [Yes/No]: ")) {
-  file.copy(autofilled_path,final_path,overwrite=TRUE)
+  template_path <- file.path(
+    repo_root,
+    "templates",
+    "registration",
+    "Universal_PROSPERO_Form_Template.xlsx"
+  )
+
+  out_dir <- file.path(
+    paths$project_root,
+    "results",
+    "registration",
+    "prospero"
+  )
+
+  dir.create(
+    out_dir,
+    recursive = TRUE,
+    showWarnings = FALSE
+  )
+
+  autofilled_path <- file.path(
+    out_dir,
+    "prospero_autofilled.xlsx"
+  )
+
+  final_path <- file.path(
+    out_dir,
+    "prospero_final.xlsx"
+  )
+
+  cat("\nCreating canonical PROSPERO template...\n")
+  create_prospero_template(template_path)
+  cat("PASS: template created and re-opened successfully.\n")
+
+  cfg <- read_project_config(repo_root, project_slug)
+
+  # Use canonical config first, supplemented only by bounded ACTIVE-project
+  # planning context. No repository-wide or foreign-project discovery.
+  project_text <- collect_project_text(paths$project_root)
+  info <- infer_project_information(cfg$data, project_text)
+
+  if (file.exists(autofilled_path)) {
+    overwrite <- ask_yes_no(
+      "\nprospero_autofilled.xlsx already exists. Overwrite it? [Yes/No]: "
+    )
+
+    if (!overwrite) {
+      cat("Existing PROSPERO draft preserved. No changes were made.\n")
+      return(invisible(FALSE))
+    }
+  }
+
+  cat("Creating near-complete PROSPERO draft...\n")
+
+  summary <- autofill_prospero(
+    template_path,
+    autofilled_path,
+    info
+  )
+
+  cat("\nPROSPERO AUTO-FILL SUMMARY\n")
+  cat("Project: ", project_slug, "\n", sep = "")
+  cat("AUTO: ", summary$auto, "\n", sep = "")
+  cat("USER REQUIRED: ", summary$user_required, "\n", sep = "")
+  cat("SYSTEM OUTPUT: ", summary$system_output, "\n", sep = "")
+  cat(
+    "Created: ",
+    normalizePath(autofilled_path, winslash = "/", mustWork = TRUE),
+    "\n",
+    sep = ""
+  )
+
+  cat(
+    "\nThe toolkit has auto-filled all defensible fields from canonical ",
+    "project configuration, universal methodological defaults, and bounded ",
+    "active-project context. Review only the remaining USER REQUIRED items ",
+    "or any AUTO field you wish to override.\n",
+    sep = ""
+  )
+
+  finalize <- ask_yes_no(
+    paste0(
+      "\n이 내용을 실제 PROSPERO 등록에 사용할 최종 양식으로 ",
+      "확정하시겠습니까? [Yes/No]: "
+    )
+  )
+
+  if (!finalize) {
+    cat("Working file kept for further editing.\n")
+    return(invisible(FALSE))
+  }
+
+  ok <- file.copy(
+    autofilled_path,
+    final_path,
+    overwrite = TRUE
+  )
+
+  if (!isTRUE(ok) || !file.exists(final_path)) {
+    stop("Failed to create prospero_final.xlsx.", call. = FALSE)
+  }
+
   invisible(loadWorkbook(final_path))
+
   cat("PASS: prospero_final.xlsx created.\n")
-  cat("Please register directly at https://www.crd.york.ac.uk/prospero/\n")
-} else {
-  cat("Working file kept for further editing.\n")
+  cat(
+    "Canonical artifact: ",
+    normalizePath(final_path, winslash = "/", mustWork = TRUE),
+    "\n",
+    sep = ""
+  )
+  cat(
+    "Please register directly at https://www.crd.york.ac.uk/prospero/\n"
+  )
+
+  invisible(TRUE)
 }
+
+run_prospero_preparation()

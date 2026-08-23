@@ -15,6 +15,83 @@ hd_as_character_vector <- function(x) {
   as.character(unlist(x, recursive = TRUE, use.names = FALSE))
 }
 
+hd_sanitize_json_control_characters <- function(x) {
+  if (is.null(x) || length(x) == 0L) return(x)
+
+  x <- as.character(x)
+
+  vapply(
+    x,
+    function(value) {
+      if (is.na(value)) return(NA_character_)
+
+      value <- iconv(value, from = "", to = "UTF-8", sub = "")
+      if (is.na(value)) value <- ""
+
+      bytes <- charToRaw(value)
+      ints <- as.integer(bytes)
+
+      if (length(ints) == 0L) return("")
+
+      out <- raw(0L)
+      in_string <- FALSE
+      escaped <- FALSE
+
+      for (i in seq_along(ints)) {
+        b <- ints[[i]]
+
+        if (in_string) {
+          if (escaped) {
+            out <- c(out, as.raw(b))
+            escaped <- FALSE
+            next
+          }
+
+          if (b == 92L) {  # backslash
+            out <- c(out, as.raw(b))
+            escaped <- TRUE
+            next
+          }
+
+          if (b == 34L) {  # double quote
+            out <- c(out, as.raw(b))
+            in_string <- FALSE
+            next
+          }
+
+          # JSON forbids unescaped U+0000-U+001F inside strings.
+          # Replace with a single space so adjacent words do not collapse.
+          if (b < 32L) {
+            out <- c(out, charToRaw(" "))
+            next
+          }
+
+          out <- c(out, as.raw(b))
+          next
+        }
+
+        if (b == 34L) {  # opening double quote
+          out <- c(out, as.raw(b))
+          in_string <- TRUE
+          escaped <- FALSE
+          next
+        }
+
+        # Outside strings, preserve standard JSON whitespace only.
+        if (b < 32L && !(b %in% c(9L, 10L, 13L))) {
+          next
+        }
+
+        out <- c(out, as.raw(b))
+      }
+
+      rawToChar(out, multiple = FALSE)
+    },
+    FUN.VALUE = character(1),
+    USE.NAMES = FALSE
+  )
+}
+
 hd_decode_json_value <- function(value_json) {
   if (is.null(value_json) || length(value_json) == 0L) {
     return(NULL)
@@ -26,10 +103,54 @@ hd_decode_json_value <- function(value_json) {
     return(NULL)
   }
 
-  jsonlite::fromJSON(
-    value_json,
-    simplifyVector = FALSE
+  parsed <- tryCatch(
+    jsonlite::fromJSON(
+      value_json,
+      simplifyVector = FALSE
+    ),
+    error = function(e) e
   )
+
+  if (!inherits(parsed, "error")) {
+    return(parsed)
+  }
+
+  sanitized <- hd_sanitize_json_control_characters(value_json)
+
+  if (identical(sanitized, value_json)) {
+    stop(
+      "Failed to decode Human Decision JSON patch value: ",
+      conditionMessage(parsed),
+      call. = FALSE
+    )
+  }
+
+  reparsed <- tryCatch(
+    jsonlite::fromJSON(
+      sanitized,
+      simplifyVector = FALSE
+    ),
+    error = function(e) e
+  )
+
+  if (inherits(reparsed, "error")) {
+    stop(
+      "Failed to decode Human Decision JSON patch value after removing ",
+      "invalid control characters. Original error: ",
+      conditionMessage(parsed),
+      "\nSanitized parse error: ",
+      conditionMessage(reparsed),
+      call. = FALSE
+    )
+  }
+
+  warning(
+    "A Human Decision JSON patch value contained invalid control ",
+    "character(s); they were replaced with spaces before JSON decoding.",
+    call. = FALSE
+  )
+
+  reparsed
 }
 
 normalize_hd_operation_records <- function(x) {

@@ -632,29 +632,140 @@ runner_validate_pubmed <- function(paths) {
 
 runner_validate_database_inputs <- function(paths) {
   context <- runner_project_context_or_null()
-  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+  if (is.null(context)) {
+    return(
+      runner_validation(
+        FALSE,
+        "Canonical active-project context could not be resolved."
+      )
+    )
+  }
 
   enabled <- tryCatch(
-    context$environment$get_enabled_databases(context$config, validate = FALSE),
+    context$environment$get_enabled_databases(
+      context$config,
+      validate = FALSE
+    ),
     error = function(e) character(0)
   )
-  enabled <- tolower(runner_as_character_vector(enabled))
+
+  enabled <- tolower(
+    runner_as_character_vector(enabled)
+  )
 
   input_map <- c(
     pubmed = context$paths$pubmed_csv,
     embase = context$paths$embase_ris,
     central = context$paths$central_ris
   )
-  supported <- intersect(enabled, names(input_map))
-  if (length(supported) == 0L) return(runner_validation(FALSE, "No supported database inputs are enabled."))
+
+  strategy_map <- c(
+    pubmed = context$paths$pubmed_search,
+    embase = context$paths$embase_search,
+    central = context$paths$central_search
+  )
+
+  supported <- intersect(
+    enabled,
+    names(input_map)
+  )
+
+  if (length(supported) == 0L) {
+    return(
+      runner_validation(
+        FALSE,
+        "No supported database inputs are enabled."
+      )
+    )
+  }
 
   required_files <- input_map[supported]
-  ok <- vapply(required_files, runner_file_nonempty, logical(1))
+  present <- vapply(
+    required_files,
+    runner_file_nonempty,
+    logical(1)
+  )
+
+  if (all(present)) {
+    return(
+      runner_validation(
+        TRUE,
+        paste(
+          "All enabled database inputs are present:",
+          paste(supported, collapse = ", ")
+        ),
+        enabled_databases = as.list(enabled),
+        files = as.list(required_files)
+      )
+    )
+  }
+
+  missing <- names(required_files)[!present]
+
+  if ("pubmed" %in% missing) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "Canonical PubMed input is unexpectedly missing after",
+          "the PubMed download stage:",
+          required_files[["pubmed"]]
+        ),
+        enabled_databases = as.list(enabled),
+        files = as.list(required_files)
+      )
+    )
+  }
+
+  manual_missing <- intersect(
+    missing,
+    c("embase", "central")
+  )
+
+  handoff <- c(
+    "Manual database retrieval/export is required.",
+    "",
+    "The toolkit has already generated the database-specific search strategies.",
+    "Open or copy the query from the path shown below, run it in the database,",
+    "then export RIS to the canonical destination shown below.",
+    ""
+  )
+
+  for (db in manual_missing) {
+    strategy <- strategy_map[[db]]
+    destination <- required_files[[db]]
+
+    handoff <- c(
+      handoff,
+      toupper(db),
+      paste0(
+        "Search strategy:",
+        "\n  ",
+        runner_normalize_slash(strategy)
+      ),
+      paste0(
+        "Export RIS to:",
+        "\n  ",
+        runner_normalize_slash(destination)
+      ),
+      ""
+    )
+  }
+
+  handoff <- c(
+    handoff,
+    "After all required RIS files have been exported, rerun:",
+    '  source("R/run_universal_srma_workflow.R")'
+  )
+
   runner_validation(
-    all(ok),
-    if (all(ok)) paste("All enabled database inputs are present:", paste(supported, collapse = ", ")) else paste("Missing enabled database input(s):", paste(paste0(names(required_files)[!ok], " -> ", required_files[!ok]), collapse = "; ")),
+    FALSE,
+    paste(handoff, collapse = "\n"),
     enabled_databases = as.list(enabled),
-    files = as.list(required_files)
+    files = as.list(required_files),
+    search_strategies = as.list(
+      strategy_map[manual_missing]
+    )
   )
 }
 
@@ -1444,7 +1555,7 @@ run_universal_srma_workflow <- function(
           pre$message,
           "PROSPERO preparation requires interactive user input.",
           "From the repository root, run:",
-          "Rscript --vanilla R/create_and_autofill_prospero.R",
+          'source("R/create_and_autofill_prospero.R")',
           "Then rerun the same Universal Runner."
         ),
         pre

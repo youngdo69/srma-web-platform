@@ -103,23 +103,70 @@ sanitize_json_control_characters <- function(x) {
     function(value) {
       if (is.na(value)) return(NA_character_)
 
-      # Normalize to UTF-8 first. Invalid byte sequences are dropped rather
-      # than propagated into downstream JSON parsing.
       value <- iconv(value, from = "", to = "UTF-8", sub = "")
       if (is.na(value)) value <- ""
 
       bytes <- charToRaw(value)
       ints <- as.integer(bytes)
 
-      # RFC 8259 permits SP, HTAB, LF and CR as unescaped whitespace.
-      # Remove all other C0 control bytes plus DEL. This guards against
-      # model-output artifacts such as 0x13 appearing inside strings.
-      keep <- !(
-        (ints < 32L & !(ints %in% c(9L, 10L, 13L))) |
-          ints == 127L
-      )
+      if (length(ints) == 0L) return("")
 
-      rawToChar(bytes[keep], multiple = FALSE)
+      out <- raw(0L)
+      in_string <- FALSE
+      escaped <- FALSE
+
+      for (i in seq_along(ints)) {
+        b <- ints[[i]]
+
+        if (in_string) {
+          if (escaped) {
+            # This byte belongs to a JSON escape sequence. Keep it unchanged.
+            out <- c(out, as.raw(b))
+            escaped <- FALSE
+            next
+          }
+
+          if (b == 92L) {  # backslash
+            out <- c(out, as.raw(b))
+            escaped <- TRUE
+            next
+          }
+
+          if (b == 34L) {  # double quote
+            out <- c(out, as.raw(b))
+            in_string <- FALSE
+            next
+          }
+
+          if (b < 32L) {
+            # Unescaped U+0000-U+001F is forbidden inside JSON strings.
+            # Replace it with a single ASCII space so adjacent words do not
+            # collapse (e.g. "pre<control>post" -> "pre post").
+            out <- c(out, charToRaw(" "))
+            next
+          }
+
+          out <- c(out, as.raw(b))
+          next
+        }
+
+        # Outside strings, JSON permits ordinary structural whitespace
+        # (space, tab, LF, CR). Other control bytes are discarded.
+        if (b == 34L) {  # opening double quote
+          out <- c(out, as.raw(b))
+          in_string <- TRUE
+          escaped <- FALSE
+          next
+        }
+
+        if (b < 32L && !(b %in% c(9L, 10L, 13L))) {
+          next
+        }
+
+        out <- c(out, as.raw(b))
+      }
+
+      rawToChar(out, multiple = FALSE)
     },
     FUN.VALUE = character(1),
     USE.NAMES = FALSE
