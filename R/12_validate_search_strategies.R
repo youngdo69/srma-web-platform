@@ -336,45 +336,83 @@ check_boolean_presence <- function(text) {
 
 check_duplicate_lines <- function(text) {
 
-  lines <- unlist(
+  # R/11 builds logical concept blocks and joins them with
+  # a standalone AND. The same controlled-vocabulary term
+  # may legitimately occur in different concept blocks.
+  blocks <- unlist(
     strsplit(
       text,
-      split = "\n",
-      fixed = TRUE
+      split = "\\n\\s*AND\\s*\\n",
+      perl = TRUE
     )
   )
 
-  lines <- trimws(lines)
+  duplicate_records <- character(0)
 
-  lines <- lines[
-    lines != "" &
-      !lines %in% c(
-        "(",
-        ")",
-        "AND",
-        "OR"
+  for (block_index in seq_along(blocks)) {
+
+    lines <- unlist(
+      strsplit(
+        blocks[[block_index]],
+        split = "\n",
+        fixed = TRUE
       )
-  ]
+    )
 
-  normalized <- vapply(
-    lines,
-    normalize_line,
-    character(1)
-  )
+    lines <- trimws(lines)
 
-  duplicated_values <- unique(
-    normalized[duplicated(normalized)]
-  )
+    lines <- lines[
+      lines != "" &
+        !lines %in% c("(", ")", "AND", "OR")
+    ]
+
+    if (length(lines) == 0L) {
+      next
+    }
+
+    # Ignore a leading Boolean connector when comparing terms.
+    # This also detects a duplicate when the first occurrence
+    # is the first term in a block and the second begins with OR.
+    lines <- sub(
+      "^(AND|OR)\\s+",
+      "",
+      lines,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+
+    normalized <- vapply(
+      lines,
+      normalize_line,
+      character(1)
+    )
+
+    duplicated_values <- unique(
+      normalized[duplicated(normalized)]
+    )
+
+    if (length(duplicated_values) > 0L) {
+      duplicate_records <- c(
+        duplicate_records,
+        paste0(
+          "concept block ",
+          block_index,
+          ": ",
+          duplicated_values
+        )
+      )
+    }
+  }
 
   list(
-    passed = length(duplicated_values) == 0,
-    duplicates = duplicated_values,
-    message = if (length(duplicated_values) == 0) {
-      "No duplicated search lines were detected."
+    passed = length(duplicate_records) == 0L,
+    duplicates = duplicate_records,
+    message = if (length(duplicate_records) == 0L) {
+      "No duplicated search lines were detected within logical concept blocks."
     } else {
       paste0(
-        "Duplicated lines: ",
-        paste(duplicated_values, collapse = " | ")
+        "Duplicated lines within the same logical concept block: ",
+        paste(duplicate_records, collapse = " | ")
       )
     }
   )
