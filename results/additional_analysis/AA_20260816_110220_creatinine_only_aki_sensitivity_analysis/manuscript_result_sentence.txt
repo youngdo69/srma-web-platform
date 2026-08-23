@@ -1,1 +1,0 @@
-In an author-directed additional analysis of 3 studies, the pooled RR was 0.72 (95% CI, 0.31–1.68; I²=42.1%), using a random-effects model with REML estimation and Knapp–Hartung inference.
