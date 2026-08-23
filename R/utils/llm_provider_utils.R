@@ -90,6 +90,147 @@ extract_openai_output_text <- function(response_body) {
   stop("No output_text item was found in the OpenAI response.")
 }
 
+
+sanitize_json_control_characters <- function(x) {
+  if (is.null(x) || length(x) == 0L) return(x)
+
+  if (!is.character(x)) {
+    x <- as.character(x)
+  }
+
+  vapply(
+    x,
+    function(value) {
+      if (is.na(value)) return(NA_character_)
+
+      value <- iconv(value, from = "", to = "UTF-8", sub = "")
+      if (is.na(value)) value <- ""
+
+      bytes <- charToRaw(value)
+      ints <- as.integer(bytes)
+
+      if (length(ints) == 0L) return("")
+
+      out <- raw(0L)
+      in_string <- FALSE
+      escaped <- FALSE
+
+      for (i in seq_along(ints)) {
+        b <- ints[[i]]
+
+        if (in_string) {
+          if (escaped) {
+            # This byte belongs to a JSON escape sequence. Keep it unchanged.
+            out <- c(out, as.raw(b))
+            escaped <- FALSE
+            next
+          }
+
+          if (b == 92L) {  # backslash
+            out <- c(out, as.raw(b))
+            escaped <- TRUE
+            next
+          }
+
+          if (b == 34L) {  # double quote
+            out <- c(out, as.raw(b))
+            in_string <- FALSE
+            next
+          }
+
+          if (b < 32L) {
+            # Unescaped U+0000-U+001F is forbidden inside JSON strings.
+            # Replace it with a single ASCII space so adjacent words do not
+            # collapse (e.g. "pre<control>post" -> "pre post").
+            out <- c(out, charToRaw(" "))
+            next
+          }
+
+          out <- c(out, as.raw(b))
+          next
+        }
+
+        # Outside strings, JSON permits ordinary structural whitespace
+        # (space, tab, LF, CR). Other control bytes are discarded.
+        if (b == 34L) {  # opening double quote
+          out <- c(out, as.raw(b))
+          in_string <- TRUE
+          escaped <- FALSE
+          next
+        }
+
+        if (b < 32L && !(b %in% c(9L, 10L, 13L))) {
+          next
+        }
+
+        out <- c(out, as.raw(b))
+      }
+
+      rawToChar(out, multiple = FALSE)
+    },
+    FUN.VALUE = character(1),
+    USE.NAMES = FALSE
+  )
+}
+
+parse_openai_structured_output_json <- function(output_text) {
+  if (!is.character(output_text) || length(output_text) != 1L || is.na(output_text)) {
+    stop("OpenAI output_text must be one non-missing character string.")
+  }
+
+  # First parse the exact model output unchanged. This preserves strict
+  # behavior for normal responses and uses sanitization only as a fallback.
+  parsed <- tryCatch(
+    jsonlite::fromJSON(
+      output_text,
+      simplifyVector = FALSE
+    ),
+    error = function(e) e
+  )
+
+  if (!inherits(parsed, "error")) {
+    return(parsed)
+  }
+
+  sanitized <- sanitize_json_control_characters(output_text)
+
+  # If sanitization made no change, retain the original parse error because
+  # the failure is not attributable to removable control characters.
+  if (identical(sanitized, output_text)) {
+    stop(
+      "Failed to parse OpenAI structured output JSON: ",
+      conditionMessage(parsed),
+      call. = FALSE
+    )
+  }
+
+  reparsed <- tryCatch(
+    jsonlite::fromJSON(
+      sanitized,
+      simplifyVector = FALSE
+    ),
+    error = function(e) e
+  )
+
+  if (inherits(reparsed, "error")) {
+    stop(
+      "Failed to parse OpenAI structured output JSON after removing invalid ",
+      "control characters. Original error: ", conditionMessage(parsed),
+      "\nSanitized parse error: ", conditionMessage(reparsed),
+      call. = FALSE
+    )
+  }
+
+  warning(
+    "OpenAI structured output contained invalid control character(s); ",
+    "they were removed before JSON parsing. The exact raw model output ",
+    "remains available in raw_output_text.",
+    call. = FALSE
+  )
+
+  reparsed
+}
+
 call_openai_structured_screening <- function(
     prompt,
     model,
@@ -165,10 +306,9 @@ call_openai_structured_screening <- function(
   output_text <- extract_openai_output_text(response_body)
 
   # Preserve nested schema records (e.g., option_patches) exactly.
-  parsed <- jsonlite::fromJSON(
-    output_text,
-    simplifyVector = FALSE
-  )
+  # Parse the exact model output first; if JSON parsing fails solely because
+  # of invalid control bytes, sanitize those bytes and retry once.
+  parsed <- parse_openai_structured_output_json(output_text)
 
   list(
     parsed = parsed,
