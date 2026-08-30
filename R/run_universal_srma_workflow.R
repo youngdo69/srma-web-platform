@@ -271,7 +271,8 @@ runner_steps <- function(run_scope_advisory = TRUE, run_additional_analysis = FA
     list(id="initialization_validation", label="Validate initialization drafts", category="RUN", type="script", scripts=c("R/01_validate_project_initialization.R"), enabled=TRUE, recovery=TRUE),
     list(id="human_decision_review", label="Prepare Human Decision review", category="RUN", type="script", scripts=c("R/01b_prepare_human_decision_review.R"), enabled=TRUE, recovery=TRUE),
     list(id="human_decision_finalization", label="Human Decision finalization and activation", category="HUMAN GATE", type="script", scripts=c("R/01_finalize_human_decisions.R"), enabled=TRUE, recovery=TRUE),
-    list(id="prospero_preparation", label="Prepare PROSPERO registration information", category="RUN", type="external_script", scripts=c("R/create_and_autofill_prospero.R", "create_and_autofill_prospero.R", "R/create_and_autofill_prospero_AUTO_PROJECT.R", "create_and_autofill_prospero_AUTO_PROJECT.R"), enabled=TRUE, recovery=TRUE),
+    list(id="prospero_preparation", label="Prepare PROSPERO registration information", category="RUN", type="script", scripts=c("R/create_and_autofill_prospero.R"), enabled=TRUE, recovery=TRUE),
+    list(id="prospero_registration_gate", label="Confirm PROSPERO registration", category="HUMAN GATE", type="gate", scripts=character(0), enabled=TRUE, recovery=TRUE),
     list(id="search_generation", label="Generate database search strategies", category="RUN", type="script", scripts=c("R/11_generate_search_strategies.R"), enabled=TRUE, recovery=TRUE),
     list(id="search_validation", label="Validate database search strategies", category="RUN", type="script", scripts=c("R/12_validate_search_strategies.R"), enabled=TRUE, recovery=TRUE),
     list(id="pubmed_download", label="Download canonical PubMed records", category="RUN", type="script", scripts=c("R/16_download_pubmed_records.R"), enabled=TRUE, recovery=TRUE),
@@ -506,10 +507,7 @@ runner_prospero_canonical_candidates <- function(project_root) {
     "prospero"
   )
 
-  c(
-    file.path(prospero_dir, "prospero_final.xlsx"),
-    file.path(prospero_dir, "prospero_autofilled.xlsx")
-  )
+  file.path(prospero_dir, "prospero_final.xlsx")
 }
 
 runner_validate_prospero <- function(paths) {
@@ -589,6 +587,184 @@ runner_validate_prospero <- function(paths) {
     project_root = project_root
   )
 }
+
+runner_prospero_registration_marker <- function(project_root) {
+  project_root <- runner_clean_scalar(project_root)
+  if (!nzchar(project_root)) return("")
+
+  file.path(
+    project_root,
+    "results",
+    "registration",
+    "prospero",
+    "prospero_registration_confirmed.yml"
+  )
+}
+
+runner_validate_prospero_registration <- function(paths) {
+  if (runner_as_logical(Sys.getenv("SRMA_PROSPERO_ALREADY_REGISTERED", unset = ""), FALSE)) {
+    return(
+      runner_validation(
+        TRUE,
+        "Existing PROSPERO registration explicitly declared by environment."
+      )
+    )
+  }
+
+  context <- runner_project_context_or_null()
+  if (is.null(context)) {
+    return(
+      runner_validation(
+        FALSE,
+        "Canonical active-project context could not be resolved for PROSPERO registration confirmation."
+      )
+    )
+  }
+
+  active_text <- runner_read_text(paths$active_project)
+  if (
+    grepl("PROSPERO", active_text, ignore.case = TRUE) &&
+    grepl("CRD[0-9]{6,}", active_text, ignore.case = TRUE, perl = TRUE)
+  ) {
+    return(
+      runner_validation(
+        TRUE,
+        "Existing PROSPERO registration evidence is present in the active project configuration.",
+        file = paths$active_project
+      )
+    )
+  }
+
+  project_root <- runner_clean_scalar(context$paths$project_root)
+  marker <- runner_prospero_registration_marker(project_root)
+
+  if (!runner_file_nonempty(marker)) {
+    return(
+      runner_validation(
+        FALSE,
+        "PROSPERO registration has not yet been confirmed for the active project.",
+        file = marker,
+        project_root = project_root
+      )
+    )
+  }
+
+  marker_doc <- tryCatch(
+    yaml::read_yaml(marker),
+    error = function(e) NULL
+  )
+
+  confirmed <- is.list(marker_doc) &&
+    is.list(marker_doc$prospero_registration) &&
+    isTRUE(marker_doc$prospero_registration$confirmed)
+
+  runner_validation(
+    confirmed,
+    if (confirmed) {
+      "PROSPERO registration confirmation is recorded for the active project."
+    } else {
+      "PROSPERO registration confirmation marker is invalid or incomplete."
+    },
+    file = marker,
+    project_root = project_root
+  )
+}
+
+runner_confirm_prospero_registration <- function(paths) {
+  context <- runner_project_context_or_null()
+  if (is.null(context)) {
+    return(
+      runner_validation(
+        FALSE,
+        "Canonical active-project context could not be resolved for PROSPERO registration confirmation."
+      )
+    )
+  }
+
+  project_root <- runner_clean_scalar(context$paths$project_root)
+  final_form <- file.path(
+    project_root,
+    "results",
+    "registration",
+    "prospero",
+    "prospero_final.xlsx"
+  )
+
+  if (!runner_file_nonempty(final_form)) {
+    return(
+      runner_validation(
+        FALSE,
+        "The canonical prospero_final.xlsx artifact is not available; registration cannot be confirmed yet.",
+        file = final_form
+      )
+    )
+  }
+
+  final_form_abs <- normalizePath(
+    final_form,
+    winslash = "/",
+    mustWork = TRUE
+  )
+
+  cat("\nFinal auto-filled PROSPERO form has been created at:\n")
+  cat(final_form_abs, "\n\n", sep = "")
+  cat("You must register your record at PROSPERO:\n")
+  cat("https://www.crd.york.ac.uk/prospero/\n\n")
+
+  if (!interactive()) {
+    return(
+      runner_validation(
+        FALSE,
+        "PROSPERO registration confirmation requires an interactive R session.",
+        file = final_form_abs
+      )
+    )
+  }
+
+  repeat {
+    answer <- tolower(trimws(readline(
+      "Have you completed the PROSPERO registration step? Response [Yes/No]: "
+    )))
+
+    if (answer %in% c("yes", "y")) {
+      marker <- runner_prospero_registration_marker(project_root)
+      dir.create(dirname(marker), recursive = TRUE, showWarnings = FALSE)
+
+      yaml::write_yaml(
+        list(
+          prospero_registration = list(
+            confirmed = TRUE,
+            confirmed_at = runner_now(),
+            final_form = final_form_abs
+          )
+        ),
+        marker
+      )
+
+      return(
+        runner_validation(
+          TRUE,
+          "PROSPERO registration confirmed by the author; workflow may proceed to searching.",
+          file = marker,
+          final_form = final_form_abs
+        )
+      )
+    }
+
+    if (answer %in% c("no", "n")) {
+      return(
+        runner_validation(
+          FALSE,
+          "PROSPERO registration is not yet complete. Workflow paused before searching.",
+          file = final_form_abs
+        )
+      )
+    }
+
+    cat("Please answer Yes or No.\n")
+  }
+}
+
 runner_validate_search_generation <- function(paths) {
   context <- runner_project_context_or_null()
   if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
@@ -1293,6 +1469,7 @@ runner_validate_step <- function(step, paths) {
     human_decision_review = runner_validate_review_preparation(paths),
     human_decision_finalization = runner_validate_finalization(paths),
     prospero_preparation = runner_validate_prospero(paths),
+    prospero_registration_gate = runner_validate_prospero_registration(paths),
     search_generation = runner_validate_search_generation(paths),
     search_validation = runner_validate_search_validation(paths),
     pubmed_download = runner_validate_pubmed(paths),
@@ -1334,19 +1511,6 @@ runner_execute_script <- function(script_path) {
   env <- new.env(parent = globalenv())
   value <- sys.source(script_path, envir = env)
   list(value=value, environment=env)
-}
-
-runner_execute_prospero <- function(script_path) {
-  rscript <- Sys.which("Rscript")
-  if (!nzchar(rscript)) stop("Rscript executable was not found; cannot isolate the PROSPERO module safely.", call. = FALSE)
-  slug <- runner_detect_project_slug()
-  args <- c("--vanilla", script_path)
-  if (nzchar(slug) && grepl("create_and_autofill_prospero\\.R$", script_path, ignore.case=TRUE)) {
-    args <- c(args, paste0("--project=", slug))
-  }
-  status <- system2(rscript, args=args)
-  if (!identical(as.integer(status), 0L)) stop("PROSPERO preparation module exited with status ", status, call. = FALSE)
-  invisible(TRUE)
 }
 
 runner_route_r29_uploads <- function(uploaded_files) {
@@ -1538,12 +1702,9 @@ run_universal_srma_workflow <- function(
   state$current_step <- step$id
   runner_write_state(state, paths$state_file)
 
-  # PROSPERO preparation requires genuine interactive terminal input.
-  # Do not launch it as a child Rscript process from inside the Runner,
-  # because stdin may not be available and readline() can loop indefinitely.
-  # A prepared canonical artifact or existing-registration evidence is
-  # recovered above before this point.
-  if (identical(step$id, "prospero_preparation")) {
+  # PROSPERO preparation now runs inside this same interactive Runner session.
+  # In non-interactive execution, pause safely rather than calling readline() indirectly.
+  if (identical(step$id, "prospero_preparation") && !interactive()) {
     return(
       runner_pause(
         state,
@@ -1551,16 +1712,49 @@ run_universal_srma_workflow <- function(
         paths,
         run_log,
         run_log_file,
-        paste(
-          pre$message,
-          "PROSPERO preparation requires interactive user input.",
-          "From the repository root, run:",
-          'source("R/create_and_autofill_prospero.R")',
-          "Then rerun the same Universal Runner."
-        ),
+        "PROSPERO preparation requires an interactive R session.",
         pre
       )
     )
+  }
+
+  if (identical(step$id, "prospero_registration_gate")) {
+    confirmation <- runner_confirm_prospero_registration(paths)
+
+    if (!isTRUE(confirmation$passed)) {
+      return(
+        runner_pause(
+          state,
+          step,
+          paths,
+          run_log,
+          run_log_file,
+          confirmation$message,
+          confirmation
+        )
+      )
+    }
+
+    state$current_step <- ""
+    state <- runner_record_step(
+      state,
+      step$id,
+      "completed",
+      started_at = started,
+      completed_at = runner_now(),
+      message = confirmation$message,
+      validation = confirmation
+    )
+    runner_write_state(state, paths$state_file)
+
+    run_log$steps[[step$id]] <- list(
+      status = "completed",
+      validation = confirmation
+    )
+    yaml::write_yaml(run_log, run_log_file)
+
+    runner_print_step(index, total, step$label, "PASS")
+    next
   }
 
   if (identical(step$type, "gate")) {
@@ -1633,7 +1827,7 @@ run_universal_srma_workflow <- function(
         on.exit(options(srma.scope_advisory=old_opt), add=TRUE)
         options(srma.scope_advisory="yes")
       }
-      if (identical(step$type, "external_script")) runner_execute_prospero(script) else runner_execute_script(script)
+      runner_execute_script(script)
     }, error=function(e) execution_error <<- e)
 
     if (!is.null(execution_error)) {
