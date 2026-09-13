@@ -806,144 +806,113 @@ runner_validate_pubmed <- function(paths) {
   runner_validation(all(ok), if (all(ok)) "Canonical PubMed download outputs are complete." else paste("Missing or empty PubMed output(s):", paste(names(output_files)[!ok], collapse = ", ")), files = as.list(output_files))
 }
 
-runner_validate_database_inputs <- function(paths) {
-  context <- runner_project_context_or_null()
+
+# ------------------------------------------------------------
+# TASK-018 integration — Universal Database Input Gate
+# ------------------------------------------------------------
+
+runner_task018_database_gate <- function(
+    verbose = FALSE,
+    write_evidence = FALSE,
+    write_provenance = FALSE
+) {
+  task_file <- "R/TASK018_database_input_gate_hardening.R"
+
+  if (!file.exists(task_file)) {
+    stop(
+      "TASK-018 database-input gate module is missing: ",
+      task_file,
+      call. = FALSE
+    )
+  }
+
+  context <- tryCatch(
+    runner_resolve_project_context(),
+    error = function(e) NULL
+  )
+
   if (is.null(context)) {
-    return(
-      runner_validation(
-        FALSE,
-        "Canonical active-project context could not be resolved."
-      )
+    stop(
+      "Canonical active-project context could not be resolved for TASK-018.",
+      call. = FALSE
     )
   }
 
-  enabled <- tryCatch(
-    context$environment$get_enabled_databases(
-      context$config,
-      validate = FALSE
-    ),
-    error = function(e) character(0)
+  task_env <- new.env(
+    parent = globalenv()
   )
 
-  enabled <- tolower(
-    runner_as_character_vector(enabled)
+  sys.source(
+    task_file,
+    envir = task_env
   )
 
-  input_map <- c(
-    pubmed = context$paths$pubmed_csv,
-    embase = context$paths$embase_ris,
-    central = context$paths$central_ris
-  )
-
-  strategy_map <- c(
-    pubmed = context$paths$pubmed_search,
-    embase = context$paths$embase_search,
-    central = context$paths$central_search
-  )
-
-  supported <- intersect(
-    enabled,
-    names(input_map)
-  )
-
-  if (length(supported) == 0L) {
-    return(
-      runner_validation(
-        FALSE,
-        "No supported database inputs are enabled."
-      )
+  if (!exists(
+    "task018_run_database_input_gate",
+    envir = task_env,
+    mode = "function",
+    inherits = FALSE
+  )) {
+    stop(
+      "TASK-018 did not define task018_run_database_input_gate().",
+      call. = FALSE
     )
   }
 
-  required_files <- input_map[supported]
-  present <- vapply(
-    required_files,
-    runner_file_nonempty,
-    logical(1)
-  )
-
-  if (all(present)) {
-    return(
-      runner_validation(
-        TRUE,
-        paste(
-          "All enabled database inputs are present:",
-          paste(supported, collapse = ", ")
-        ),
-        enabled_databases = as.list(enabled),
-        files = as.list(required_files)
-      )
-    )
-  }
-
-  missing <- names(required_files)[!present]
-
-  if ("pubmed" %in% missing) {
-    return(
-      runner_validation(
-        FALSE,
-        paste(
-          "Canonical PubMed input is unexpectedly missing after",
-          "the PubMed download stage:",
-          required_files[["pubmed"]]
-        ),
-        enabled_databases = as.list(enabled),
-        files = as.list(required_files)
-      )
-    )
-  }
-
-  manual_missing <- intersect(
-    missing,
-    c("embase", "central")
-  )
-
-  handoff <- c(
-    "Manual database retrieval/export is required.",
-    "",
-    "The toolkit has already generated the database-specific search strategies.",
-    "Open or copy the query from the path shown below, run it in the database,",
-    "then export RIS to the canonical destination shown below.",
-    ""
-  )
-
-  for (db in manual_missing) {
-    strategy <- strategy_map[[db]]
-    destination <- required_files[[db]]
-
-    handoff <- c(
-      handoff,
-      toupper(db),
-      paste0(
-        "Search strategy:",
-        "\n  ",
-        runner_normalize_slash(strategy)
-      ),
-      paste0(
-        "Export RIS to:",
-        "\n  ",
-        runner_normalize_slash(destination)
-      ),
-      ""
-    )
-  }
-
-  handoff <- c(
-    handoff,
-    "After all required RIS files have been exported, rerun:",
-    '  source("R/run_universal_srma_workflow.R")'
-  )
-
-  runner_validation(
-    FALSE,
-    paste(handoff, collapse = "\n"),
-    enabled_databases = as.list(enabled),
-    files = as.list(required_files),
-    search_strategies = as.list(
-      strategy_map[manual_missing]
-    )
+  task_env$task018_run_database_input_gate(
+    config = context$config,
+    paths = context$paths,
+    verbose = verbose,
+    write_evidence = write_evidence,
+    write_provenance = write_provenance
   )
 }
+
+
+runner_validate_database_inputs <- function(paths) {
+  gate <- tryCatch(
+    runner_task018_database_gate(
+      verbose = FALSE,
+      write_evidence = FALSE,
+      write_provenance = FALSE
+    ),
+    error = function(e) e
+  )
+
+  if (inherits(gate, "error")) {
+    return(
+      list(
+        passed = FALSE,
+        message = paste(
+          "TASK-018 database input validation could not run:",
+          conditionMessage(gate)
+        ),
+        task018_state = "VALIDATION_ERROR"
+      )
+    )
+  }
+
+  passed <- isTRUE(gate$ready)
+
+  list(
+    passed = passed,
+    message = if (passed) {
+      "All enabled database inputs passed the TASK-018 canonical input gate."
+    } else {
+      paste(
+        "TASK-018 database input gate is not ready.",
+        "State:",
+        as.character(gate$runner_state %||% "DATABASE_INPUT_NOT_READY")
+      )
+    },
+    task018_state = as.character(
+      gate$runner_state %||% ""
+    ),
+    enabled_databases = gate$enabled_databases,
+    database_results = gate$database_results
+  )
+}
+
 
 runner_validate_merge <- function(paths) {
   context <- runner_project_context_or_null()
@@ -1757,8 +1726,72 @@ run_universal_srma_workflow <- function(
     next
   }
 
+  if (identical(step$id, "database_input_gate")) {
+    task018_gate <- tryCatch(
+      runner_task018_database_gate(
+        verbose = TRUE,
+        write_evidence = TRUE,
+        write_provenance = TRUE
+      ),
+      error = function(e) e
+    )
+
+    if (inherits(task018_gate, "error")) {
+      return(
+        runner_pause(
+          state,
+          step,
+          paths,
+          run_log,
+          run_log_file,
+          paste(
+            pre$message,
+            "TASK-018 guidance failed:",
+            conditionMessage(task018_gate)
+          ),
+          pre
+        )
+      )
+    }
+
+    task018_validation <- list(
+      passed = isTRUE(task018_gate$ready),
+      message = paste(
+        "TASK-018 database input gate state:",
+        as.character(task018_gate$runner_state %||% "")
+      ),
+      task018_state = as.character(
+        task018_gate$runner_state %||% ""
+      ),
+      enabled_databases = task018_gate$enabled_databases,
+      database_results = task018_gate$database_results
+    )
+
+    return(
+      runner_pause(
+        state,
+        step,
+        paths,
+        run_log,
+        run_log_file,
+        task018_validation$message,
+        task018_validation
+      )
+    )
+  }
+
   if (identical(step$type, "gate")) {
-    return(runner_pause(state, step, paths, run_log, run_log_file, pre$message, pre))
+    return(
+      runner_pause(
+        state,
+        step,
+        paths,
+        run_log,
+        run_log_file,
+        pre$message,
+        pre
+      )
+    )
   }
 
     if (identical(step$type, "r29")) {
