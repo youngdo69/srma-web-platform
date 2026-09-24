@@ -3,6 +3,7 @@
 # R/25_run_multimodal_data_extraction.R
 #
 # TASK-013 — Multimodal Data Extraction
+# TASK-023 hardening: universal yes/true config-flag normalization
 #
 # Architecture (DEC-008)
 # ------------------------------------------------------------
@@ -92,6 +93,34 @@ safe_chr <- function(x) {
     return("")
   }
   as.character(x[[1]])
+}
+
+# Universal config-flag parser.
+# Accepts logical TRUE as well as common YAML/string representations
+# such as yes/true/1/enabled. Explicit false-like values remain FALSE.
+is_enabled_flag <- function(x) {
+  if (is.null(x) || length(x) == 0L || all(is.na(x))) {
+    return(FALSE)
+  }
+
+  value <- x[[1]]
+
+  if (is.logical(value)) {
+    return(isTRUE(value))
+  }
+
+  key <- tolower(trimws(as.character(value)))
+
+  key %in% c(
+    "yes",
+    "y",
+    "true",
+    "t",
+    "1",
+    "enabled",
+    "enable",
+    "on"
+  )
 }
 
 now_text <- function() {
@@ -184,14 +213,16 @@ if (
 }
 
 if (
-  !isTRUE(config$data_extraction$agent_extraction) ||
-  !isTRUE(config$data_extraction$human_verification)
+  !is_enabled_flag(config$data_extraction$agent_extraction) ||
+  !is_enabled_flag(config$data_extraction$human_verification)
 ) {
   stop(
     "TASK-013 requires DEC-008 configuration:\n",
     "data_extraction:\n",
     "  agent_extraction: yes\n",
-    "  human_verification: yes",
+    "  human_verification: yes\n",
+    "Accepted enabled values include logical TRUE and common ",
+    "yes/true/1/enabled representations.",
     call. = FALSE
   )
 }
@@ -215,8 +246,8 @@ extraction_schema <- yaml::read_yaml(schema_file)
 
 if (
   is.null(extraction_schema$architecture) ||
-  !isTRUE(extraction_schema$architecture$agent_extraction) ||
-  !isTRUE(extraction_schema$architecture$human_verification)
+  !is_enabled_flag(extraction_schema$architecture$agent_extraction) ||
+  !is_enabled_flag(extraction_schema$architecture$human_verification)
 ) {
   stop(
     "data_extraction_schema.yml does not match DEC-008 architecture.",

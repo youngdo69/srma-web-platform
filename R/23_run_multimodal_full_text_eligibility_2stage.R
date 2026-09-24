@@ -408,6 +408,173 @@ if (anyDuplicated(registry$screening_id) > 0L) {
   )
 }
 
+
+# ============================================================
+# TASK-020 LIVE PDF DISCOVERY
+# ============================================================
+# R/22 may be executed before the user finishes obtaining PDFs.
+# R/23 therefore reconciles the registry with the live PDF folder
+# immediately before eligibility review.
+# ============================================================
+
+pdf_intake_directory <- file.path(
+  paths$project_root,
+  "data",
+  "raw",
+  "full_text",
+  "pdfs"
+)
+
+dir.create(
+  pdf_intake_directory,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+is_valid_pdf_r23 <- function(file_path) {
+  if (
+    is.null(file_path) ||
+    length(file_path) != 1L ||
+    is.na(file_path) ||
+    !nzchar(file_path) ||
+    !file.exists(file_path) ||
+    is.na(file.info(file_path)$size) ||
+    file.info(file_path)$size < 4
+  ) {
+    return(FALSE)
+  }
+
+  signature_raw <- tryCatch(
+    readBin(file_path, what = "raw", n = 4L),
+    error = function(e) raw(0)
+  )
+
+  length(signature_raw) == 4L &&
+    identical(rawToChar(signature_raw), "%PDF")
+}
+
+pdf_files_live <- list.files(
+  pdf_intake_directory,
+  pattern = "\\.pdf$",
+  full.names = TRUE,
+  ignore.case = TRUE
+)
+
+pdf_ids_live <- if (length(pdf_files_live) > 0L) {
+  tolower(tools::file_path_sans_ext(basename(pdf_files_live)))
+} else {
+  character(0)
+}
+
+registry_status_before_rescan <- registry$pdf_status
+registry_path_before_rescan <- registry$pdf_path
+registry_checksum_before_rescan <- registry$pdf_checksum_md5
+
+for (i in seq_len(nrow(registry))) {
+  screening_id_i <- safe_chr(registry$screening_id[[i]])
+  current_path_i <- safe_chr(registry$pdf_path[[i]])
+
+  live_match <- which(
+    pdf_ids_live == tolower(screening_id_i)
+  )
+
+  live_paths <- if (length(live_match) > 0L) {
+    pdf_files_live[live_match]
+  } else {
+    character(0)
+  }
+
+  candidate_paths <- unique(c(live_paths, current_path_i))
+  candidate_paths <- candidate_paths[
+    !is.na(candidate_paths) &
+      nzchar(candidate_paths) &
+      file.exists(candidate_paths)
+  ]
+
+  if (length(candidate_paths) == 0L) {
+    registry$pdf_status[[i]] <- "Missing"
+    registry$pdf_path[[i]] <- file.path(
+      pdf_intake_directory,
+      paste0(screening_id_i, ".pdf")
+    )
+    registry$pdf_checksum_md5[[i]] <- NA_character_
+    next
+  }
+
+  valid_flags <- vapply(
+    candidate_paths,
+    is_valid_pdf_r23,
+    logical(1)
+  )
+
+  if (any(valid_flags)) {
+    chosen_pdf <- candidate_paths[which(valid_flags)[[1]]]
+    registry$pdf_status[[i]] <- "Available"
+    registry$pdf_path[[i]] <- normalizePath(
+      chosen_pdf, winslash = "/", mustWork = TRUE
+    )
+    registry$pdf_checksum_md5[[i]] <- unname(
+      tools::md5sum(chosen_pdf)[[1]]
+    )
+  } else {
+    chosen_pdf <- candidate_paths[[1]]
+    registry$pdf_status[[i]] <- "Invalid PDF"
+    registry$pdf_path[[i]] <- normalizePath(
+      chosen_pdf, winslash = "/", mustWork = TRUE
+    )
+    registry$pdf_checksum_md5[[i]] <- NA_character_
+  }
+}
+
+# Persist refreshed acquisition state for downstream reproducibility.
+readr::write_csv(
+  registry,
+  registry_csv,
+  na = ""
+)
+
+pdf_available_after_rescan <- sum(
+  registry$pdf_status == "Available",
+  na.rm = TRUE
+)
+pdf_missing_after_rescan <- sum(
+  registry$pdf_status == "Missing",
+  na.rm = TRUE
+)
+pdf_invalid_after_rescan <- sum(
+  registry$pdf_status == "Invalid PDF",
+  na.rm = TRUE
+)
+
+status_changed <- !mapply(
+  identical,
+  as.list(clean_text(registry_status_before_rescan)),
+  as.list(clean_text(registry$pdf_status))
+)
+path_changed <- !mapply(
+  identical,
+  as.list(clean_text(registry_path_before_rescan)),
+  as.list(clean_text(registry$pdf_path))
+)
+checksum_changed <- !mapply(
+  identical,
+  as.list(clean_text(registry_checksum_before_rescan)),
+  as.list(clean_text(registry$pdf_checksum_md5))
+)
+
+pdf_evidence_changed <- sum(
+  status_changed | path_changed | checksum_changed
+)
+
+cat("\n")
+cat("R/23 live PDF intake rescan\n")
+cat("------------------------------------------------------------\n")
+cat("PDF folder: ", pdf_intake_directory, "\n", sep = "")
+cat("PDF Available: ", pdf_available_after_rescan, "\n", sep = "")
+cat("PDF Missing: ", pdf_missing_after_rescan, "\n", sep = "")
+cat("Invalid PDF: ", pdf_invalid_after_rescan, "\n", sep = "")
+cat("Registry evidence rows refreshed: ", pdf_evidence_changed, "\n\n", sep = "")
+
 allowed_pdf_status <- c(
   "Available",
   "Missing",
@@ -2455,8 +2622,14 @@ report_lines <- c(
   "--------------------------------------------------",
   "Authoritative Included Studies created: NO",
   "Runner integration performed: NO",
-  "Next action after PASS: 1st Author completes Author_Final_Review",
-  "Next script after author review: TASK-012 — Final Included Studies",
+  "TASK-021 EXPLICIT AUTHOR HUMAN GATE GUIDANCE",
+  paste0("Human review workbook: ", output_workbook),
+  "Human review worksheet: Author_Final_Review",
+  "Required for every record: author_final_decision = Include or Exclude",
+  "Required when Exclude: author_final_exclusion_reason = one canonical reason",
+  "Recommended audit fields: author_notes, author_reviewed_at",
+  "Save the SAME workbook at the SAME path and filename.",
+  "Then rerun the Universal Runner. The Runner should validate the Human Gate and proceed to TASK-012 / R/24.",
   "",
   "TASK STATUS",
   "--------------------------------------------------",
@@ -2508,19 +2681,35 @@ if (stage_complete) {
     "PASS: R/23 multimodal full-text eligibility Agent Reviewer 1 completed successfully.\n"
   )
 
-  cat(
-    "Next action: the 1st author reviews Agent_Review and completes the ",
-    "Author_Final_Review sheet.\n",
-    sep = ""
-  )
+  cat("\n")
+  cat("============================================================\n")
+  cat("HUMAN REVIEW REQUIRED — 1st AUTHOR FINAL FULL-TEXT REVIEW\n")
+  cat("============================================================\n\n")
 
-  cat(
-    "The author's final Include/Exclude decision will be authoritative.\n"
-  )
+  cat("Open this workbook:\n")
+  cat("- ", output_workbook, "\n\n", sep = "")
 
-  cat(
-    "Do NOT create Included Studies until TASK-012 finalization.\n"
-  )
+  cat("Open worksheet:\n")
+  cat("- Author_Final_Review\n\n")
+
+  cat("For EVERY record, complete:\n")
+  cat("- author_final_decision = Include or Exclude\n\n")
+
+  cat("If author_final_decision = Exclude, ALSO complete:\n")
+  cat("- author_final_exclusion_reason = one canonical exclusion reason\n\n")
+
+  cat("Recommended audit fields:\n")
+  cat("- author_notes\n")
+  cat("- author_reviewed_at\n\n")
+
+  cat("IMPORTANT:\n")
+  cat("- Save the SAME workbook.\n")
+  cat("- Keep the SAME filename and SAME path.\n")
+  cat("- Do NOT create a separate adjudication CSV or a new workbook.\n\n")
+
+  cat("After saving the completed workbook, rerun the Universal Runner.\n")
+  cat("The Runner should validate this Human Gate and then proceed to\n")
+  cat("TASK-012 / R/24 — Final Included Studies.\n")
 
 } else {
   cat(

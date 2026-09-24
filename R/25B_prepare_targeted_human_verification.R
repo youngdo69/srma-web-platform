@@ -30,6 +30,8 @@
 # 5. Create a focused Human Verification workbook.
 # 6. Preserve Agent values unchanged and add blank human-verification
 #    fields for TASK-014.
+# 7. Audit every authoritative R/24 included study that is not selected
+#    for the targeted verification plan, with role/reason/human action.
 #
 # Important
 # ------------------------------------------------------------
@@ -96,6 +98,75 @@ safe_chr <- function(x) {
     return("")
   }
   as.character(x[[1]])
+}
+
+first_existing_name <- function(data, candidates) {
+  hit <- intersect(
+    candidates,
+    names(data)
+  )
+
+  if (length(hit) == 0L) {
+    return("")
+  }
+
+  hit[[1]]
+}
+
+value_from_column <- function(data, column_name, default = "") {
+  if (
+    !nzchar(column_name) ||
+    !column_name %in% names(data) ||
+    nrow(data) == 0L
+  ) {
+    return(rep(default, nrow(data)))
+  }
+
+  value <- clean_text(
+    data[[column_name]]
+  )
+
+  value[
+    is.na(value)
+  ] <- default
+
+  value
+}
+
+collapse_actions_for_id <- function(screening_id, actions) {
+  if (
+    is.na(screening_id) ||
+    !nzchar(screening_id) ||
+    length(actions) == 0L
+  ) {
+    return("")
+  }
+
+  hits <- actions[
+    grepl(
+      screening_id,
+      actions,
+      fixed = TRUE
+    )
+  ]
+
+  hits <- unique(
+    trimws(
+      hits[
+        !is.na(hits) &
+          nzchar(trimws(hits))
+      ]
+    )
+  )
+
+  if (length(hits) == 0L) {
+    return("")
+  }
+
+  paste(
+    hits,
+    collapse = " | "
+  )
 }
 
 now_text <- function() {
@@ -320,6 +391,14 @@ study_roles_file <- file.path(
   "study_roles.csv"
 )
 
+included_studies_file <- file.path(
+  paths$project_root,
+  "data",
+  "processed",
+  "full_text",
+  "included_studies.csv"
+)
+
 study_agent_file <- file.path(
   extraction_data_directory,
   "study_characteristics_agent.csv"
@@ -360,6 +439,11 @@ audit_csv <- file.path(
   "target_audit_checks.csv"
 )
 
+included_not_targeted_csv <- file.path(
+  targeted_directory,
+  "included_not_targeted_for_verification.csv"
+)
+
 report_file <- file.path(
   paths$logs_directory,
   "targeted_human_verification_preparation_report.txt"
@@ -375,6 +459,7 @@ required_files <- c(
   meta_sets_file,
   harmonization_file,
   study_roles_file,
+  included_studies_file,
   study_agent_file,
   group_agent_file,
   outcome_agent_file
@@ -417,6 +502,27 @@ harmonization <- read_character_csv(
 study_roles <- read_character_csv(
   study_roles_file
 )
+
+included_studies <- read_character_csv(
+  included_studies_file
+)
+
+if (!"screening_id" %in% names(included_studies)) {
+  stop(
+    "R/24 included_studies.csv is missing screening_id.",
+    call. = FALSE
+  )
+}
+
+included_studies$screening_id <- clean_text(
+  included_studies$screening_id
+)
+
+if ("screening_id" %in% names(study_roles)) {
+  study_roles$screening_id <- clean_text(
+    study_roles$screening_id
+  )
+}
 
 required_meta_columns <- c(
   "analysis_name",
@@ -684,6 +790,223 @@ if (length(missing_target_studies) > 0L) {
       collapse = ", "
     ),
     call. = FALSE
+  )
+}
+
+
+# ============================================================
+# 9A. Audit R/24 included studies not selected for verification
+# ============================================================
+# This table is audit/provenance only. It does NOT change systematic-
+# review inclusion and does NOT automatically add a study to a planned
+# quantitative analysis. It explains why an included study is absent
+# from the targeted Human Verification plan.
+# ============================================================
+
+included_ids <- unique(
+  included_studies$screening_id[
+    !is.na(included_studies$screening_id) &
+      nzchar(included_studies$screening_id)
+  ]
+)
+
+omitted_included_ids <- setdiff(
+  included_ids,
+  target_ids
+)
+
+role_status_col <- first_existing_name(
+  study_roles,
+  c(
+    "systematic_review_status",
+    "sr_status",
+    "review_status",
+    "inclusion_status",
+    "systematic_review_role"
+  )
+)
+
+role_recommendation_col <- first_existing_name(
+  study_roles,
+  c(
+    "recommended_meta_analysis_role",
+    "meta_analysis_role",
+    "recommended_role",
+    "role"
+  )
+)
+
+role_reason_col <- first_existing_name(
+  study_roles,
+  c(
+    "reason",
+    "rationale",
+    "recommended_role_reason",
+    "meta_analysis_reason",
+    "exclusion_reason"
+  )
+)
+
+included_title_col <- first_existing_name(
+  included_studies,
+  c(
+    "title",
+    "article_title"
+  )
+)
+
+study_agent_title_col <- first_existing_name(
+  study_agent,
+  c(
+    "title",
+    "article_title"
+  )
+)
+
+included_not_targeted <- tibble::tibble(
+  screening_id = omitted_included_ids
+)
+
+if (nrow(included_not_targeted) > 0L) {
+
+  included_not_targeted <- included_not_targeted |>
+    dplyr::left_join(
+      included_studies,
+      by = "screening_id",
+      suffix = c("", "_included")
+    )
+
+  if (
+    !nzchar(included_title_col) &&
+    nzchar(study_agent_title_col)
+  ) {
+    title_reference <- study_agent |>
+      dplyr::select(
+        screening_id,
+        title = dplyr::all_of(
+          study_agent_title_col
+        )
+      ) |>
+      dplyr::distinct(
+        screening_id,
+        .keep_all = TRUE
+      )
+
+    included_not_targeted <- included_not_targeted |>
+      dplyr::left_join(
+        title_reference,
+        by = "screening_id"
+      )
+  }
+
+  if ("screening_id" %in% names(study_roles)) {
+    role_reference <- study_roles |>
+      dplyr::filter(
+        screening_id %in% omitted_included_ids
+      ) |>
+      dplyr::distinct(
+        screening_id,
+        .keep_all = TRUE
+      )
+
+    included_not_targeted <- included_not_targeted |>
+      dplyr::left_join(
+        role_reference,
+        by = "screening_id",
+        suffix = c("", "_role")
+      )
+  }
+
+  systematic_review_status <- if (
+    nzchar(role_status_col) &&
+    role_status_col %in% names(included_not_targeted)
+  ) {
+    value_from_column(
+      included_not_targeted,
+      role_status_col,
+      default = "Included (R/24 authoritative)"
+    )
+  } else {
+    rep(
+      "Included (R/24 authoritative)",
+      nrow(included_not_targeted)
+    )
+  }
+
+  recommended_role <- if (
+    nzchar(role_recommendation_col) &&
+    role_recommendation_col %in% names(included_not_targeted)
+  ) {
+    value_from_column(
+      included_not_targeted,
+      role_recommendation_col,
+      default = "No quantitative role recorded"
+    )
+  } else {
+    rep(
+      "No quantitative role recorded",
+      nrow(included_not_targeted)
+    )
+  }
+
+  role_reason <- if (
+    nzchar(role_reason_col) &&
+    role_reason_col %in% names(included_not_targeted)
+  ) {
+    value_from_column(
+      included_not_targeted,
+      role_reason_col,
+      default = "No study-level reason recorded by R/25A"
+    )
+  } else {
+    rep(
+      "No study-level reason recorded by R/25A",
+      nrow(included_not_targeted)
+    )
+  }
+
+  matching_human_action <- vapply(
+    included_not_targeted$screening_id,
+    collapse_actions_for_id,
+    character(1),
+    actions = human_actions,
+    USE.NAMES = FALSE
+  )
+
+  matching_human_action[
+    !nzchar(matching_human_action)
+  ] <- "No explicit next_human_action recorded by R/25A"
+
+  included_not_targeted <- included_not_targeted |>
+    dplyr::mutate(
+      systematic_review_status = systematic_review_status,
+      verification_plan_status = "Not selected for targeted Human Verification",
+      recommended_meta_analysis_role = recommended_role,
+      reason_not_targeted = role_reason,
+      advisory_human_action = matching_human_action
+    ) |>
+    dplyr::relocate(
+      screening_id,
+      dplyr::any_of(
+        c(
+          "title",
+          "article_title"
+        )
+      ),
+      systematic_review_status,
+      verification_plan_status,
+      recommended_meta_analysis_role,
+      reason_not_targeted,
+      advisory_human_action
+    )
+} else {
+  included_not_targeted <- tibble::tibble(
+    screening_id = character(),
+    systematic_review_status = character(),
+    verification_plan_status = character(),
+    recommended_meta_analysis_role = character(),
+    reason_not_targeted = character(),
+    advisory_human_action = character()
   )
 }
 
@@ -1030,6 +1353,12 @@ readr::write_csv(
   na = ""
 )
 
+readr::write_csv(
+  included_not_targeted,
+  included_not_targeted_csv,
+  na = ""
+)
+
 
 # ============================================================
 # 16. Workbook styles
@@ -1237,6 +1566,7 @@ instructions <- tibble::tibble(
     "Tier 2",
     "Tier 3",
     "Audit",
+    "Included but not targeted",
     "Target outcome",
     "Agent values",
     "Human fields",
@@ -1253,6 +1583,7 @@ instructions <- tibble::tibble(
     "Tier 2 = additional study/studies used only in sensitivity analysis.",
     "Tier 3 = observational studies used in a separate secondary synthesis.",
     "Audit = study/studies requiring overlap, duplicate-cohort, or other non-quantitative checks.",
+    "Included_Not_Targeted lists every authoritative R/24 included study that is absent from the targeted verification plan, with the R/25A role, reason, and any study-specific next human action. This sheet is audit-only and does not change inclusion.",
     paste0(
       "Mapped primary outcome: ",
       paste(
@@ -1344,6 +1675,7 @@ advisory_summary <- tibble::tibble(
     "Sensitivity-only studies",
     "Secondary observational studies",
     "Audit-only studies",
+    "Included studies not targeted",
     "Total targeted studies"
   ),
   Value = c(
@@ -1370,6 +1702,16 @@ advisory_summary <- tibble::tibble(
       audit_only_ids,
       collapse = " | "
     ),
+    if (
+      nrow(included_not_targeted) > 0L
+    ) {
+      paste(
+        included_not_targeted$screening_id,
+        collapse = " | "
+      )
+    } else {
+      "None"
+    },
     as.character(
       length(target_ids)
     )
@@ -1395,6 +1737,20 @@ write_table_sheet(
   verification_plan,
   wide_columns = c(
     "meta_analysis_role"
+  ),
+  highlight_human_columns = FALSE
+)
+
+write_table_sheet(
+  "Included_Not_Targeted",
+  "Authoritative Included Studies Not Selected for Targeted Human Verification",
+  included_not_targeted,
+  wide_columns = c(
+    "title",
+    "article_title",
+    "recommended_meta_analysis_role",
+    "reason_not_targeted",
+    "advisory_human_action"
   ),
   highlight_human_columns = FALSE
 )
@@ -1678,6 +2034,7 @@ required_sheets <- c(
   "Instructions",
   "Advisory_Summary",
   "Verification_Plan",
+  "Included_Not_Targeted",
   "Meta_Analysis_Sets",
   "Target_Study_Verification",
   "Target_Outcome_Verification",
@@ -1720,6 +2077,24 @@ saved_outcome <- openxlsx::readWorkbook(
   colNames = TRUE,
   skipEmptyRows = FALSE
 )
+
+saved_included_not_targeted <- openxlsx::readWorkbook(
+  target_workbook_file,
+  sheet = "Included_Not_Targeted",
+  startRow = 3,
+  colNames = TRUE,
+  skipEmptyRows = FALSE
+)
+
+if (
+  nrow(included_not_targeted) > 0L &&
+  nrow(saved_included_not_targeted) != nrow(included_not_targeted)
+) {
+  stop(
+    "Saved Included_Not_Targeted row count mismatch.",
+    call. = FALSE
+  )
+}
 
 if (nrow(saved_study) != nrow(target_study_data)) {
   stop(
@@ -1857,6 +2232,50 @@ report_lines <- c(
     "Audit checks: ",
     nrow(audit_checks)
   ),
+  paste0(
+    "Authoritative included studies not targeted: ",
+    nrow(included_not_targeted)
+  ),
+  if (
+    nrow(included_not_targeted) > 0L
+  ) {
+    paste0(
+      "Not targeted IDs: ",
+      paste(
+        included_not_targeted$screening_id,
+        collapse = " | "
+      )
+    )
+  } else {
+    "Not targeted IDs: None"
+  },
+  "",
+  "INCLUDED BUT NOT TARGETED — AUDIT",
+  "--------------------------------------------------",
+  if (
+    nrow(included_not_targeted) > 0L
+  ) {
+    paste(
+      vapply(
+        seq_len(nrow(included_not_targeted)),
+        function(i) {
+          paste0(
+            included_not_targeted$screening_id[[i]],
+            " | Role: ",
+            included_not_targeted$recommended_meta_analysis_role[[i]],
+            " | Reason: ",
+            included_not_targeted$reason_not_targeted[[i]],
+            " | Human action: ",
+            included_not_targeted$advisory_human_action[[i]]
+          )
+        },
+        character(1)
+      ),
+      collapse = "\n"
+    )
+  } else {
+    "None"
+  },
   "",
   "OUTPUTS",
   "--------------------------------------------------",
@@ -1879,6 +2298,10 @@ report_lines <- c(
   paste0(
     "Audit CSV: ",
     audit_csv
+  ),
+  paste0(
+    "Included-not-targeted audit CSV: ",
+    included_not_targeted_csv
   ),
   "",
   "STAGE BOUNDARY",
@@ -1958,6 +2381,37 @@ if (length(audit_only_ids) > 0L) {
 }
 cat("\n")
 
+cat("Included studies not selected for targeted Human Verification:\n")
+if (nrow(included_not_targeted) > 0L) {
+  for (i in seq_len(nrow(included_not_targeted))) {
+    cat(
+      "- ",
+      included_not_targeted$screening_id[[i]],
+      "\n",
+      "  Role: ",
+      included_not_targeted$recommended_meta_analysis_role[[i]],
+      "\n",
+      "  Reason: ",
+      included_not_targeted$reason_not_targeted[[i]],
+      "\n",
+      "  Human action: ",
+      included_not_targeted$advisory_human_action[[i]],
+      "\n",
+      sep = ""
+    )
+  }
+} else {
+  cat("- None\n")
+}
+cat("\n")
+
+cat(
+  "Included-not-targeted audit CSV:\n- ",
+  included_not_targeted_csv,
+  "\n\n",
+  sep = ""
+)
+
 cat(
   "Targeted study rows: ",
   nrow(target_study_data),
@@ -2000,6 +2454,8 @@ invisible(
     target_study_data = target_study_data,
     target_outcome_data = target_outcome_data,
     audit_checks = audit_checks,
+    included_not_targeted = included_not_targeted,
+    included_not_targeted_csv = included_not_targeted_csv,
     workbook = target_workbook_file,
     report = report_file
   )

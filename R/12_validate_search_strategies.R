@@ -493,14 +493,20 @@ validate_embase <- function(text) {
     message = "At least one :ti,ab,kw field restriction is required."
   )
 
-  checks$emtree_explosion <- list(
-    passed = has_regex(
-      text,
-      "'/exp"
+  checks$emtree_descriptor <- list(
+    passed = (
+      has_regex(
+        text,
+        "'/exp"
+      ) ||
+      has_regex(
+        text,
+        "'/de"
+      )
     ),
     message = paste(
-      "No exploded Emtree term using '/exp was detected.",
-      "This may be acceptable only if intentionally omitted."
+      "No Emtree descriptor using '/exp or '/de was detected.",
+      "Either exploded (/exp) or non-exploded (/de) Emtree syntax is acceptable."
     )
   )
 
@@ -520,6 +526,17 @@ validate_embase <- function(text) {
   message = 'CENTRAL MeSH syntax [mh "..."] was detected in Embase.'
 )
 
+  checks$no_and_not <- list(
+    passed = !has_regex(
+      text,
+      "\\bAND\\s+NOT\\b"
+    ),
+    message = paste(
+      "Embase uses NOT directly for exclusion.",
+      "Replace AND NOT with NOT."
+    )
+  )
+
   checks
 }
 
@@ -531,6 +548,14 @@ validate_central <- function(text) {
 
   checks <- list()
 
+  checks$no_slash <- list(
+    passed = !grepl("/", text, fixed = TRUE),
+    message = paste(
+      "CENTRAL strategy must not contain '/'.",
+      "Remove unsupported slash-qualified syntax before database testing."
+    )
+  )
+
   checks$text_fields <- list(
     passed = has_regex(
       text,
@@ -540,15 +565,15 @@ validate_central <- function(text) {
   )
 
   checks$mesh_descriptor <- list(
-  passed = has_regex(
-    text,
-    '\\[mh\\s+"[^"]+"\\]'
-  ),
-  message = paste(
-    'No CENTRAL MeSH syntax [mh "..."] was detected.',
-    "This may be acceptable only if intentionally omitted."
+    passed = has_regex(
+      text,
+      '\\[mh\\s+(?:\\^\\s*)?"[^"]+"\\]'
+    ),
+    message = paste(
+      'No CENTRAL MeSH syntax [mh "Term"] or [mh ^"Term"] was detected.',
+      "This may be acceptable only if intentionally omitted."
+    )
   )
-)
 
   checks$no_pubmed_tags <- list(
     passed = !has_regex(
@@ -877,4 +902,3 @@ if (nrow(failed_results) == 0) {
     " check(s) did not pass."
   )
 }
-

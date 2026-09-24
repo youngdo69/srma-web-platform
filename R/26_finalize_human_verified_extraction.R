@@ -552,9 +552,16 @@ if (
 outcomes <- openxlsx::readWorkbook(
   input_workbook,
   sheet = "Target_Outcome_Verification",
+  startRow = 3,
   colNames = TRUE,
-  skipEmptyRows = TRUE
+  skipEmptyRows = FALSE
 )
+
+# R26_COMPAT_ANALYSIS_GROUP_FROM_META_ANALYSIS_ROLE
+if (!"analysis_group" %in% names(outcomes) && "meta_analysis_role" %in% names(outcomes)) {
+  outcomes$analysis_group <- trimws(as.character(outcomes$meta_analysis_role))
+}
+
 
 if (nrow(outcomes) == 0L) {
   stop(
@@ -571,8 +578,9 @@ if (
   study <- openxlsx::readWorkbook(
     input_workbook,
     sheet = "Target_Study_Verification",
+    startRow = 3,
     colNames = TRUE,
-    skipEmptyRows = TRUE
+    skipEmptyRows = FALSE
   )
 }
 

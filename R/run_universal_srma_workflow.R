@@ -3,7 +3,7 @@
 # R/run_universal_srma_workflow.R
 #
 # TASK-016 — Final Universal Runner Integration
-# VERSION: 3.0.6
+# VERSION: 3.0.9
 #
 # PURPOSE
 # ------------------------------------------------------------
@@ -207,7 +207,7 @@ runner_paths <- function() {
 runner_empty_state <- function() {
   list(
     workflow = "universal_srma_final",
-    runner_version = "3.0.6",
+    runner_version = "3.0.12",
     status = "not_started",
     current_step = "",
     started_at = "",
@@ -224,7 +224,7 @@ runner_normalize_state <- function(state) {
   if (is.null(state) || !is.list(state)) return(template)
   for (name in names(template)) if (is.null(state[[name]])) state[[name]] <- template[[name]]
   state$workflow <- "universal_srma_final"
-  state$runner_version <- "3.0.6"
+  state$runner_version <- "3.0.12"
   state$completed_steps <- runner_as_character_vector(state$completed_steps)
   if (!is.list(state$step_records)) state$step_records <- list()
   state
@@ -1256,19 +1256,229 @@ runner_validate_targeted_prep <- function(paths) {
 
 runner_validate_extraction_human_gate <- function(paths) {
   wb <- runner_targeted_workbook()
-  if (!runner_file_nonempty(wb) || !runner_dependency_available("openxlsx")) return(runner_validation(FALSE, "Targeted Human Verification workbook is unavailable for the active project."))
 
-  d <- tryCatch(openxlsx::readWorkbook(wb, sheet = "Target_Outcome_Verification", colNames = TRUE, skipEmptyRows = TRUE), error = function(e) NULL)
-  if (is.null(d) || nrow(d) == 0L) return(runner_validation(FALSE, "Target_Outcome_Verification cannot be read."))
-  required <- c("human_include_in_planned_analysis", "verification_status")
-  if (!all(required %in% names(d))) return(runner_validation(FALSE, "Target_Outcome_Verification lacks required human verification columns."))
+  if (
+    !runner_file_nonempty(wb) ||
+    !runner_dependency_available("openxlsx")
+  ) {
+    return(
+      runner_validation(
+        FALSE,
+        "Targeted Human Verification workbook is unavailable for the active project.",
+        file = wb
+      )
+    )
+  }
 
-  include <- trimws(as.character(d$human_include_in_planned_analysis))
-  planned <- !is.na(include) & include == "Yes"
-  if (!any(planned)) return(runner_validation(FALSE, "No planned analysis row is marked Yes yet."))
-  status <- trimws(as.character(d$verification_status))
-  ok <- all(!planned | status %in% c("Verified", "Corrected"))
-  runner_validation(ok, if (ok) "Human Verification of all planned analysis rows is complete." else "One or more planned analysis rows are not Verified/Corrected.", file = wb)
+  # R/25B writes a title in row 1, leaves row 2 blank, and writes the
+  # canonical table header in row 3. The Human Gate must read the same
+  # workbook contract as R/25B's own post-save validation.
+  d <- tryCatch(
+    openxlsx::readWorkbook(
+      wb,
+      sheet = "Target_Outcome_Verification",
+      startRow = 3,
+      colNames = TRUE,
+      skipEmptyRows = FALSE
+    ),
+    error = function(e) NULL
+  )
+
+  if (is.null(d) || nrow(d) == 0L) {
+    return(
+      runner_validation(
+        FALSE,
+        "Target_Outcome_Verification cannot be read from the canonical row-3 header.",
+        file = wb
+      )
+    )
+  }
+
+  required <- c(
+    "human_include_in_planned_analysis",
+    "verification_status"
+  )
+
+  missing_required <- setdiff(
+    required,
+    names(d)
+  )
+
+  if (length(missing_required) > 0L) {
+    return(
+      runner_validation(
+        FALSE,
+        paste0(
+          "Target_Outcome_Verification lacks required human verification column(s): ",
+          paste(missing_required, collapse = ", "),
+          "."
+        ),
+        file = wb,
+        detected_columns = names(d)
+      )
+    )
+  }
+
+  include <- trimws(
+    as.character(
+      d$human_include_in_planned_analysis
+    )
+  )
+
+  planned <- (
+    !is.na(include) &
+      tolower(include) == "yes"
+  )
+
+  if (!any(planned)) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "Human Verification is required.",
+          "Open targeted_human_verification.xlsx, worksheet Target_Outcome_Verification,",
+          "set human_include_in_planned_analysis to Yes or No for each targeted outcome row,",
+          "and mark every planned-analysis row as Verified or Corrected."
+        ),
+        file = wb
+      )
+    )
+  }
+
+  status <- trimws(
+    as.character(
+      d$verification_status
+    )
+  )
+
+  ok <- all(
+    !planned |
+      status %in% c(
+        "Verified",
+        "Corrected"
+      )
+  )
+
+  runner_validation(
+    ok,
+    if (ok) {
+      "Human Verification of all planned analysis rows is complete."
+    } else {
+      paste(
+        "One or more planned-analysis rows are not Verified/Corrected.",
+        "Complete Target_Outcome_Verification and rerun the same Runner."
+      )
+    },
+    file = wb
+  )
+}
+
+
+# Interactive Human Gate for targeted extraction verification.
+# "Yes" never overrides scientific validation; it only tells the Runner
+# that the author has saved the workbook and wants an immediate re-check.
+runner_confirm_extraction_human_gate <- function(paths) {
+  wb <- runner_targeted_workbook()
+
+  initial <- runner_validate_extraction_human_gate(paths)
+
+  # If the workbook/dependency itself is unavailable, there is nothing
+  # meaningful to revalidate interactively.
+  if (
+    !runner_file_nonempty(wb) ||
+    !runner_dependency_available("openxlsx")
+  ) {
+    return(initial)
+  }
+
+  # Already complete (for example when this helper is reached via from_step).
+  if (isTRUE(initial$passed)) {
+    return(initial)
+  }
+
+  if (!interactive()) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "Human Verification requires an interactive R session.",
+          "Open and save targeted_human_verification.xlsx, then rerun the Runner interactively."
+        ),
+        file = wb
+      )
+    )
+  }
+
+  wb_display <- tryCatch(
+    normalizePath(
+      wb,
+      winslash = "/",
+      mustWork = TRUE
+    ),
+    error = function(e) wb
+  )
+
+  cat("\n")
+  cat("============================================================\n")
+  cat("HUMAN GATE — Targeted Data Verification\n")
+  cat("============================================================\n\n")
+  cat("Open and complete the Human Verification workbook:\n")
+  cat(wb_display, "\n\n", sep = "")
+  cat("Required review areas:\n")
+  cat("  1. Target_Study_Verification\n")
+  cat("     - verification_status\n")
+  cat("     - human_verified_* fields when correction is required\n")
+  cat("  2. Target_Outcome_Verification\n")
+  cat("     - verification_status\n")
+  cat("     - human_include_in_planned_analysis = Yes / No\n")
+  cat("     - human_verified_* fields when correction is required\n\n")
+  cat("Save the Excel workbook before answering Yes.\n")
+  cat("Current validation state:\n- ", initial$message, "\n\n", sep = "")
+
+  repeat {
+    answer <- tolower(
+      trimws(
+        readline(
+          "Have you completed AND SAVED the Human Verification workbook? Response [Yes/No]: "
+        )
+      )
+    )
+
+    if (answer %in% c("yes", "y")) {
+      cat("\nRe-validating Human Verification workbook...\n")
+
+      validation <- runner_validate_extraction_human_gate(paths)
+
+      if (isTRUE(validation$passed)) {
+        cat("PASS: ", validation$message, "\n", sep = "")
+        cat("Proceeding automatically to R/26 finalization.\n\n")
+        return(validation)
+      }
+
+      cat("NOT YET COMPLETE: ", validation$message, "\n", sep = "")
+      cat(
+        "Return to the workbook, correct/save it, then answer Yes again.\n",
+        "Answer No if you want the workflow to pause safely.\n\n",
+        sep = ""
+      )
+      next
+    }
+
+    if (answer %in% c("no", "n")) {
+      return(
+        runner_validation(
+          FALSE,
+          paste(
+            "Human Verification is not yet complete.",
+            "Workflow paused safely; save the workbook and resume the same Runner."
+          ),
+          file = wb
+        )
+      )
+    }
+
+    cat("Please answer Yes or No.\n")
+  }
 }
 
 runner_resolve_manifest_dataset_path <- function(raw_path, context, canonical_directory) {
@@ -1399,34 +1609,1031 @@ runner_rob_workbook <- function() {
   file.path(runner_risk_of_bias_root(context), "risk_of_bias_author_editable.xlsx")
 }
 
+# Ensure that the R/36 author-review workbook contains tool-specific
+# drop-down menus for final author judgements. This is intentionally
+# self-healing so older R/36 workbooks can be upgraded at the Human Gate
+# without rerunning the expensive upstream RoB Agent step.
+runner_ensure_rob_author_dropdowns <- function(paths) {
+  wb_path <- runner_rob_workbook()
+
+  if (!runner_file_nonempty(wb_path)) {
+    return(
+      runner_validation(
+        FALSE,
+        "RoB author-review workbook is unavailable; dropdowns cannot be installed.",
+        file = wb_path,
+        repaired = FALSE
+      )
+    )
+  }
+
+  if (!runner_dependency_available("openxlsx")) {
+    return(
+      runner_validation(
+        FALSE,
+        "The openxlsx package is required to install RoB author-review dropdowns.",
+        file = wb_path,
+        repaired = FALSE
+      )
+    )
+  }
+
+  sheet_names <- tryCatch(
+    openxlsx::getSheetNames(wb_path),
+    error = function(e) character(0)
+  )
+
+  required_sheets <- c("Domain_Review", "Overall_Review")
+
+  if (!all(required_sheets %in% sheet_names)) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "RoB workbook is missing required sheet(s):",
+          paste(setdiff(required_sheets, sheet_names), collapse = ", ")
+        ),
+        file = wb_path,
+        repaired = FALSE
+      )
+    )
+  }
+
+  # Presence of this dedicated hidden sheet is the idempotency marker.
+  # If it exists, the workbook has already been upgraded by this Runner.
+  validation_sheet <- "RoB_Validation_Lists"
+
+  if (validation_sheet %in% sheet_names) {
+    return(
+      runner_validation(
+        TRUE,
+        "Tool-specific RoB author judgement dropdowns are already installed.",
+        file = wb_path,
+        repaired = FALSE
+      )
+    )
+  }
+
+  domains <- tryCatch(
+    openxlsx::read.xlsx(
+      wb_path,
+      sheet = "Domain_Review",
+      check.names = FALSE
+    ),
+    error = function(e) NULL
+  )
+
+  overall <- tryCatch(
+    openxlsx::read.xlsx(
+      wb_path,
+      sheet = "Overall_Review",
+      check.names = FALSE
+    ),
+    error = function(e) NULL
+  )
+
+  if (is.null(domains) || is.null(overall)) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "Domain_Review or Overall_Review cannot be read.",
+          "Close Excel if the workbook is open and rerun the Runner."
+        ),
+        file = wb_path,
+        repaired = FALSE
+      )
+    )
+  }
+
+  if (
+    !"author_domain_judgement" %in% names(domains) ||
+      !"author_final_overall_judgement" %in% names(overall)
+  ) {
+    return(
+      runner_validation(
+        FALSE,
+        "Required author judgement columns are missing; dropdowns cannot be installed.",
+        file = wb_path,
+        repaired = FALSE
+      )
+    )
+  }
+
+  normalize_tool <- function(x) {
+    x <- toupper(trimws(as.character(x)))
+    out <- rep(NA_character_, length(x))
+    out[grepl("ROBINS", x)] <- "ROBINS-I"
+    out[
+      grepl("ROB[[:space:]_-]*2", x) |
+        grepl("COCHRANE[[:space:]_-]*ROB", x)
+    ] <- "RoB 2"
+    out
+  }
+
+  find_tool_vector <- function(data) {
+    if (is.null(data) || nrow(data) == 0L) {
+      return(character(0))
+    }
+
+    preferred <- intersect(
+      c(
+        "tool",
+        "rob_tool",
+        "risk_of_bias_tool",
+        "assessment_tool",
+        "rob_method",
+        "risk_of_bias_method"
+      ),
+      names(data)
+    )
+
+    candidates <- unique(
+      c(
+        preferred,
+        names(data)
+      )
+    )
+
+    for (col in candidates) {
+      values <- normalize_tool(data[[col]])
+      if (any(!is.na(values))) {
+        return(values)
+      }
+    }
+
+    rep(NA_character_, nrow(data))
+  }
+
+  domain_tool <- find_tool_vector(domains)
+  overall_tool <- find_tool_vector(overall)
+
+  # If Overall_Review lacks an explicit tool column, recover it from
+  # Domain_Review using a shared study identifier where possible.
+  if (
+    length(overall_tool) == nrow(overall) &&
+      any(is.na(overall_tool)) &&
+      length(domain_tool) == nrow(domains) &&
+      any(!is.na(domain_tool))
+  ) {
+    id_candidates <- intersect(
+      c(
+        "screening_id",
+        "study_id",
+        "study_key",
+        "study_label",
+        "citation",
+        "first_author_year"
+      ),
+      intersect(
+        names(domains),
+        names(overall)
+      )
+    )
+
+    if (length(id_candidates) > 0L) {
+      id_col <- id_candidates[[1]]
+
+      domain_map <- data.frame(
+        id = as.character(domains[[id_col]]),
+        tool = domain_tool,
+        stringsAsFactors = FALSE
+      )
+
+      domain_map <- domain_map[
+        !is.na(domain_map$id) &
+          nzchar(domain_map$id) &
+          !is.na(domain_map$tool),
+        ,
+        drop = FALSE
+      ]
+
+      if (nrow(domain_map) > 0L) {
+        domain_map <- domain_map[
+          !duplicated(domain_map$id),
+          ,
+          drop = FALSE
+        ]
+
+        mapped <- domain_map$tool[
+          match(
+            as.character(overall[[id_col]]),
+            domain_map$id
+          )
+        ]
+
+        replace_idx <- is.na(overall_tool) & !is.na(mapped)
+        overall_tool[replace_idx] <- mapped[replace_idx]
+      }
+    }
+  }
+
+  # A single-tool review is common. If the domain sheet establishes one
+  # unambiguous tool, use it for any unresolved overall rows.
+  known_domain_tools <- unique(domain_tool[!is.na(domain_tool)])
+
+  if (
+    length(known_domain_tools) == 1L &&
+      length(overall_tool) == nrow(overall)
+  ) {
+    overall_tool[is.na(overall_tool)] <- known_domain_tools[[1]]
+  }
+
+  unresolved_domain <- which(is.na(domain_tool))
+  unresolved_overall <- which(is.na(overall_tool))
+
+  if (
+    length(unresolved_domain) > 0L ||
+      length(unresolved_overall) > 0L
+  ) {
+    return(
+      runner_validation(
+        FALSE,
+        paste0(
+          "Could not determine the RoB tool for every author-review row. ",
+          "Unresolved Domain_Review rows: ",
+          length(unresolved_domain),
+          "; unresolved Overall_Review rows: ",
+          length(unresolved_overall),
+          ". The workbook needs an explicit tool/rob_tool column or a shared study identifier."
+        ),
+        file = wb_path,
+        repaired = FALSE,
+        unresolved_domain = length(unresolved_domain),
+        unresolved_overall = length(unresolved_overall)
+      )
+    )
+  }
+
+  rob2_options <- c(
+    "Low",
+    "Some concerns",
+    "High"
+  )
+
+  robinsi_options <- c(
+    "Low",
+    "Moderate",
+    "Serious",
+    "Critical",
+    "No information"
+  )
+
+  wb <- tryCatch(
+    openxlsx::loadWorkbook(wb_path),
+    error = function(e) NULL
+  )
+
+  if (is.null(wb)) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "The RoB workbook could not be opened for dropdown installation.",
+          "Close Excel if it is open and rerun the Runner."
+        ),
+        file = wb_path,
+        repaired = FALSE
+      )
+    )
+  }
+
+  openxlsx::addWorksheet(
+    wb,
+    validation_sheet,
+    visible = FALSE
+  )
+
+  validation_data <- data.frame(
+    RoB2_Judgement = c(
+      rob2_options,
+      rep(
+        NA_character_,
+        length(robinsi_options) - length(rob2_options)
+      )
+    ),
+    ROBINSI_Judgement = robinsi_options,
+    stringsAsFactors = FALSE
+  )
+
+  openxlsx::writeData(
+    wb,
+    validation_sheet,
+    validation_data,
+    startRow = 1,
+    startCol = 1,
+    colNames = TRUE
+  )
+
+  domain_col <- match(
+    "author_domain_judgement",
+    names(domains)
+  )
+
+  overall_col <- match(
+    "author_final_overall_judgement",
+    names(overall)
+  )
+
+  add_row_validation <- function(
+      sheet,
+      excel_row,
+      excel_col,
+      tool
+  ) {
+    list_formula <- if (identical(tool, "RoB 2")) {
+      paste0(
+        "'",
+        validation_sheet,
+        "'!$A$2:$A$",
+        1L + length(rob2_options)
+      )
+    } else {
+      paste0(
+        "'",
+        validation_sheet,
+        "'!$B$2:$B$",
+        1L + length(robinsi_options)
+      )
+    }
+
+    openxlsx::dataValidation(
+      wb,
+      sheet = sheet,
+      cols = excel_col,
+      rows = excel_row,
+      type = "list",
+      value = list_formula,
+      allowBlank = TRUE
+    )
+  }
+
+  if (nrow(domains) > 0L) {
+    for (i in seq_len(nrow(domains))) {
+      add_row_validation(
+        "Domain_Review",
+        excel_row = i + 1L,
+        excel_col = domain_col,
+        tool = domain_tool[[i]]
+      )
+    }
+  }
+
+  if (nrow(overall) > 0L) {
+    for (i in seq_len(nrow(overall))) {
+      add_row_validation(
+        "Overall_Review",
+        excel_row = i + 1L,
+        excel_col = overall_col,
+        tool = overall_tool[[i]]
+      )
+    }
+  }
+
+  # Add a visible note to the judgement-column headers so that manual
+  # typing also follows the official labels if Excel hides validation UI.
+  openxlsx::writeComment(
+    wb,
+    "Domain_Review",
+    col = domain_col,
+    row = 1,
+    comment = openxlsx::createComment(
+      comment = paste(
+        "Choose from the row-specific dropdown.",
+        "RoB 2: Low / Some concerns / High.",
+        "ROBINS-I: Low / Moderate / Serious / Critical / No information."
+      ),
+      author = "Universal SR-MA Toolkit"
+    )
+  )
+
+  openxlsx::writeComment(
+    wb,
+    "Overall_Review",
+    col = overall_col,
+    row = 1,
+    comment = openxlsx::createComment(
+      comment = paste(
+        "Choose from the row-specific dropdown.",
+        "RoB 2: Low / Some concerns / High.",
+        "ROBINS-I: Low / Moderate / Serious / Critical / No information."
+      ),
+      author = "Universal SR-MA Toolkit"
+    )
+  )
+
+  save_error <- NULL
+
+  saved <- tryCatch(
+    {
+      openxlsx::saveWorkbook(
+        wb,
+        wb_path,
+        overwrite = TRUE
+      )
+      TRUE
+    },
+    error = function(e) {
+      save_error <<- conditionMessage(e)
+      FALSE
+    }
+  )
+
+  if (!saved) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "Could not save the workbook after installing RoB dropdowns.",
+          "Close Excel if it is open and rerun the Runner.",
+          if (!is.null(save_error)) save_error else ""
+        ),
+        file = wb_path,
+        repaired = FALSE
+      )
+    )
+  }
+
+  runner_validation(
+    TRUE,
+    paste(
+      "Installed tool-specific author judgement dropdowns.",
+      "RoB 2: Low / Some concerns / High.",
+      "ROBINS-I: Low / Moderate / Serious / Critical / No information."
+    ),
+    file = wb_path,
+    repaired = TRUE
+  )
+}
+
 runner_validate_rob_author_gate <- function(paths) {
   wb <- runner_rob_workbook()
-  if (!runner_file_nonempty(wb) || !runner_dependency_available("openxlsx")) return(runner_validation(FALSE, "RoB author-review workbook is unavailable for the active project."))
 
-  domains <- tryCatch(openxlsx::read.xlsx(wb, sheet = "Domain_Review", check.names = FALSE), error = function(e) NULL)
-  overall <- tryCatch(openxlsx::read.xlsx(wb, sheet = "Overall_Review", check.names = FALSE), error = function(e) NULL)
-  if (is.null(domains) || is.null(overall)) return(runner_validation(FALSE, "Domain_Review or Overall_Review cannot be read."))
-  if (!"author_domain_judgement" %in% names(domains) || !"author_final_overall_judgement" %in% names(overall)) return(runner_validation(FALSE, "Required author-final RoB judgement columns are missing."))
+  if (!runner_file_nonempty(wb)) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "RoB author-review workbook is unavailable for the active project.",
+          "Expected workbook:",
+          wb
+        ),
+        file = wb,
+        domain_rows = 0L,
+        domain_missing = NA_integer_,
+        overall_rows = 0L,
+        overall_missing = NA_integer_
+      )
+    )
+  }
+
+  if (!runner_dependency_available("openxlsx")) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "The openxlsx package is required to validate the RoB author-review workbook.",
+          "Install it once with install.packages(\"openxlsx\")."
+        ),
+        file = wb,
+        domain_rows = NA_integer_,
+        domain_missing = NA_integer_,
+        overall_rows = NA_integer_,
+        overall_missing = NA_integer_
+      )
+    )
+  }
+
+  domain_error <- NULL
+  overall_error <- NULL
+
+  domains <- tryCatch(
+    openxlsx::read.xlsx(
+      wb,
+      sheet = "Domain_Review",
+      check.names = FALSE
+    ),
+    error = function(e) {
+      domain_error <<- conditionMessage(e)
+      NULL
+    }
+  )
+
+  overall <- tryCatch(
+    openxlsx::read.xlsx(
+      wb,
+      sheet = "Overall_Review",
+      check.names = FALSE
+    ),
+    error = function(e) {
+      overall_error <<- conditionMessage(e)
+      NULL
+    }
+  )
+
+  if (is.null(domains) || is.null(overall)) {
+    details <- c(
+      if (!is.null(domain_error)) paste0("Domain_Review: ", domain_error) else NULL,
+      if (!is.null(overall_error)) paste0("Overall_Review: ", overall_error) else NULL
+    )
+
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "Domain_Review or Overall_Review cannot be read.",
+          "Close the Excel workbook if it is open, then rerun the same Runner.",
+          if (length(details) > 0L) paste(details, collapse = " | ") else ""
+        ),
+        file = wb,
+        domain_rows = if (is.null(domains)) NA_integer_ else nrow(domains),
+        domain_missing = NA_integer_,
+        overall_rows = if (is.null(overall)) NA_integer_ else nrow(overall),
+        overall_missing = NA_integer_
+      )
+    )
+  }
+
+  if (
+    !"author_domain_judgement" %in% names(domains) ||
+      !"author_final_overall_judgement" %in% names(overall)
+  ) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "Required author-final RoB judgement columns are missing.",
+          "Domain_Review must contain 'author_domain_judgement' and",
+          "Overall_Review must contain 'author_final_overall_judgement'."
+        ),
+        file = wb,
+        domain_rows = nrow(domains),
+        domain_missing = NA_integer_,
+        overall_rows = nrow(overall),
+        overall_missing = NA_integer_
+      )
+    )
+  }
 
   dj <- trimws(as.character(domains$author_domain_judgement))
   oj <- trimws(as.character(overall$author_final_overall_judgement))
-  ok <- nrow(domains) > 0L && nrow(overall) > 0L && all(!is.na(dj) & nzchar(dj)) && all(!is.na(oj) & nzchar(oj))
-  runner_validation(ok, if (ok) "All author-final RoB domain and overall judgements are complete." else "Author-final RoB review remains incomplete.", file = wb)
+
+  domain_complete <- !is.na(dj) & nzchar(dj)
+  overall_complete <- !is.na(oj) & nzchar(oj)
+
+  domain_missing <- sum(!domain_complete)
+  overall_missing <- sum(!overall_complete)
+
+  ok <- (
+    nrow(domains) > 0L &&
+      nrow(overall) > 0L &&
+      domain_missing == 0L &&
+      overall_missing == 0L
+  )
+
+  message <- if (ok) {
+    "All author-final RoB domain and overall judgements are complete."
+  } else {
+    paste0(
+      "Author-final RoB review remains incomplete. ",
+      "Domain_Review missing author_domain_judgement: ",
+      domain_missing,
+      "/",
+      nrow(domains),
+      "; Overall_Review missing author_final_overall_judgement: ",
+      overall_missing,
+      "/",
+      nrow(overall),
+      "."
+    )
+  }
+
+  runner_validation(
+    ok,
+    message,
+    file = wb,
+    domain_rows = nrow(domains),
+    domain_missing = domain_missing,
+    overall_rows = nrow(overall),
+    overall_missing = overall_missing
+  )
+}
+
+
+# Interactive Human Gate for final risk-of-bias review.
+# "Yes" never overrides RoB validation; it only tells the Runner that
+# the author has saved the workbook and wants an immediate re-check.
+runner_confirm_rob_author_gate <- function(paths) {
+  wb <- runner_rob_workbook()
+
+  dropdown_status <- runner_ensure_rob_author_dropdowns(paths)
+
+  if (!isTRUE(dropdown_status$passed)) {
+    return(dropdown_status)
+  }
+
+  initial <- runner_validate_rob_author_gate(paths)
+
+  # If the workbook or dependency itself is unavailable, interactive
+  # confirmation cannot repair the problem.
+  if (
+    !runner_file_nonempty(wb) ||
+    !runner_dependency_available("openxlsx")
+  ) {
+    return(initial)
+  }
+
+  # Already complete: do not interrupt the user with redundant guidance.
+  if (isTRUE(initial$passed)) {
+    return(initial)
+  }
+
+  wb_display <- tryCatch(
+    normalizePath(
+      wb,
+      winslash = "/",
+      mustWork = TRUE
+    ),
+    error = function(e) wb
+  )
+
+  guidance_lines <- c(
+    "HUMAN ACTION REQUIRED — Final Risk-of-Bias Review",
+    paste0("Open: ", wb_display),
+    "Complete every active author-final judgement row:",
+    "  1. Sheet 'Domain_Review'",
+    "     - review the Agent provisional judgement/evidence",
+    "     - complete 'author_domain_judgement' in every row",
+    "     - use the row-specific workbook dropdown",
+    "       RoB 2: Low / Some concerns / High",
+    "       ROBINS-I: Low / Moderate / Serious / Critical / No information",
+    "  2. Sheet 'Overall_Review'",
+    "     - review the Agent provisional overall judgement",
+    "     - complete 'author_final_overall_judgement' in every row",
+    "     - use the row-specific workbook dropdown",
+    "       RoB 2: Low / Some concerns / High",
+    "       ROBINS-I: Low / Moderate / Serious / Critical / No information",
+    "If you change an Agent judgement, add an author note/rationale when the workbook provides a note field.",
+    "Save the workbook IN THE SAME LOCATION AND WITH THE SAME FILENAME.",
+    "Close Excel before re-validation, then rerun the same Runner or answer Yes below."
+  )
+
+  if (!interactive()) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          c(
+            guidance_lines,
+            paste0("Current validation state: ", initial$message)
+          ),
+          collapse = "\n"
+        ),
+        file = wb,
+        domain_rows = initial$domain_rows %||% NA_integer_,
+        domain_missing = initial$domain_missing %||% NA_integer_,
+        overall_rows = initial$overall_rows %||% NA_integer_,
+        overall_missing = initial$overall_missing %||% NA_integer_
+      )
+    )
+  }
+
+  cat("\n")
+  cat("============================================================\n")
+  cat("HUMAN GATE — Final Risk-of-Bias Review\n")
+  cat("============================================================\n\n")
+  cat("Open the author-review workbook:\n")
+  cat(wb_display, "\n\n", sep = "")
+  cat("Required author actions:\n")
+  cat("  1. Domain_Review\n")
+  cat("     - review the Agent provisional judgement/evidence\n")
+  cat("     - complete author_domain_judgement in EVERY row\n")
+  cat("     - use the row-specific workbook dropdown\n")
+  cat("       RoB 2: Low / Some concerns / High\n")
+  cat("       ROBINS-I: Low / Moderate / Serious / Critical / No information\n")
+  cat("  2. Overall_Review\n")
+  cat("     - review the Agent provisional overall judgement\n")
+  cat("     - complete author_final_overall_judgement in EVERY row\n")
+  cat("     - use the workbook dropdown/allowed judgement labels\n\n")
+  cat(
+    "If you change an Agent judgement, add an author note/rationale ",
+    "when the workbook provides a note field.\n\n",
+    sep = ""
+  )
+  cat("Save the workbook in the SAME location/name and CLOSE Excel before validation.\n")
+  cat("Current validation state:\n- ", initial$message, "\n", sep = "")
+
+  if (
+    !is.null(initial$domain_missing) &&
+    !is.na(initial$domain_missing)
+  ) {
+    cat(
+      "  Domain judgments still blank: ",
+      initial$domain_missing,
+      "/",
+      initial$domain_rows,
+      "\n",
+      sep = ""
+    )
+  }
+
+  if (
+    !is.null(initial$overall_missing) &&
+    !is.na(initial$overall_missing)
+  ) {
+    cat(
+      "  Overall judgments still blank: ",
+      initial$overall_missing,
+      "/",
+      initial$overall_rows,
+      "\n",
+      sep = ""
+    )
+  }
+
+  cat("\n")
+
+  repeat {
+    answer <- tolower(
+      trimws(
+        readline(
+          "Have you completed, SAVED, and CLOSED the RoB workbook? Response [Yes/No]: "
+        )
+      )
+    )
+
+    if (answer %in% c("yes", "y")) {
+      cat("\nRe-validating RoB author-review workbook...\n")
+
+      validation <- runner_validate_rob_author_gate(paths)
+
+      if (isTRUE(validation$passed)) {
+        cat("PASS: ", validation$message, "\n", sep = "")
+        cat("Proceeding automatically to R/37 final RoB generation.\n\n")
+        return(validation)
+      }
+
+      cat("NOT YET COMPLETE: ", validation$message, "\n", sep = "")
+
+      if (
+        !is.null(validation$domain_missing) &&
+        !is.na(validation$domain_missing)
+      ) {
+        cat(
+          "  Domain judgments still blank: ",
+          validation$domain_missing,
+          "/",
+          validation$domain_rows,
+          "\n",
+          sep = ""
+        )
+      }
+
+      if (
+        !is.null(validation$overall_missing) &&
+        !is.na(validation$overall_missing)
+      ) {
+        cat(
+          "  Overall judgments still blank: ",
+          validation$overall_missing,
+          "/",
+          validation$overall_rows,
+          "\n",
+          sep = ""
+        )
+      }
+
+      cat(
+        "Return to the workbook, correct/save/close it, then answer Yes again.\n",
+        "Answer No if you want the workflow to pause safely.\n\n",
+        sep = ""
+      )
+      next
+    }
+
+    if (answer %in% c("no", "n")) {
+      return(
+        runner_validation(
+          FALSE,
+          paste(
+            "Author-final RoB review is not yet complete.",
+            "Workflow paused safely; complete/save/close the workbook and resume the same Runner."
+          ),
+          file = wb,
+          domain_rows = initial$domain_rows %||% NA_integer_,
+          domain_missing = initial$domain_missing %||% NA_integer_,
+          overall_rows = initial$overall_rows %||% NA_integer_,
+          overall_missing = initial$overall_missing %||% NA_integer_
+        )
+      )
+    }
+
+    cat("Please answer Yes or No.\n")
+  }
 }
 
 runner_validate_rob_finalization <- function(paths) {
   context <- runner_project_context_or_null()
-  if (is.null(context)) return(runner_validation(FALSE, "Canonical active-project context could not be resolved."))
+
+  if (is.null(context)) {
+    return(
+      runner_validation(
+        FALSE,
+        "Canonical active-project context could not be resolved."
+      )
+    )
+  }
+
   root <- runner_risk_of_bias_root(context)
   figs <- file.path(root, "figures")
-  files <- c(
-    combined = file.path(root, "risk_of_bias_final.csv"),
-    report = file.path(figs, "rob_figure_validation_report.txt"),
-    rob2_traffic_light = file.path(figs, "rob2_traffic_light.pdf"),
-    robins_i_traffic_light = file.path(figs, "robins_i_traffic_light.pdf")
+
+  combined <- file.path(
+    root,
+    "risk_of_bias_final.csv"
   )
-  ok <- vapply(files, runner_file_nonempty, logical(1))
-  runner_validation(all(ok), if (all(ok)) "Final author-reviewed RoB data and publication figures are complete for the active project." else paste("Missing or empty canonical R/37 output(s):", paste(names(files)[!ok], collapse = ", ")), files = as.list(files))
+
+  report <- file.path(
+    figs,
+    "rob_figure_validation_report.txt"
+  )
+
+  if (!runner_file_nonempty(combined)) {
+    return(
+      runner_validation(
+        FALSE,
+        "Canonical R/37 risk_of_bias_final.csv is missing or empty.",
+        file = combined
+      )
+    )
+  }
+
+  if (!runner_file_nonempty(report)) {
+    return(
+      runner_validation(
+        FALSE,
+        "Canonical R/37 figure validation report is missing or empty.",
+        file = report
+      )
+    )
+  }
+
+  rob_final <- runner_read_csv_character(combined)
+
+  if (
+    is.null(rob_final) ||
+      nrow(rob_final) == 0L
+  ) {
+    return(
+      runner_validation(
+        FALSE,
+        "Canonical R/37 risk_of_bias_final.csv cannot be interpreted.",
+        file = combined
+      )
+    )
+  }
+
+  normalize_rob_tool <- function(x) {
+    x <- toupper(trimws(as.character(x)))
+    out <- rep(NA_character_, length(x))
+
+    out[grepl("ROBINS", x)] <- "ROBINS-I"
+
+    out[
+      grepl("ROB[[:space:]_-]*2", x) |
+        grepl("COCHRANE[[:space:]_-]*ROB", x)
+    ] <- "RoB 2"
+
+    out
+  }
+
+  tool_col_candidates <- intersect(
+    c(
+      "tool",
+      "rob_tool",
+      "risk_of_bias_tool",
+      "assessment_tool",
+      "rob_method",
+      "risk_of_bias_method"
+    ),
+    names(rob_final)
+  )
+
+  tools <- character(0)
+
+  if (length(tool_col_candidates) > 0L) {
+    for (col in tool_col_candidates) {
+      candidate <- normalize_rob_tool(
+        rob_final[[col]]
+      )
+
+      if (any(!is.na(candidate))) {
+        tools <- candidate
+        break
+      }
+    }
+  }
+
+  # Fallback for legacy/current files whose tool column has a different name:
+  # scan columns for explicit RoB 2 / ROBINS-I labels.
+  if (length(tools) == 0L) {
+    for (col in names(rob_final)) {
+      candidate <- normalize_rob_tool(
+        rob_final[[col]]
+      )
+
+      if (any(!is.na(candidate))) {
+        tools <- candidate
+        break
+      }
+    }
+  }
+
+  if (
+    length(tools) == 0L ||
+      all(is.na(tools))
+  ) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "Could not determine which RoB tools are present in risk_of_bias_final.csv.",
+          "R/37 completion validation requires explicit RoB 2 / ROBINS-I provenance."
+        ),
+        file = combined
+      )
+    )
+  }
+
+  present_tools <- sort(
+    unique(
+      tools[
+        !is.na(tools)
+      ]
+    )
+  )
+
+  required_files <- c(
+    combined = combined,
+    report = report
+  )
+
+  if ("RoB 2" %in% present_tools) {
+    required_files <- c(
+      required_files,
+      rob2_traffic_light = file.path(
+        figs,
+        "rob2_traffic_light.pdf"
+      )
+    )
+  }
+
+  if ("ROBINS-I" %in% present_tools) {
+    required_files <- c(
+      required_files,
+      robins_i_traffic_light = file.path(
+        figs,
+        "robins_i_traffic_light.pdf"
+      )
+    )
+  }
+
+  ok <- vapply(
+    required_files,
+    runner_file_nonempty,
+    logical(1)
+  )
+
+  if (!all(ok)) {
+    return(
+      runner_validation(
+        FALSE,
+        paste(
+          "Missing or empty canonical R/37 output(s) for the RoB tool(s) actually present:",
+          paste(
+            names(required_files)[!ok],
+            collapse = ", "
+          )
+        ),
+        files = as.list(required_files),
+        present_tools = present_tools
+      )
+    )
+  }
+
+  runner_validation(
+    TRUE,
+    paste0(
+      "Final author-reviewed RoB data and publication figures are complete. ",
+      "RoB tools present: ",
+      paste(
+        present_tools,
+        collapse = ", "
+      ),
+      ". Figures for absent RoB tools are not required."
+    ),
+    files = as.list(required_files),
+    present_tools = present_tools
+  )
 }
 
 runner_validate_step <- function(step, paths) {
@@ -1650,20 +2857,55 @@ run_universal_srma_workflow <- function(
       next
     }
 
+    # Explicit from_step semantics:
+    # The first explicitly requested step must execute even when a valid
+    # artifact already exists. Otherwise from_step would only clear state
+    # while recovery immediately skips the requested script.
+    force_requested_step <- (
+      !is.null(from_step) &&
+        identical(step$id, from_step)
+    )
+
     # A completed state is trusted only if the completion validator still passes.
+    # Never recover/skip the explicitly requested first step.
     pre <- runner_validate_step(step, paths)
-    if (step$id %in% state$completed_steps && isTRUE(pre$passed)) {
+
+    if (
+      !isTRUE(force_requested_step) &&
+      step$id %in% state$completed_steps &&
+      isTRUE(pre$passed)
+    ) {
       runner_print_step(index, total, step$label, "ALREADY COMPLETE")
       run_log$steps[[step$id]] <- list(status="recovered", validation=pre)
       next
     }
 
-    if (isTRUE(step$recovery) && isTRUE(pre$passed)) {
-      state <- runner_record_step(state, step$id, "completed", completed_at=runner_now(), message=paste("Recovered from validated artifacts:", pre$message), validation=pre)
+    if (
+      !isTRUE(force_requested_step) &&
+      isTRUE(step$recovery) &&
+      isTRUE(pre$passed)
+    ) {
+      state <- runner_record_step(
+        state,
+        step$id,
+        "completed",
+        completed_at = runner_now(),
+        message = paste("Recovered from validated artifacts:", pre$message),
+        validation = pre
+      )
       runner_write_state(state, paths$state_file)
       run_log$steps[[step$id]] <- list(status="recovered", validation=pre)
       runner_print_step(index, total, step$label, "RECOVERED")
       next
+    }
+
+    if (isTRUE(force_requested_step)) {
+      cat(
+        "\nExplicit from_step requested; forcing execution of: ",
+        step$id,
+        "\n",
+        sep = ""
+      )
     }
 
     runner_print_step(index, total, step$label)
@@ -1778,6 +3020,84 @@ run_universal_srma_workflow <- function(
         task018_validation
       )
     )
+  }
+
+  if (identical(step$id, "extraction_human_gate")) {
+    confirmation <- runner_confirm_extraction_human_gate(paths)
+
+    if (!isTRUE(confirmation$passed)) {
+      return(
+        runner_pause(
+          state,
+          step,
+          paths,
+          run_log,
+          run_log_file,
+          confirmation$message,
+          confirmation
+        )
+      )
+    }
+
+    state$current_step <- ""
+    state <- runner_record_step(
+      state,
+      step$id,
+      "completed",
+      started_at = started,
+      completed_at = runner_now(),
+      message = confirmation$message,
+      validation = confirmation
+    )
+    runner_write_state(state, paths$state_file)
+
+    run_log$steps[[step$id]] <- list(
+      status = "completed",
+      validation = confirmation
+    )
+    yaml::write_yaml(run_log, run_log_file)
+
+    runner_print_step(index, total, step$label, "PASS")
+    next
+  }
+
+  if (identical(step$id, "rob_author_gate")) {
+    confirmation <- runner_confirm_rob_author_gate(paths)
+
+    if (!isTRUE(confirmation$passed)) {
+      return(
+        runner_pause(
+          state,
+          step,
+          paths,
+          run_log,
+          run_log_file,
+          confirmation$message,
+          confirmation
+        )
+      )
+    }
+
+    state$current_step <- ""
+    state <- runner_record_step(
+      state,
+      step$id,
+      "completed",
+      started_at = started,
+      completed_at = runner_now(),
+      message = confirmation$message,
+      validation = confirmation
+    )
+    runner_write_state(state, paths$state_file)
+
+    run_log$steps[[step$id]] <- list(
+      status = "completed",
+      validation = confirmation
+    )
+    yaml::write_yaml(run_log, run_log_file)
+
+    runner_print_step(index, total, step$label, "PASS")
+    next
   }
 
   if (identical(step$type, "gate")) {

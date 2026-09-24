@@ -156,8 +156,35 @@ format_embase_emtree <- function(term) {
   )
 }
 
-format_central_free_text <- function(term) {
+# CENTRAL does not accept '/' in the generated query.
+# For free text, replace slash characters with spaces.
+sanitize_central_free_text <- function(term) {
   term <- trimws(term)
+  term <- gsub("/", " ", term, fixed = TRUE)
+  term <- gsub("\\s+", " ", term, perl = TRUE)
+  trimws(term)
+}
+
+# PubMed MeSH qualifiers such as "Aortic Valve/surgery" cannot be
+# translated safely into CENTRAL by simply retaining '/'.
+# To avoid invalid syntax AND avoid broadening the concept by silently
+# converting a qualified heading into its broad parent heading, omit
+# qualified descriptors from CENTRAL. Existing concept free-text terms
+# remain available in the same OR block.
+sanitize_central_mesh_term <- function(term) {
+  term <- trimws(term)
+
+  if (grepl("/", term, fixed = TRUE)) {
+    return("")
+  }
+
+  term
+}
+
+format_central_free_text <- function(term) {
+  term <- sanitize_central_free_text(term)
+
+  if (!nzchar(term)) return("")
 
   if (is_single_word(term)) {
     paste0(term, ":ti,ab,kw")
@@ -167,9 +194,13 @@ format_central_free_text <- function(term) {
 }
 
 format_central_mesh <- function(term) {
+  term <- sanitize_central_mesh_term(term)
+
+  if (!nzchar(term)) return("")
+
   paste0(
     '[mh "',
-    escape_quotes(trimws(term)),
+    escape_quotes(term),
     '"]'
   )
 }
@@ -438,10 +469,23 @@ build_database_searches <- function(concepts) {
     character(1)
   )
 
+  central_query <- paste(
+    central_blocks[nzchar(central_blocks)],
+    collapse = "\nAND\n"
+  )
+
+  # CENTRAL generation guard: '/' must never reach the output query.
+  if (grepl("/", central_query, fixed = TRUE)) {
+    stop(
+      "CENTRAL search generation produced an unsupported '/' character.",
+      call. = FALSE
+    )
+  }
+
   list(
     pubmed = paste(pubmed_blocks[nzchar(pubmed_blocks)], collapse = "\nAND\n"),
     embase = paste(embase_blocks[nzchar(embase_blocks)], collapse = "\nAND\n"),
-    central = paste(central_blocks[nzchar(central_blocks)], collapse = "\nAND\n"),
+    central = central_query,
     concepts = included
   )
 }

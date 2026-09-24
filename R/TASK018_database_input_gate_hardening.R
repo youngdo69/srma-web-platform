@@ -419,6 +419,7 @@ task018_builtin_registry <- function() {
       ),
       default_extension = "csv",
       upstream_task = "TASK-005 — Canonical PubMed Download",
+      manual_refinement_mode = "none",
       search_instructions = character(0)
     ),
 
@@ -435,6 +436,7 @@ task018_builtin_registry <- function() {
       ),
       default_extension = "ris",
       upstream_task = NA_character_,
+      manual_refinement_mode = "descriptor_no_explosion",
       search_instructions = c(
         "Embase를 엽니다.",
         "Advanced Search 또는 기관에서 제공되는 해당 검색 인터페이스를 엽니다.",
@@ -457,6 +459,7 @@ task018_builtin_registry <- function() {
       ),
       default_extension = "ris",
       upstream_task = NA_character_,
+      manual_refinement_mode = "central_term_only",
       search_instructions = c(
         "Cochrane Library / CENTRAL을 엽니다.",
         "Advanced Search 또는 Search Manager 화면을 엽니다.",
@@ -530,6 +533,7 @@ task018_registry_entry <- function(
     accepted_extensions = character(0),
     default_extension = NA_character_,
     upstream_task = NA_character_,
+    manual_refinement_mode = "none",
     search_instructions = character(0)
   )
 
@@ -1160,6 +1164,258 @@ task018_validate_database_input <- function(
 }
 
 
+# ------------------------------------------------------------
+# 8A. Manual database search breadth review / refinement
+#
+# These are TEST CANDIDATES only.
+# Canonical search files are not overwritten here.
+# ------------------------------------------------------------
+
+task018_refined_candidate_path <- function(
+  project_root,
+  database_id
+) {
+  file.path(
+    project_root,
+    "search_strategies",
+    paste0(
+      database_id,
+      "_search_refined_candidate.txt"
+    )
+  )
+}
+
+task018_refine_embase_descriptor_no_explosion <- function(text) {
+  # Conservative DB-specific narrowing:
+  # retain every free-text term, but stop exploding Emtree descriptors.
+  refined <- gsub(
+    "'/exp",
+    "'/de",
+    text,
+    fixed = TRUE
+  )
+
+  refined <- gsub(
+    "/exp",
+    "/de",
+    refined,
+    fixed = TRUE
+  )
+
+  refined
+}
+
+task018_refine_central_term_only <- function(text) {
+  # Conservative CENTRAL precision candidate:
+  # preserve every controlled-vocabulary descriptor and every
+  # generated free-text synonym, but turn MeSH explosion OFF.
+  #
+  # Cochrane Library compact syntax:
+  #   [mh "Term"]   -> exploded
+  #   [mh ^"Term"]  -> this term only / unexploded
+  #
+  # This candidate is never auto-promoted to canonical.
+
+  refined <- gsub(
+    '[mh "',
+    '[mh ^"',
+    text,
+    fixed = TRUE
+  )
+
+  # CENTRAL fail-safe: slash is prohibited by toolkit policy.
+  refined <- gsub(
+    "/",
+    " ",
+    refined,
+    fixed = TRUE
+  )
+
+  refined
+}
+
+task018_generate_manual_refinement_candidates <- function(
+  database_results,
+  config,
+  project_root
+) {
+  candidate_paths <- list()
+
+  for (database_id in names(database_results)) {
+    x <- database_results[[database_id]]
+
+    if (!identical(x$status, "MISSING_USER_EXPORT")) {
+      next
+    }
+
+    metadata <- task018_registry_entry(
+      database_id,
+      config
+    )
+
+    mode <- as.character(
+      metadata$manual_refinement_mode %||% "none"
+    )
+
+    if (
+      identical(mode, "none") ||
+      !task018_file_nonempty(x$search_strategy_file)
+    ) {
+      next
+    }
+
+    original <- paste(
+      readLines(
+        x$search_strategy_file,
+        warn = FALSE,
+        encoding = "UTF-8"
+      ),
+      collapse = "\n"
+    )
+
+    refined <- switch(
+      mode,
+
+      descriptor_no_explosion =
+        task018_refine_embase_descriptor_no_explosion(
+          original
+        ),
+
+      central_term_only =
+        task018_refine_central_term_only(
+          original
+        ),
+
+      stop(
+        "Unsupported manual_refinement_mode: ",
+        mode,
+        call. = FALSE
+      )
+    )
+
+    if (!nzchar(trimws(refined))) {
+      stop(
+        "Refined candidate became empty for database: ",
+        database_id,
+        call. = FALSE
+      )
+    }
+
+    if (
+      identical(database_id, "central") &&
+      grepl("/", refined, fixed = TRUE)
+    ) {
+      stop(
+        "CENTRAL refined candidate still contains '/'.",
+        call. = FALSE
+      )
+    }
+
+    candidate_path <- task018_refined_candidate_path(
+      project_root,
+      database_id
+    )
+
+    writeLines(
+      strsplit(
+        refined,
+        "\n",
+        fixed = TRUE
+      )[[1]],
+      candidate_path,
+      useBytes = TRUE
+    )
+
+    candidate_paths[[database_id]] <- candidate_path
+  }
+
+  candidate_paths
+}
+
+task018_prompt_manual_search_review <- function(
+  database_results,
+  config,
+  project_root
+) {
+  result <- list(
+    action = "NOT_REVIEWED",
+    candidate_paths = list()
+  )
+
+  if (!interactive()) {
+    return(result)
+  }
+
+  task018_print_rule()
+  cat("MANUAL DATABASE SEARCH REVIEW\n")
+  task018_print_rule()
+
+  cat(
+    "\nEmbase/CENTRAL에서 위 검색식을 시험 검색한 뒤,\n",
+    "검색 건수와 제목/초록 일부를 확인하십시오.\n\n",
+    "현재 systematic review의 범위에 비해 검색 결과가 지나치게 broad합니까?\n\n",
+    "[1] 아직 판단하지 않았습니다 — 현재 검색식을 유지하고 일단 pause\n",
+    "[2] 아니오 — 현재 검색식이 적절합니다\n",
+    "[3] 예 — 더 정제된 검색식 후보를 생성합니다\n\n",
+    sep = ""
+  )
+
+  choice <- trimws(
+    readline("선택 [1-3]: ")
+  )
+
+  if (!choice %in% c("1", "2", "3")) {
+    choice <- "1"
+  }
+
+  if (identical(choice, "1")) {
+    result$action <- "NOT_REVIEWED"
+    return(result)
+  }
+
+  if (identical(choice, "2")) {
+    result$action <- "KEEP_CURRENT"
+    return(result)
+  }
+
+  candidate_paths <- task018_generate_manual_refinement_candidates(
+    database_results = database_results,
+    config = config,
+    project_root = project_root
+  )
+
+  result$action <- "REFINED_CANDIDATE"
+  result$candidate_paths <- candidate_paths
+
+  cat("\n")
+  task018_print_rule()
+  cat("REFINED SEARCH CANDIDATES GENERATED\n")
+  task018_print_rule()
+
+  cat(
+    "\n이 파일들은 검토용 후보입니다.\n",
+    "아직 canonical search strategy를 덮어쓰지 않았습니다.\n",
+    "실제 Embase/CENTRAL에서 다시 시험 검색한 후 최종 선택합니다.\n\n",
+    sep = ""
+  )
+
+  for (database_id in names(candidate_paths)) {
+    metadata <- task018_registry_entry(
+      database_id,
+      config
+    )
+
+    cat(
+      metadata$display_name,
+      " refined candidate:\n",
+      candidate_paths[[database_id]],
+      "\n\n",
+      sep = ""
+    )
+  }
+
+  result
+}
 # ------------------------------------------------------------
 # 8. Manual search/export guidance
 # ------------------------------------------------------------
@@ -1829,6 +2085,62 @@ task018_run_database_input_gate <- function(
     }
   }
 
+  manual_search_review <- list(
+    action = "NOT_REVIEWED",
+    candidate_paths = list()
+  )
+
+  manual_missing_ids <- names(results)[
+    vapply(
+      results,
+      function(x) identical(x$status, "MISSING_USER_EXPORT"),
+      logical(1)
+    )
+  ]
+
+  if (
+    isTRUE(verbose) &&
+    length(manual_missing_ids) > 0L
+  ) {
+    manual_search_review <- task018_prompt_manual_search_review(
+      database_results = results[manual_missing_ids],
+      config = config,
+      project_root = project_root
+    )
+
+    if (
+      identical(manual_search_review$action, "REFINED_CANDIDATE") &&
+      length(manual_search_review$candidate_paths) > 0L
+    ) {
+      cat("\n")
+      for (database_id in names(manual_search_review$candidate_paths)) {
+        metadata <- task018_registry_entry(database_id, config)
+        candidate_path <- manual_search_review$candidate_paths[[database_id]]
+
+        task018_print_rule()
+        cat(
+          metadata$display_name,
+          " — REFINED CANDIDATE FOR TEST SEARCH\n",
+          sep = ""
+        )
+        task018_print_rule()
+
+        cat(
+          paste(
+            readLines(
+              candidate_path,
+              warn = FALSE,
+              encoding = "UTF-8"
+            ),
+            collapse = "\n"
+          ),
+          "\n\n",
+          sep = ""
+        )
+      }
+    }
+  }
+
   statuses <- vapply(
     results,
     `[[`,
@@ -1872,7 +2184,16 @@ task018_run_database_input_gate <- function(
     has_manual_wait
   ) {
     status <- "WAITING"
-    runner_state <- "WAITING_FOR_DATABASE_EXPORT"
+    runner_state <- if (
+      identical(
+        manual_search_review$action,
+        "REFINED_CANDIDATE"
+      )
+    ) {
+      "WAITING_FOR_REFINED_DATABASE_SEARCH"
+    } else {
+      "WAITING_FOR_DATABASE_EXPORT"
+    }
   } else {
     status <- "ACTION_REQUIRED"
     runner_state <- "DATABASE_INPUT_NOT_READY"
@@ -1906,6 +2227,8 @@ task018_run_database_input_gate <- function(
       enabled_databases,
     database_results =
       results,
+    manual_search_review =
+      manual_search_review,
     provenance_file =
       provenance_file
   )
@@ -2063,3 +2386,79 @@ task018_is_direct_execution <- function() {
 if (task018_is_direct_execution()) {
   task018_run_database_input_gate()
 }
+
+# BEGIN TASK-019C USER-DIRECTED REFINEMENT INTEGRATION
+#
+# Wrapper around the existing TASK-018 gate.
+# It preserves the existing database-input/refinement behavior, then
+# offers one additional user-directed AI refinement option while the
+# manual-database gate is waiting.
+#
+if (!exists(".task018_run_database_input_gate_pre_task019c", inherits = FALSE)) {
+  .task018_run_database_input_gate_pre_task019c <- task018_run_database_input_gate
+}
+
+task018_run_database_input_gate <- function(..., task019c_prompt = TRUE) {
+  result <- .task018_run_database_input_gate_pre_task019c(...)
+
+  if (!isTRUE(task019c_prompt) || !interactive()) {
+    return(result)
+  }
+
+  runner_state <- ""
+  if (is.list(result) && !is.null(result$runner_state) && length(result$runner_state) > 0L) {
+    runner_state <- as.character(result$runner_state[[1]])
+  }
+
+  eligible_states <- c(
+    "WAITING_FOR_DATABASE_EXPORT",
+    "WAITING_FOR_REFINED_DATABASE_SEARCH"
+  )
+
+  if (!(runner_state %in% eligible_states)) {
+    return(result)
+  }
+
+  cat("\n")
+  cat("============================================================\n")
+  cat("ADDITIONAL USER-DIRECTED SEARCH REFINEMENT\n")
+  cat("============================================================\n")
+  cat("현재 검색식에 AI가 반영할 추가 수정 요청이 있습니까?\n\n")
+  cat("[1] 아니오 — 현재 검색식으로 진행\n")
+  cat("[2] 예 — 자연어로 추가 수정 요청 입력\n\n")
+
+  choice <- trimws(readline("선택 [1-2]: "))
+
+  if (!identical(choice, "2")) {
+    return(result)
+  }
+
+  request <- trimws(readline(
+    "AI에게 반영할 검색식 수정 요청을 입력하세요: "
+  ))
+
+  if (!nzchar(request)) {
+    cat("입력된 요청이 없어 현재 검색식을 유지합니다.\n")
+    return(result)
+  }
+
+  source(
+    "R/TASK019C_user_directed_search_refinement.R",
+    local = .GlobalEnv
+  )
+
+  refinement <- task019c_apply_user_refinement(
+    request = request,
+    databases = NULL,
+    verbose = TRUE,
+    run_r12_validation = TRUE
+  )
+
+  result$status <- "WAITING"
+  result$runner_state <- "WAITING_FOR_USER_REFINED_DATABASE_SEARCH"
+  result$ready <- FALSE
+  result$user_directed_refinement <- refinement
+
+  result
+}
+# END TASK-019C USER-DIRECTED REFINEMENT INTEGRATION
