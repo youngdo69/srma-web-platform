@@ -388,54 +388,175 @@ records_after_dedup_n <- nrow(
   deduplicated
 )
 
+# TASK-022 PRISMA LEGACY FULL-TEXT BRIDGE
+# ------------------------------------------------------------
+# Older R/21 versions could retain records as
+# 'Awaiting full-text clarification' in the authoritative
+# title/abstract final dataset while routing only literal
+# final_decision == 'Include' rows into the full-text handoff.
+#
+# If those legacy awaiting records are absent from both the
+# handoff and final_full_text_eligibility.csv, R/35 treats them
+# transparently as legacy human full-text exclusions rather
+# than falsely classifying them as reports not retrieved.
+#
+# The final included count remains authoritative from R/24
+# included_studies.csv.
+
 records_screened_n <- nrow(
   ta_final
 )
 
+normalize_prisma_decision_key <- function(x) {
+  x <- tolower(trimws(as.character(x)))
+  x[is.na(x)] <- ""
+  x <- gsub("[^a-z]+", " ", x)
+  trimws(gsub("[[:space:]]+", " ", x))
+}
+
+if (!"screening_id" %in% names(ta_final)) {
+  stop(
+    "PRISMA compatibility validation requires screening_id in final_title_abstract_screening.csv.",
+    call. = FALSE
+  )
+}
+
+if (!"screening_id" %in% names(full_text_handoff)) {
+  stop(
+    "PRISMA compatibility validation requires screening_id in included_for_full_text_review.csv.",
+    call. = FALSE
+  )
+}
+
+if (!"screening_id" %in% names(full_text_final)) {
+  stop(
+    "PRISMA compatibility validation requires screening_id in final_full_text_eligibility.csv.",
+    call. = FALSE
+  )
+}
+
+ta_decision_key <- normalize_prisma_decision_key(
+  ta_final$final_decision
+)
+
+ta_ids <- trimws(as.character(ta_final$screening_id))
+handoff_ids <- unique(
+  trimws(as.character(full_text_handoff$screening_id))
+)
+full_text_final_ids <- unique(
+  trimws(as.character(full_text_final$screening_id))
+)
+
 records_excluded_n <- sum(
-  tolower(
-    trimws(
-      as.character(
-        ta_final$final_decision
-      )
-    )
-  ) == "exclude",
+  ta_decision_key == "exclude",
   na.rm = TRUE
 )
 
-reports_sought_n <- nrow(
-  full_text_handoff
+legacy_awaiting_mask <-
+  ta_decision_key == "awaiting full text clarification" &
+  !(ta_ids %in% handoff_ids) &
+  !(ta_ids %in% full_text_final_ids)
+
+legacy_awaiting_ids <- unique(
+  ta_ids[legacy_awaiting_mask]
+)
+legacy_awaiting_ids <- legacy_awaiting_ids[
+  !is.na(legacy_awaiting_ids) & nzchar(legacy_awaiting_ids)
+]
+
+legacy_full_text_excluded_n <- length(
+  legacy_awaiting_ids
 )
 
-reports_assessed_n <- nrow(
-  full_text_final
+nonexclude_ids <- unique(
+  ta_ids[
+    nzchar(ta_decision_key) &
+      ta_decision_key != "exclude"
+  ]
 )
 
-reports_not_retrieved_n <- reports_sought_n -
+accounted_nonexclude_ids <- unique(
+  c(
+    handoff_ids,
+    legacy_awaiting_ids
+  )
+)
+
+unexplained_nonexclude_ids <- setdiff(
+  nonexclude_ids,
+  accounted_nonexclude_ids
+)
+
+if (length(unexplained_nonexclude_ids) > 0L) {
+  stop(
+    paste0(
+      "PRISMA title/abstract routing contains ",
+      length(unexplained_nonexclude_ids),
+      " non-Exclude record(s) that are neither in the canonical ",
+      "full-text handoff nor recognized as legacy Awaiting full-text clarification records. ",
+      "Example screening_id(s): ",
+      paste(head(unexplained_nonexclude_ids, 10L), collapse = ", ")
+    ),
+    call. = FALSE
+  )
+}
+
+reports_sought_n <-
+  nrow(full_text_handoff) +
+  legacy_full_text_excluded_n
+
+reports_assessed_n <-
+  nrow(full_text_final) +
+  legacy_full_text_excluded_n
+
+reports_not_retrieved_n <-
+  reports_sought_n -
   reports_assessed_n
 
-reports_excluded_n <- sum(
-  tolower(
-    trimws(
-      as.character(
-        full_text_final$final_decision
-      )
-    )
-  ) == "exclude",
+if (reports_not_retrieved_n < 0L) {
+  stop(
+    "PRISMA inconsistency: reports assessed exceeds reports sought.",
+    call. = FALSE
+  )
+}
+
+full_text_decision_key <- normalize_prisma_decision_key(
+  full_text_final$final_decision
+)
+
+canonical_full_text_excluded_n <- sum(
+  full_text_decision_key == "exclude",
   na.rm = TRUE
 )
 
-studies_included_n <- sum(
-  tolower(
-    trimws(
-      as.character(
-        included_studies$final_decision
-      )
-    )
-  ) == "include",
-  na.rm = TRUE
+reports_excluded_n <-
+  canonical_full_text_excluded_n +
+  legacy_full_text_excluded_n
+
+studies_included_n <- nrow(
+  included_studies
 )
 
+if (legacy_full_text_excluded_n > 0L) {
+  cat("\n")
+  cat("PRISMA legacy full-text compatibility bridge\n")
+  cat("------------------------------------------------------------\n")
+  cat(
+    "Legacy Awaiting full-text clarification records treated as human full-text exclusions: ",
+    legacy_full_text_excluded_n,
+    "\n",
+    sep = ""
+  )
+  cat(
+    "These records are NOT counted as reports not retrieved.\n"
+  )
+  cat(
+    "Final included studies remain authoritative from included_studies.csv: ",
+    studies_included_n,
+    "\n\n",
+    sep = ""
+  )
+}
 
 # ============================================================
 # 6. Full-text exclusion reasons
@@ -447,13 +568,11 @@ reason_counts <- excluded_full_text |>
       as.character(
         final_exclusion_reason
       )
-    ),
-    final_exclusion_reason = dplyr::if_else(
-      is.na(final_exclusion_reason) |
-        final_exclusion_reason == "",
-      "Reason not recorded",
-      final_exclusion_reason
     )
+  ) |>
+  dplyr::filter(
+    !is.na(final_exclusion_reason),
+    nzchar(final_exclusion_reason)
   ) |>
   dplyr::count(
     final_exclusion_reason,
@@ -464,6 +583,31 @@ reason_counts <- excluded_full_text |>
     final_exclusion_reason
   )
 
+if (legacy_full_text_excluded_n > 0L) {
+  legacy_reason_label <- paste(
+    "Legacy human full-text exclusion",
+    "(individual reason not captured in canonical artifact)"
+  )
+
+  reason_counts <- dplyr::bind_rows(
+    reason_counts,
+    tibble::tibble(
+      final_exclusion_reason = legacy_reason_label,
+      count = legacy_full_text_excluded_n
+    )
+  ) |>
+    dplyr::group_by(
+      final_exclusion_reason
+    ) |>
+    dplyr::summarise(
+      count = sum(count),
+      .groups = "drop"
+    ) |>
+    dplyr::arrange(
+      dplyr::desc(count),
+      final_exclusion_reason
+    )
+}
 
 # ============================================================
 # 7. Arithmetic validation — FAIL on inconsistency

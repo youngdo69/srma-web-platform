@@ -27,6 +27,27 @@
 # - Does not remove studies from the systematic review.
 # ============================================================
 
+
+# TASK-024 — universal DEC-008 config flag normalization
+srma_dec008_enabled <- function(x) {
+  if (is.null(x) || length(x) == 0L || all(is.na(x))) {
+    return(FALSE)
+  }
+
+  value <- x[[1]]
+
+  if (is.logical(value)) {
+    return(isTRUE(value))
+  }
+
+  key <- tolower(trimws(as.character(value)))
+
+  key %in% c(
+    "yes", "y", "true", "t", "1",
+    "enabled", "enable", "on"
+  )
+}
+
 required_packages <- c(
   "yaml", "readr", "dplyr", "tibble", "stringr",
   "jsonlite", "httr2", "dotenv", "openxlsx"
@@ -117,8 +138,8 @@ project_title <- get_project_title(config)
 
 if (
   is.null(config$data_extraction) ||
-  !isTRUE(config$data_extraction$agent_extraction) ||
-  !isTRUE(config$data_extraction$human_verification)
+  !srma_dec008_enabled(config$data_extraction$agent_extraction) ||
+  !srma_dec008_enabled(config$data_extraction$human_verification)
 ) {
   stop(
     "R/25A requires DEC-008 configuration:\n",

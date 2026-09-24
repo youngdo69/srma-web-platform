@@ -336,45 +336,83 @@ check_boolean_presence <- function(text) {
 
 check_duplicate_lines <- function(text) {
 
-  lines <- unlist(
+  # R/11 builds logical concept blocks and joins them with
+  # a standalone AND. The same controlled-vocabulary term
+  # may legitimately occur in different concept blocks.
+  blocks <- unlist(
     strsplit(
       text,
-      split = "\n",
-      fixed = TRUE
+      split = "\\n\\s*AND\\s*\\n",
+      perl = TRUE
     )
   )
 
-  lines <- trimws(lines)
+  duplicate_records <- character(0)
 
-  lines <- lines[
-    lines != "" &
-      !lines %in% c(
-        "(",
-        ")",
-        "AND",
-        "OR"
+  for (block_index in seq_along(blocks)) {
+
+    lines <- unlist(
+      strsplit(
+        blocks[[block_index]],
+        split = "\n",
+        fixed = TRUE
       )
-  ]
+    )
 
-  normalized <- vapply(
-    lines,
-    normalize_line,
-    character(1)
-  )
+    lines <- trimws(lines)
 
-  duplicated_values <- unique(
-    normalized[duplicated(normalized)]
-  )
+    lines <- lines[
+      lines != "" &
+        !lines %in% c("(", ")", "AND", "OR")
+    ]
+
+    if (length(lines) == 0L) {
+      next
+    }
+
+    # Ignore a leading Boolean connector when comparing terms.
+    # This also detects a duplicate when the first occurrence
+    # is the first term in a block and the second begins with OR.
+    lines <- sub(
+      "^(AND|OR)\\s+",
+      "",
+      lines,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+
+    normalized <- vapply(
+      lines,
+      normalize_line,
+      character(1)
+    )
+
+    duplicated_values <- unique(
+      normalized[duplicated(normalized)]
+    )
+
+    if (length(duplicated_values) > 0L) {
+      duplicate_records <- c(
+        duplicate_records,
+        paste0(
+          "concept block ",
+          block_index,
+          ": ",
+          duplicated_values
+        )
+      )
+    }
+  }
 
   list(
-    passed = length(duplicated_values) == 0,
-    duplicates = duplicated_values,
-    message = if (length(duplicated_values) == 0) {
-      "No duplicated search lines were detected."
+    passed = length(duplicate_records) == 0L,
+    duplicates = duplicate_records,
+    message = if (length(duplicate_records) == 0L) {
+      "No duplicated search lines were detected within logical concept blocks."
     } else {
       paste0(
-        "Duplicated lines: ",
-        paste(duplicated_values, collapse = " | ")
+        "Duplicated lines within the same logical concept block: ",
+        paste(duplicate_records, collapse = " | ")
       )
     }
   )
@@ -455,14 +493,20 @@ validate_embase <- function(text) {
     message = "At least one :ti,ab,kw field restriction is required."
   )
 
-  checks$emtree_explosion <- list(
-    passed = has_regex(
-      text,
-      "'/exp"
+  checks$emtree_descriptor <- list(
+    passed = (
+      has_regex(
+        text,
+        "'/exp"
+      ) ||
+      has_regex(
+        text,
+        "'/de"
+      )
     ),
     message = paste(
-      "No exploded Emtree term using '/exp was detected.",
-      "This may be acceptable only if intentionally omitted."
+      "No Emtree descriptor using '/exp or '/de was detected.",
+      "Either exploded (/exp) or non-exploded (/de) Emtree syntax is acceptable."
     )
   )
 
@@ -482,6 +526,17 @@ validate_embase <- function(text) {
   message = 'CENTRAL MeSH syntax [mh "..."] was detected in Embase.'
 )
 
+  checks$no_and_not <- list(
+    passed = !has_regex(
+      text,
+      "\\bAND\\s+NOT\\b"
+    ),
+    message = paste(
+      "Embase uses NOT directly for exclusion.",
+      "Replace AND NOT with NOT."
+    )
+  )
+
   checks
 }
 
@@ -493,6 +548,14 @@ validate_central <- function(text) {
 
   checks <- list()
 
+  checks$no_slash <- list(
+    passed = !grepl("/", text, fixed = TRUE),
+    message = paste(
+      "CENTRAL strategy must not contain '/'.",
+      "Remove unsupported slash-qualified syntax before database testing."
+    )
+  )
+
   checks$text_fields <- list(
     passed = has_regex(
       text,
@@ -502,15 +565,15 @@ validate_central <- function(text) {
   )
 
   checks$mesh_descriptor <- list(
-  passed = has_regex(
-    text,
-    '\\[mh\\s+"[^"]+"\\]'
-  ),
-  message = paste(
-    'No CENTRAL MeSH syntax [mh "..."] was detected.',
-    "This may be acceptable only if intentionally omitted."
+    passed = has_regex(
+      text,
+      '\\[mh\\s+(?:\\^\\s*)?"[^"]+"\\]'
+    ),
+    message = paste(
+      'No CENTRAL MeSH syntax [mh "Term"] or [mh ^"Term"] was detected.',
+      "This may be acceptable only if intentionally omitted."
+    )
   )
-)
 
   checks$no_pubmed_tags <- list(
     passed = !has_regex(
@@ -839,4 +902,3 @@ if (nrow(failed_results) == 0) {
     " check(s) did not pass."
   )
 }
-

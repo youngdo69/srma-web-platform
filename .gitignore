@@ -68,3 +68,27 @@ dist/
 # END SRMA UNIVERSAL RUNTIME IGNORE
 
 Projects/
+
+# >>> SRMA MASTER TOOLKIT LOCAL/RUNTIME ARTIFACTS >>>
+# Master repository protection: actual reviews must run in separate project folders.
+/.env
+/renv/library/
+/data/
+/results/
+/projects/
+/search_strategies/
+/config/generated/
+/config/project_config.yml
+/config/search_terms.yml
+/backup/
+/cleanup_*.txt
+/folder-tree.txt
+R/*.bak
+R/*.backup_*
+R/*.pre_task*
+R/*.pre_TASK*
+/.Rhistory
+/.RData
+/.Rproj.user/
+# <<< SRMA MASTER TOOLKIT LOCAL/RUNTIME ARTIFACTS <<<
+
