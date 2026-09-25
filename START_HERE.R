@@ -5,6 +5,18 @@
 # First-run / resume entry point.
 # The onboarding layer performs only environment/preflight work,
 # then hands workflow control to the canonical Runner.
+#
+# VERSION: 1.1.0
+#
+# DEPENDENCY CONTRACT
+# ------------------------------------------------------------
+# - renv.lock is the canonical package source of truth.
+# - START_HERE restores the complete lockfile environment, not just a small
+#   bootstrap subset.
+# - Workflow-critical direct dependencies are validated after restore.
+# - R/41 DOCX dependencies (officer, flextable) are core dependencies.
+# - Optional figure-rendering packages remain on-demand inside R/41.
+# - Set options(srma.start_here.environment_only = TRUE) for dependency-only QC.
 # ============================================================
 
 `%||%` <- function(x, y) {
@@ -64,11 +76,57 @@ srma_assert_writable <- function(root) {
   invisible(TRUE)
 }
 
+srma_required_packages <- function() {
+  # Direct packages required by the canonical workflow and final manuscript
+  # production/QC path. Transitive dependencies are owned by renv.lock.
+  c(
+    "yaml",
+    "jsonlite",
+    "httr2",
+    "dotenv",
+    "readr",
+    "dplyr",
+    "tibble",
+    "stringr",
+    "xml2",
+    "openxlsx",
+    "digest",
+    "officer",
+    "flextable"
+  )
+}
+
+srma_missing_packages <- function(packages) {
+  packages[
+    !vapply(
+      packages,
+      requireNamespace,
+      quietly = TRUE,
+      FUN.VALUE = logical(1)
+    )
+  ]
+}
+
 srma_ensure_renv <- function(root) {
   lockfile <- file.path(root, "renv.lock")
+  required_packages <- srma_required_packages()
 
   if (!file.exists(lockfile)) {
-    cat("renv.lock: not present; continuing with the current R library.\n")
+    missing_required <- srma_missing_packages(required_packages)
+
+    if (length(missing_required) > 0L) {
+      stop(
+        "renv.lock is not present and required workflow package(s) are missing:\n- ",
+        paste(missing_required, collapse = "\n- "),
+        "\n\nA release copy of the Universal SR-MA Toolkit should include renv.lock.",
+        "\nRestore the canonical lockfile or install the required packages before continuing.",
+        call. = FALSE
+      )
+    }
+
+    cat(
+      "renv.lock: not present; current R library satisfies the required package preflight.\n"
+    )
     return(invisible(TRUE))
   }
 
@@ -99,57 +157,67 @@ srma_ensure_renv <- function(root) {
     }
   )
 
-  core_packages <- c(
-    "yaml",
-    "jsonlite",
-    "httr2",
-    "dotenv"
-  )
-
-  missing_core <- core_packages[
-    !vapply(
-      core_packages,
-      requireNamespace,
-      quietly = TRUE,
-      FUN.VALUE = logical(1)
-    )
-  ]
-
   auto_restore <- !identical(
     getOption("srma.start_here.auto_restore"),
     FALSE
   )
 
-  if (length(missing_core) > 0L && isTRUE(auto_restore)) {
+  if (isTRUE(auto_restore)) {
     cat(
-      "Project packages are incomplete. Restoring from renv.lock once...\n"
+      "Checking/restoring the canonical R environment from renv.lock...\n"
     )
 
-    renv::restore(
-      project = root,
-      prompt = FALSE
+    tryCatch(
+      renv::restore(
+        project = root,
+        prompt = FALSE
+      ),
+      error = function(e) {
+        stop(
+          "renv::restore() failed:\n",
+          conditionMessage(e),
+          "\n\nResolve the package/CRAN/network issue and rerun ",
+          'source("START_HERE.R").',
+          call. = FALSE
+        )
+      }
     )
-
-    missing_core <- core_packages[
-      !vapply(
-        core_packages,
-        requireNamespace,
-        quietly = TRUE,
-        FUN.VALUE = logical(1)
-      )
-    ]
+  } else {
+    cat(
+      "Automatic renv restore: DISABLED by option srma.start_here.auto_restore=FALSE\n"
+    )
   }
 
-  if (length(missing_core) > 0L) {
+  missing_required <- srma_missing_packages(required_packages)
+
+  if (length(missing_required) > 0L) {
     stop(
-      "Required project packages are still unavailable:\n- ",
-      paste(missing_core, collapse = "\n- "),
-      "\nRun renv::restore() and retry.",
+      "Toolkit dependency preflight FAILED after renv activation",
+      if (isTRUE(auto_restore)) " / restore" else "",
+      ".\n\nMissing workflow-required package(s):\n- ",
+      paste(missing_required, collapse = "\n- "),
+      "\n\nThis usually means the canonical renv.lock is incomplete or out of sync ",
+      "with the current toolkit code.",
+      "\n\nMAINTAINER ACTION — from the toolkit root:\n",
+      "  renv::install(c(",
+      paste(sprintf('"%s"', missing_required), collapse = ", "),
+      "))\n",
+      "  renv::snapshot(prompt = FALSE)\n",
+      "  source(\"START_HERE.R\")\n",
+      "\nDo not work around this by installing packages ad hoc inside an individual ",
+      "workflow module.",
       call. = FALSE
     )
   }
 
+  cat(
+    "Required workflow packages: PASS (",
+    length(required_packages),
+    " direct dependencies)\n",
+    sep = ""
+  )
   cat("R environment / renv: PASS\n")
+
   invisible(TRUE)
 }
 
@@ -336,6 +404,21 @@ srma_start_here <- function() {
   cat("Repository / writable workspace: PASS\n")
 
   srma_ensure_renv(root)
+
+  environment_only <- identical(
+    getOption("srma.start_here.environment_only"),
+    TRUE
+  )
+
+  if (isTRUE(environment_only)) {
+    cat(
+      "\nSTART_HERE environment preflight: PASS\n",
+      "Project initialization, API preflight, and Runner hand-off were skipped ",
+      "because srma.start_here.environment_only=TRUE.\n",
+      sep = ""
+    )
+    return(invisible(TRUE))
+  }
 
   if (!isTRUE(srma_provider_preflight(root))) {
     return(invisible(FALSE))

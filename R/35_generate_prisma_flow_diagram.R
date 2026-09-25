@@ -2,7 +2,7 @@
 # Universal SR-MA Agent Toolkit
 # R/35_generate_prisma_flow_diagram.R
 #
-# VERSION: UNIVERSAL-R35-2026-08-16C
+# VERSION: UNIVERSAL-R35-2026-09-25D
 #
 # PURPOSE
 # ------------------------------------------------------------
@@ -1133,11 +1133,20 @@ draw_prisma <- function() {
     "Eligibility"
   )
 
+  # Universal terminal-lane geometry:
+  # Keep the terminal included node vertically centred on the Included phase
+  # bar regardless of project counts or exclusion-box height.
+  included_phase_y <- 0.065
+  included_phase_height <- 0.115
+  included_box_height <- 0.095
+  included_box_y <- included_phase_y +
+    (included_phase_height - included_box_height) / 2
+
   draw_phase(
     0.035,
-    0.065,
+    included_phase_y,
     0.055,
-    0.115,
+    included_phase_height,
     "Included"
   )
 
@@ -1247,11 +1256,13 @@ draw_prisma <- function() {
   )
 
   # Included
+  # The terminal node is centred on the Included phase lane rather than
+  # positioned by a project-specific absolute y coordinate.
   draw_text_box(
     0.34,
-    0.13,
+    included_box_y,
     0.32,
-    0.095,
+    included_box_height,
     included_text,
     fontsize = 10.2,
     wrap_width = 34
@@ -1311,7 +1322,7 @@ draw_prisma <- function() {
     0.50,
     0.35,
     0.50,
-    0.228
+    included_box_y + included_box_height + 0.003
   )
 
 
@@ -1532,6 +1543,10 @@ report_lines <- c(
   "ARITHMETIC VALIDATION",
   "--------------------------------------------------",
   validation_report_lines,
+  "",
+  "LAYOUT CONTRACT",
+  "--------------------------------------------------",
+  "  Terminal included node: vertically centred on the Included phase lane",
   "",
   "OPTIONAL RETRIEVAL AUDIT",
   "--------------------------------------------------",

@@ -2,7 +2,7 @@
 # Universal SR-MA Agent Toolkit
 # R/38_prepare_manuscript_evidence_package.R
 #
-# VERSION: 2.1.2
+# VERSION: 2.1.3
 #
 # PURPOSE
 # ------------------------------------------------------------
@@ -4039,14 +4039,67 @@ results_lines <- c(
   ""
 )
 
-publication_tables <- artifact_registry |>
+# Prefer atomic publication tables (CSV/TSV) as the canonical textual
+# evidence supplied to R/39. Workbook containers are delivery/editing
+# artifacts and may contain duplicate table sheets plus audit/instruction
+# sheets. Feeding both the atomic tables and workbook containers into the
+# Results dossier can duplicate evidence or reintroduce stale/noncanonical
+# content. Use a single workbook only as a fallback when no atomic table
+# files are available.
+available_atomic_tables <- artifact_registry |>
   dplyr::filter(
-    artifact_type %in% c(
-      "table",
-      "table_container"
-    ),
+    artifact_type == "table",
     source_status == "AVAILABLE"
-  ) |>
+  )
+
+if (nrow(available_atomic_tables) > 0L) {
+
+  publication_tables <- available_atomic_tables
+  table_evidence_mode <- "ATOMIC_TABLE_FILES"
+
+} else {
+
+  available_table_containers <- artifact_registry |>
+    dplyr::filter(
+      artifact_type == "table_container",
+      source_status == "AVAILABLE"
+    ) |>
+    dplyr::mutate(
+      .container_rank = dplyr::case_when(
+        grepl(
+          "manuscript_tables_author_editable\\.xlsx$",
+          source_relative_path,
+          ignore.case = TRUE
+        ) ~ 1L,
+        grepl(
+          "manuscript_tables_generated\\.xlsx$",
+          source_relative_path,
+          ignore.case = TRUE
+        ) ~ 2L,
+        TRUE ~ 3L
+      )
+    ) |>
+    dplyr::arrange(
+      .container_rank,
+      source_relative_path
+    )
+
+  publication_tables <- if (nrow(available_table_containers) > 0L) {
+    available_table_containers |>
+      dplyr::slice(1L) |>
+      dplyr::select(-.container_rank)
+  } else {
+    artifact_registry[0, , drop = FALSE]
+  }
+
+  table_evidence_mode <- if (nrow(publication_tables) > 0L) {
+    "SINGLE_WORKBOOK_FALLBACK"
+  } else {
+    "NO_TABLE_EVIDENCE"
+  }
+}
+
+publication_tables <- publication_tables |>
   dplyr::arrange(
     factor(
       manuscript_priority,
@@ -4062,6 +4115,12 @@ publication_tables <- artifact_registry |>
 if (nrow(publication_tables) > 0L) {
   table_lines <- c(
     "## Canonical table evidence — dynamic artifact registry",
+    "",
+    paste0(
+      "- Table evidence selection mode: ",
+      table_evidence_mode,
+      "."
+    ),
     ""
   )
 

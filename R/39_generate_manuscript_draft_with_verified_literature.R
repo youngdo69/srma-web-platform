@@ -2,7 +2,7 @@
 # Universal SR-MA Agent Toolkit
 # R/39_generate_manuscript_draft_with_verified_literature.R
 #
-# VERSION: 2.2.0
+# VERSION: 2.4.0
 #
 # PURPOSE
 # ------------------------------------------------------------
@@ -315,7 +315,130 @@ strip_markdown_fence <- function(x) {
     perl = TRUE
   )
 
+  # Some model responses can contain a legacy literal `nn###` / `nn##`
+  # boundary where two intended newlines were flattened before a Markdown
+  # heading. Restore only this highly specific heading-boundary pattern.
+  x <- gsub(
+    "[[:space:]]+nn(?=#{1,6}[[:space:]]+)",
+    "\n\n",
+    x,
+    perl = TRUE
+  )
+
   trimws(x)
+}
+
+
+# ------------------------------------------------------------
+# Publication-facing text hygiene
+# ------------------------------------------------------------
+# Scientific content is authored upstream. This layer only normalizes visible
+# manuscript prose so internal workflow vocabulary, stale display references,
+# flattened Markdown boundaries, and simple LaTeX math do not leak into the
+# author-facing manuscript. R/40 remains the independent numerical/citation
+# consistency gate after R/39.
+
+normalize_publication_text <- function(x) {
+  x <- as.character(x)
+
+  # Recover a legacy flattened two-newline + Markdown-heading boundary.
+  x <- gsub(
+    "[[:space:]]+nn(?=#{1,6}[[:space:]]+)",
+    "\n\n",
+    x,
+    perl = TRUE
+  )
+
+  # Journal-neutral plain-text math. Keep the scientific value unchanged while
+  # removing Markdown/LaTeX delimiters that Word export may render literally.
+  fixed_math <- c(
+    "\\(\\tau^2\\)" = "τ²",
+    "\\(I^2\\)" = "I²",
+    "\\(Q\\)" = "Q",
+    "\\(P\\)" = "P",
+    "\\tau^2" = "τ²",
+    "I^2" = "I²"
+  )
+
+  for (needle in names(fixed_math)) {
+    x <- gsub(
+      needle,
+      fixed_math[[needle]],
+      x,
+      fixed = TRUE
+    )
+  }
+
+  # Machine-style eligibility labels -> normal scholarly prose.
+  x <- gsub("\\bDESCRIPTIVEONLY\\b", "descriptive only", x, perl = TRUE)
+  x <- gsub("\\bNOT[_]?ESTIMABLE\\b", "not estimable", x, perl = TRUE)
+
+  # A few toolkit-provenance phrases have no place in visible publication text.
+  # These replacements are presentation-only and do not change scientific facts.
+  x <- gsub("canonical quantitative synthesis", "quantitative synthesis", x,
+            ignore.case = TRUE, fixed = TRUE)
+  x <- gsub("canonical pooled estimates", "pooled estimates", x,
+            ignore.case = TRUE, fixed = TRUE)
+  x <- gsub("canonical inferential model", "prespecified meta-analytic model", x,
+            ignore.case = TRUE, fixed = TRUE)
+  x <- gsub("canonical search-stage records", "study records", x,
+            ignore.case = TRUE, fixed = TRUE)
+  x <- gsub("targeted Human Verification", "prespecified data verification", x,
+            ignore.case = TRUE, fixed = TRUE)
+  x <- gsub("preserved human-review gates", "prespecified review procedures", x,
+            ignore.case = TRUE, fixed = TRUE)
+  x <- gsub("author-approved assessment outputs", "finalized risk-of-bias assessments", x,
+            ignore.case = TRUE, fixed = TRUE)
+
+  # R/41 owns final Table/Figure numbering. Remove only simple parenthetical
+  # display-number callouts; do not touch scientific table/figure terminology.
+  x <- gsub(
+    "[[:space:]]*\\((?:(?:Table|Figure)[[:space:]]+[0-9]+)(?:[[:space:]]*[,;][[:space:]]*(?:Table|Figure)[[:space:]]+[0-9]+)*\\)",
+    "",
+    x,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+
+  trimws(x)
+}
+
+publication_hygiene_issues <- function(x) {
+  x <- as.character(x)
+
+  failed <- character(0)
+
+  regex_checks <- c(
+    flattened_markdown_heading = "[[:space:]]+nn#{2,6}[[:space:]]+",
+    internal_module_name = "\\bR/[0-9]+(?:B)?\\b",
+    machine_status_label = "\\b(?:DESCRIPTIVEONLY|NOT[_]?ESTIMABLE)\\b",
+    machine_study_identifier = "\\b(?:SCR_[0-9]+|screening_id(?:::|\\b))",
+    human_gate_vocabulary = "\\b(?:Human Verification|human-review gate|workflow state)\\b",
+    internal_canonical_phrase = "\\bcanonical[[:space:]]+(?:output|workflow|evidence|inferential|quantitative|pooled|search-stage|model)\\b",
+    premature_display_number = "\\b(?:Table|Figure)[[:space:]]+[0-9]+\\b"
+  )
+
+  regex_failed <- names(regex_checks)[
+    vapply(
+      regex_checks,
+      function(pattern) {
+        grepl(pattern, x, ignore.case = TRUE, perl = TRUE)
+      },
+      logical(1)
+    )
+  ]
+
+  failed <- c(failed, regex_failed)
+
+  if (
+    grepl("\\(", x, fixed = TRUE) ||
+      grepl("\\)", x, fixed = TRUE) ||
+      grepl("\\tau", x, fixed = TRUE)
+  ) {
+    failed <- c(failed, "latex_inline_math")
+  }
+
+  unique(failed)
 }
 
 load_dotenv_simple <- function(
@@ -1232,6 +1355,73 @@ call_openai <- function(
 }
 
 
+# ------------------------------------------------------------
+# Conservative post-generation evidence-conformance repair
+# ------------------------------------------------------------
+# This is deliberately narrower than drafting. It does not create a new section;
+# it edits only unsupported/over-broad statements against the frozen R/38
+# evidence contract. R/40 remains the independent final validator.
+
+repair_section_for_evidence_conformance <- function(
+    section_name,
+    section_text,
+    evidence_text,
+    literature_text = "",
+    preserve_artifact_tokens = FALSE
+) {
+  repair_system <- paste(
+    "You are a conservative evidence-conformance editor for a systematic-review manuscript.",
+    "Your task is NOT to rewrite the section broadly. Make the minimum edits needed so every current-review claim is directly supported by the supplied frozen evidence.",
+    "Do not add any new scientific claim, number, statistic, PMID, citation, subgroup, outcome, or interpretation.",
+    "Do not perform arithmetic or derive totals, percentages, ratios, averages, ranges, or rounded values from component numbers.",
+    "Preserve all correct wording, headings, and citation tokens unless a sentence itself is unsupported and must be removed or narrowed.",
+    "If a population descriptor in an included study is broader or mixed relative to the review-level label, preserve that study-specific qualification and do not claim uniformity across all included studies.",
+    "Do not infer technical feasibility, technical success, procedural feasibility, procedural success, safety, or effectiveness merely because a procedure was performed. Such conclusions require explicit endpoint evidence in the frozen results.",
+    "A verified literature record marked Included in current review: YES must never be used to import extra current-review outcomes, effect directions, significance tests, or procedural findings that are absent from the frozen R/38 Results evidence.",
+    "For risk-of-bias prose, never use bare numeric domain identifiers such as domain 1 or domains 1-4. Use named domains only if their names are explicitly supported; otherwise retain only the overall judgement or a non-numeric summary.",
+    "Keep uncertainty language conservative.",
+    if (isTRUE(preserve_artifact_tokens)) {
+      "Preserve every exact <!-- ARTIFACT: ... --> token already present, unchanged and adjacent to the same substantive evidence paragraph."
+    } else {
+      "Do not introduce artifact tokens."
+    },
+    "Preserve valid [[PMID:...]] tokens when the supported sentence remains; if an unsupported sentence is removed, its citation token may be removed with it.",
+    "Return ONLY the repaired section text, with no commentary or code fence."
+  )
+
+  repair_user <- paste0(
+    "SECTION: ", section_name, "\n\n",
+    "FROZEN R/38 EVIDENCE:\n", evidence_text, "\n\n",
+    if (nzchar(literature_text)) {
+      paste0("VERIFIED LITERATURE LIBRARY (records explicitly flag whether they are included in the current review):\n", literature_text, "\n\n")
+    } else {
+      ""
+    },
+    "CURRENT SECTION:\n", section_text
+  )
+
+  repaired <- call_openai(
+    repair_system,
+    repair_user,
+    paste0("evidence_conformance_", tolower(section_name)),
+    max_output_tokens = max(6000L, as.integer(nchar(section_text) / 2L + 4000L))
+  )
+
+  normalize_publication_text(
+    strip_markdown_fence(repaired)
+  )
+}
+
+rob_numeric_domain_leakage <- function(x) {
+  x <- as.character(x)
+  grepl(
+    "(?i)\\b(?:risk[- ]of[- ]bias|ROBINS[- ]?I|RoB(?:\\s?2)?)?[^\\n.]{0,120}\\bdomains?\\s+(?:[0-9]+(?:\\s*[–—-]\\s*[0-9]+)?)(?:\\s*(?:,|and|&)\\s*[0-9]+(?:\\s*[–—-]\\s*[0-9]+)?)*",
+    x,
+    perl = TRUE
+  )
+}
+
+
 # ============================================================
 # 6. Build literature-search context
 # ============================================================
@@ -1262,44 +1452,60 @@ get_config_text <- function(
   default
 }
 
+# Resolve manuscript-literature search context from the canonical project
+# research_question tree first, while retaining compatibility with older
+# eligibility/root-level config layouts. This keeps R/39 aligned with R/25
+# and other modules that treat research_question as the primary PICO/PICOS
+# source of truth.
 context_dimension_specs <- list(
   Population = c(
+    "research_question.population",
     "eligibility.population",
     "population"
   ),
   Intervention = c(
+    "research_question.intervention",
     "eligibility.intervention",
     "intervention"
   ),
   Comparator = c(
+    "research_question.comparator",
     "eligibility.comparator",
     "comparator"
   ),
   Exposure = c(
+    "research_question.exposure",
     "eligibility.exposure",
     "exposure"
   ),
   `Index test` = c(
+    "research_question.index_test",
     "eligibility.index_test",
     "index_test"
   ),
   `Reference standard` = c(
+    "research_question.reference_standard",
     "eligibility.reference_standard",
     "reference_standard"
   ),
   `Prognostic factor` = c(
+    "research_question.prognostic_factor",
     "eligibility.prognostic_factor",
     "prognostic_factor"
   ),
   `Primary outcomes` = c(
+    "research_question.outcomes.primary",
     "outcomes.primary",
     "primary_outcomes"
   ),
   `Secondary outcomes` = c(
+    "research_question.outcomes.secondary",
     "outcomes.secondary",
     "secondary_outcomes"
   ),
   `Study design` = c(
+    "research_question.study_design",
+    "research_question.study_designs",
     "eligibility.study_design",
     "eligibility.study_designs"
   )
@@ -1656,6 +1862,12 @@ if (length(all_pmids) == 0L) {
 # ============================================================
 # 9. Add included-study PMIDs when available
 # ============================================================
+
+# Keep an explicit universal set of included-study PMIDs. This allows later
+# drafting/repair stages to distinguish current-review studies from truly
+# external contextual literature and prevents importing extra outcomes from an
+# included publication when those outcomes are absent from frozen R/38 evidence.
+included_pmids <- character(0)
 
 included_candidates <- c(
   file.path(
@@ -2450,10 +2662,21 @@ library_rows <- vapply(
       )
     }
 
+    included_flag <- if (
+      safe_chr(row$pmid, "") %in% included_pmids
+    ) {
+      "YES"
+    } else {
+      "NO"
+    }
+
     paste0(
       "[[PMID:",
       row$pmid,
       "]]\n",
+      "Included in current review: ",
+      included_flag,
+      "\n",
       "Title: ",
       row$title,
       "\n",
@@ -2536,8 +2759,10 @@ intro_text <- call_openai(
   max_output_tokens = 10000L
 )
 
-intro_text <- strip_markdown_fence(
-  intro_text
+intro_text <- normalize_publication_text(
+  strip_markdown_fence(
+    intro_text
+  )
 )
 
 write_text_file(
@@ -2553,17 +2778,20 @@ write_text_file(
 methods_system <- paste(
   "You are drafting the Methods section of a peer-reviewed systematic review and meta-analysis.",
   "Use ONLY the supplied frozen R/38 factual blocks and project information.",
-  "Do not add methods that are not explicitly supported by canonical configuration or executed R/27/R/28/R/28B provenance.",
+  "Do not add methods that are not explicitly supported by the supplied configuration or executed evidence provenance.",
+  "Translate internal provenance into publication-facing methodology. Never expose toolkit module names such as R/27, R/28, or R/28B; workflow state labels; artifact IDs; screening IDs; or internal phrases such as canonical output or Human Verification in manuscript prose.",
   "Do not invent registration IDs, dates, reviewers, software versions, thresholds, transformations, continuity corrections, subgroup analyses, sensitivity analyses, publication-bias tests, or meta-regressions.",
   "The Statistical analysis subsection must be publication-manuscript quality and comparable in completeness to a strong peer-reviewed meta-analysis in the project domain.",
-  "It should explicitly cover, when supported: executed analysis family (binary, continuous, time-to-event, rate, proportion/prevalence, correlation, diagnostic-accuracy, or generic effect estimate); effect measure/transformation; pooling model; between-study variance estimator; confidence-interval or Hartung-Knapp/Knapp-Hartung inference; heterogeneity statistics; sensitivity/diagnostic analyses; publication-bias procedures and minimum-k eligibility; meta-regression/moderator procedures; and software/workflow provenance.",
-  "If project_config.yml is silent but executed canonical outputs explicitly document a method, use the executed output as the source of truth.",
+  "It should explicitly cover, when supported: executed analysis family (binary, continuous, time-to-event, rate, proportion/prevalence, correlation, diagnostic-accuracy, or generic effect estimate); effect measure/transformation; pooling model; between-study variance estimator; confidence-interval or Hartung-Knapp/Knapp-Hartung inference; heterogeneity statistics; sensitivity/diagnostic analyses; publication-bias procedures and minimum-k eligibility; meta-regression/moderator procedures; and publication-appropriate software or analytical implementation details when explicitly supported.",
+  "If project_config.yml is silent but executed evidence outputs explicitly document a method, use the executed evidence as the source of truth while describing the method in normal scholarly language.",
   "Never write the literal placeholder [CONFIG NOT SPECIFIED].",
   "If an optional method is absent from all canonical executed evidence, omit that method rather than guessing.",
   "Do not report analyses that were only considered but not executed.",
-  "Preserve exploratory/underpowered/descriptive/not-estimable labels exactly.",
+  "Preserve the meaning of exploratory, underpowered, descriptive-only, and not-estimable classifications, but render internal machine-style labels such as DESCRIPTIVEONLY or NOT_ESTIMABLE as normal scholarly prose.",
   "Write polished scholarly English with enough methodological detail for reproducibility, but avoid padding unsupported content.",
-  "Do not cite external literature unless explicitly present in the supplied factual blocks."
+  "Do not cite external literature unless explicitly present in the supplied factual blocks.",
+  "Do not assign Table or Figure numbers; the final publication-export layer owns all display numbering and cross-references.",
+  "Use publication-safe plain Unicode for simple statistical notation (for example τ² and I²); do not emit LaTeX delimiters; use plain Unicode statistical notation instead."
 )
 
 methods_user <- paste0(
@@ -2574,7 +2802,7 @@ methods_user <- paste0(
   methods_factual_blocks,
   "\n\n",
   "Draft a complete Methods section with appropriate subheadings.\n",
-  "The Statistical analysis subsection is a priority: synthesize ALL actually executed statistical variables and methods exposed by the dossier, including the canonical model-output provenance and diagnostic records.\n",
+  "The Statistical analysis subsection is a priority: synthesize ALL actually executed statistical variables and methods exposed by the dossier, including supported model and diagnostic details, without exposing internal provenance labels or toolkit module names.\n",
   "When several analysis groups used the same method, describe the common method once and note exceptions only when supported.\n",
   "Do not reproduce raw console output or evidence tables in the final prose.\n",
   "Do not leave [CONFIG NOT SPECIFIED] in the manuscript."
@@ -2587,8 +2815,10 @@ methods_text <- call_openai(
   max_output_tokens = 16000L
 )
 
-methods_text <- strip_markdown_fence(
-  methods_text
+methods_text <- normalize_publication_text(
+  strip_markdown_fence(
+    methods_text
+  )
 )
 
 write_text_file(
@@ -2604,24 +2834,30 @@ write_text_file(
 results_system <- paste(
   "You are drafting the Results section of a peer-reviewed systematic review and meta-analysis.",
   "Use ONLY the supplied frozen R/38 Results evidence dossier and artifact registry.",
+  "Write publication-facing prose. Never expose toolkit module names (for example R/27 or R/28B), workflow state labels, artifact IDs, screening IDs, or internal phrases such as canonical output or Human Verification in the visible manuscript. Coverage tokens are the only internal tokens allowed here, solely because they are stripped later by R/40.",
+  "Translate internal machine-style status labels such as DESCRIPTIVEONLY, NOTESTIMABLE, and NOT_ESTIMABLE into ordinary scholarly phrases such as descriptive only or not estimable.",
   "Do not recalculate statistics and do not manufacture totals, ranges, P values, subgroup effects, or sensitivity results.",
+  "Do not create any arithmetic-derived current-review value that is not explicitly stated in the supplied evidence dossier. In particular, never sum subgroup or arm counts to create a new total, never derive a percentage, mean, ratio, range, or rounded estimate from other reported numbers, and never combine denominators across studies. If a useful aggregate is not literally present in the dossier, report the component counts or describe the evidence without that aggregate.",
   "Do not change numerical precision beyond normal sentence formatting.",
   "This is a UNIVERSAL drafting task: do not assume that the review concerns treatments, patients, procedures, or a pairwise intervention comparison unless the evidence dossier explicitly does so.",
   "Adapt terminology to the actual review architecture (for example intervention/comparator, exposure/outcome, index test/reference standard, prognostic factor/outcome, prevalence/proportion, rate, correlation, time-to-event, or generic effect estimate).",
   "The Results must be artifact-aware. Every semantic evidence unit represented by an artifact marked coverage_required=TRUE must be substantively represented in the narrative.",
   "Immediately after the paragraph or sentence cluster that covers a required artifact, reproduce its exact HTML coverage token, for example <!-- ARTIFACT: A0001 -->. Do not alter, merge, or invent artifact IDs.",
   "For descriptive/reporting tables, summarize the most informative study-level patterns supported by the columns actually present. Do not force participant, intervention, procedure, diagnostic, exposure, or prognostic terminology unless those concepts exist in that table.",
-  "For quantitative syntheses, report the number of studies and sample size when explicitly available, the executed effect measure and pooled estimate, 95% CI or other canonical interval, overall-effect P value when available, and heterogeneity metrics when available.",
+  "For quantitative syntheses, report the number of studies and sample size when explicitly available, the executed effect measure and pooled estimate, 95% CI or other reported interval, overall-effect P value when available, and heterogeneity metrics when available.",
   "For forest plots, describe study-level direction, precision, and consistency only from supplied backing data; never infer values by visually reading the image.",
-  "For sensitivity, leave-one-out, publication-bias, meta-regression, moderator, influence, or other diagnostics, describe only analyses actually executed and preserve their eligibility/status labels.",
-  "For risk of bias, summarize only author-approved canonical outputs and use the terminology of the actual RoB tool present.",
+  "For sensitivity, leave-one-out, publication-bias, meta-regression, moderator, influence, or other diagnostics, describe only analyses actually executed and preserve their scientific eligibility/status meaning in normal scholarly prose.",
+  "For risk of bias, summarize only author-approved outputs and use the terminology of the actual RoB tool present.",
   "Risk-of-bias prose must be evidence-selective: describe a domain as a concern only when the final author-approved assessment actually shows a non-low/non-clean judgement for at least one relevant study. Do not enumerate generic tool domains merely because they exist in the instrument.",
+  "Never identify risk-of-bias domains by bare numeric labels (for example domain 1, domains 1-4, or domains 5 and 6). Numeric domain identifiers are internal assessment coordinates, not scientific numeric results. Prefer named domains when explicitly supported; otherwise report only the overall judgement and a non-numeric summary such as several domains.",
   "When reporting study-selection or retrieval flow, distinguish PRISMA accounting categories from physical-document availability. A report that is not classified as 'not retrieved' must not automatically be described as having an available PDF or full-text file when the evidence dossier documents metadata-only assessment, missing PDF, abstract-only evidence, registry data, or another non-PDF source.",
   "Prefer human-readable study labels (author/year, citation, or study label) in manuscript prose. Do not expose internal machine identifiers, artifact IDs, database keys, or screening IDs unless no human-readable identifier exists and the identifier is scientifically necessary.",
   "Statistical interpretation in Results is limited to what the evidence directly supports: direction, interval precision, null crossing where appropriate for the effect measure, heterogeneity, and robustness to executed diagnostics.",
   "Do not provide mechanistic or causal explanations in Results.",
   "Do not use superiority, equivalence, noninferiority, causality, diagnostic utility, prognostic importance, or absence-of-effect language unless the supplied evidence and design justify it.",
   "If a registry artifact is supplementary and coverage_required=FALSE, it may be omitted unless it materially helps explain a reported analysis.",
+  "Do not assign or cite literal Table/Figure numbers in Results. Coverage tokens identify artifacts internally; R/41 will create the final numbered cross-references after R/40 validation.",
+  "Use publication-safe plain Unicode for simple statistical notation (for example τ² and I²); do not emit LaTeX delimiters.",
   "Write polished scholarly English with a level of detail comparable to a strong peer-reviewed meta-analysis in the relevant domain."
 )
 
@@ -2652,8 +2888,10 @@ results_text <- call_openai(
   max_output_tokens = 18000L
 )
 
-results_text <- strip_markdown_fence(
-  results_text
+results_text <- normalize_publication_text(
+  strip_markdown_fence(
+    results_text
+  )
 )
 
 required_artifact_ids <- required_coverage_artifacts$artifact_id
@@ -2699,8 +2937,10 @@ if (length(missing_artifact_ids) > 0L) {
     max_output_tokens = 18000L
   )
 
-  results_text <- strip_markdown_fence(
-    results_text
+  results_text <- normalize_publication_text(
+    strip_markdown_fence(
+      results_text
+    )
   )
 
   present_artifact_ids <- extract_artifact_markers(
@@ -2710,6 +2950,31 @@ if (length(missing_artifact_ids) > 0L) {
   missing_artifact_ids <- artifact_ids_needing_results_coverage(
     results_text,
     required_coverage_artifacts
+  )
+}
+
+# Conservative evidence-conformance pass after artifact-coverage repair. This is
+# intentionally post-generation so stochastic drafting cannot silently broaden
+# population scope, infer procedural feasibility, or expose numeric RoB domain IDs.
+results_text <- repair_section_for_evidence_conformance(
+  section_name = "Results",
+  section_text = results_text,
+  evidence_text = results_factual_blocks,
+  preserve_artifact_tokens = TRUE
+)
+
+present_artifact_ids <- extract_artifact_markers(
+  results_text
+)
+missing_artifact_ids <- artifact_ids_needing_results_coverage(
+  results_text,
+  required_coverage_artifacts
+)
+
+if (rob_numeric_domain_leakage(results_text)) {
+  stop(
+    "R/39 evidence-conformance gate failed: numbered risk-of-bias domain identifiers remain in Results.",
+    call. = FALSE
   )
 }
 
@@ -2739,7 +3004,13 @@ write_text_file(
 discussion_system <- paste(
   "You are drafting the Discussion of a peer-reviewed systematic review and meta-analysis.",
   "The current review's findings must come ONLY from the supplied R/38 Results factual blocks.",
+  "For current-review findings, use only numerical values that are explicitly stated in those factual blocks. Do not calculate or infer new totals, pooled sample sizes, percentages, averages, ratios, ranges, or rounded values from component numbers. In particular, do not sum treatment-arm counts or study denominators; if an aggregate is not literally present, state the component values or use non-numeric wording.",
+  "Translate all internal evidence provenance into publication-facing prose. Do not expose toolkit module names, workflow state labels, artifact or screening identifiers, or machine-style labels in the Discussion.",
   "External comparison/interpretation must use ONLY the verified literature library.",
+  "Each verified literature record is explicitly marked Included in current review: YES or NO. A record marked YES is NOT independent external context. Do not import any additional outcome, direction, significance test, procedural-success result, safety result, or other finding from such an included publication unless that exact finding is also present in the frozen R/38 Results factual blocks.",
+  "Do not generalize a narrower review-level population label to every included study when the frozen tables show a broader or mixed population in any study. Preserve study-specific population scope and qualify the review-level summary accordingly.",
+  "Do not conclude that the current review demonstrates technical feasibility, technical success, procedural feasibility, procedural success, safety, or effectiveness unless the frozen R/38 Results factual blocks contain direct canonical endpoint evidence supporting that conclusion. Mere performance of a procedure is not sufficient evidence of feasibility or success.",
+  "When discussing risk of bias, never use bare numeric domain identifiers. Use domain names only when explicitly supplied in the frozen evidence; otherwise summarize the overall judgement without numbered-domain detail.",
   "Use exact citation tokens [[PMID:12345678]].",
   "Never invent or alter PMIDs.",
   "Clearly distinguish the current review's findings from prior literature.",
@@ -2749,6 +3020,9 @@ discussion_system <- paste(
   "When discussing risk of bias, carry forward only concerns explicitly supported by the final author-approved RoB evidence. Never broaden the concern list by naming additional domains that were low/clean in all relevant studies.",
   "When discussing retrieval or evidence availability, preserve distinctions documented in the frozen evidence package (for example PRISMA not-retrieved status versus metadata-only assessment or missing PDF) rather than collapsing them into a stronger statement.",
   "If final RoB is pending, mark RoB-dependent interpretations as provisional.",
+  "Do not assign or cite literal Table/Figure numbers; the publication-export layer owns final display numbering.",
+  "Use normal scholarly prose rather than toolkit provenance vocabulary or machine-style status labels.",
+  "Use publication-safe plain Unicode for simple statistical notation (for example τ² and I²).",
   "No reference list."
 )
 
@@ -2789,9 +3063,26 @@ discussion_text <- call_openai(
   max_output_tokens = 16000L
 )
 
-discussion_text <- strip_markdown_fence(
-  discussion_text
+discussion_text <- normalize_publication_text(
+  strip_markdown_fence(
+    discussion_text
+  )
 )
+
+discussion_text <- repair_section_for_evidence_conformance(
+  section_name = "Discussion",
+  section_text = discussion_text,
+  evidence_text = results_factual_blocks,
+  literature_text = verified_library_text,
+  preserve_artifact_tokens = FALSE
+)
+
+if (rob_numeric_domain_leakage(discussion_text)) {
+  stop(
+    "R/39 evidence-conformance gate failed: numbered risk-of-bias domain identifiers remain in Discussion.",
+    call. = FALSE
+  )
+}
 
 write_text_file(
   discussion_text,
@@ -2895,8 +3186,14 @@ abstract_system <- paste(
   "You are drafting a structured abstract for a systematic review and meta-analysis.",
   "Use ONLY the supplied Introduction/Methods/Results/Discussion drafts.",
   "Do not introduce new numerical claims or new references.",
+  "Do not perform arithmetic on numbers appearing in the supplied drafts. Never create a new total, percentage, pooled sample size, average, ratio, range, or rounded estimate by combining component values. A number may appear in the abstract only if that same scientific value is explicitly stated in at least one supplied draft.",
   "Keep conclusions proportional to uncertainty.",
+  "Do not generalize a narrower review-level population label to every included study when the supplied Results show that one or more included studies used a broader or mixed population; preserve that qualification in the abstract summary.",
+  "Do not state that the current review demonstrates technical feasibility, technical success, procedural feasibility, procedural success, safety, or effectiveness unless the supplied Results contain direct endpoint evidence for that conclusion.",
+  "When summarizing risk of bias, do not use bare numeric domain identifiers; use only supported overall judgements or explicitly named domains.",
   "If final risk of bias is pending, keep the conclusion explicitly provisional.",
+  "Use publication-facing language only: no toolkit module names, workflow-state labels, canonical-output terminology, Human Verification wording, artifact/screening identifiers, or Table/Figure numbers.",
+  "Use publication-safe plain Unicode for simple statistical notation (for example τ² and I²); do not emit LaTeX delimiters.",
   "Return only the abstract text."
 )
 
@@ -2927,9 +3224,29 @@ abstract_text <- call_openai(
   max_output_tokens = 5000L
 )
 
-abstract_text <- strip_markdown_fence(
-  abstract_text
+abstract_text <- normalize_publication_text(
+  strip_markdown_fence(
+    abstract_text
+  )
 )
+
+abstract_text <- repair_section_for_evidence_conformance(
+  section_name = "Abstract",
+  section_text = abstract_text,
+  evidence_text = paste(
+    methods_factual_blocks,
+    results_factual_blocks,
+    sep = "\n\n"
+  ),
+  preserve_artifact_tokens = FALSE
+)
+
+if (rob_numeric_domain_leakage(abstract_text)) {
+  stop(
+    "R/39 evidence-conformance gate failed: numbered risk-of-bias domain identifiers remain in Abstract.",
+    call. = FALSE
+  )
+}
 
 write_text_file(
   abstract_text,
@@ -3055,6 +3372,25 @@ numbered_manuscript <- replace_tokens_with_numbers(
   token_manuscript,
   citation_map
 )
+
+# R/41 is the only layer allowed to assign Table/Figure display numbers. R/39
+# must also leave no internal workflow vocabulary or Markdown/LaTeX leakage in
+# the visible manuscript body. Artifact coverage tokens are intentionally
+# excluded from this gate because R/40 removes them after validation.
+final_hygiene_failures <- publication_hygiene_issues(
+  numbered_manuscript
+)
+
+if (length(final_hygiene_failures) > 0L) {
+  stop(
+    paste0(
+      "R/39 publication-prose hygiene gate failed: ",
+      paste(final_hygiene_failures, collapse = ", "),
+      ". Regenerate R/39 with the current script before R/40 validation."
+    ),
+    call. = FALSE
+  )
+}
 
 
 # ============================================================
@@ -3357,7 +3693,7 @@ draft_status <- if (
 
 state <- list(
   manuscript_drafting = list(
-    version = "2.2.0",
+    version = "2.4.0",
     generated_at = now_text(),
     project_id = project_id,
     project_title = project_title,

@@ -1,0 +1,14 @@
+| Phase | 목표 | 핵심 결과 |
+|---|---|---|
+| **WEB-001** | Web architecture foundation | User–Project–Workspace–Job 구조 |
+| **WEB-002** | Toolkit engine API | Runner를 web-callable engine으로 변환 |
+| **WEB-003** | Job/Worker system | 긴 작업을 background 실행 |
+| **WEB-004** | Authentication | Login / account / session |
+| **WEB-005** | Project Dashboard | My Projects + progress |
+| **WEB-006** | New Project Wizard | config를 GUI에서 생성 |
+| **WEB-007** | Workflow UI | Runner visualization |
+| **WEB-008** | Human Gates | Screening/full text/RoB review |
+| **WEB-009** | Results | MA / PRISMA / RoB / tables |
+| **WEB-010** | Manuscript | R/34–41 GUI |
+| **WEB-011** | Production security | isolation / backup / audit |
+| **WEB-012** | Deployment | public web service |

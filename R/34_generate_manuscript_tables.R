@@ -2,7 +2,7 @@
 # Universal SR-MA Agent Toolkit
 # R/34_generate_manuscript_tables.R
 #
-# VERSION: UNIVERSAL-R34-2026-08-16C
+# VERSION: UNIVERSAL-R34-2026-09-25E
 #
 # PURPOSE
 # ------------------------------------------------------------
@@ -25,7 +25,8 @@
 # - Human-verified/final fields are preferred when present
 # - Missing values remain NR rather than being invented
 # - Authors may freely edit and save the author-editable workbook
-# - The author-editable workbook is never overwritten automatically
+# - The author-editable workbook is refreshed automatically only when it still matches
+#   the prior generated workbook exactly; otherwise author edits are preserved
 #
 # OUTPUTS
 # ------------------------------------------------------------
@@ -781,7 +782,9 @@ field_specs <- list(
     exact = c(
       "first_author",
       "first_author_name",
-      "lead_author"
+      "lead_author",
+      "authors",
+      "author"
     ),
     regex = c(
       "^first.*author$",
@@ -1116,6 +1119,8 @@ field_specs <- list(
   # ----- intervention / exposure -----------------------------------
   intervention_name = list(
     exact = c(
+      "intervention_or_exposure",
+      "surgery_or_procedure",
       "intervention_name",
       "intervention_description",
       "treatment_description",
@@ -1179,6 +1184,7 @@ field_specs <- list(
 
   initiation_timing = list(
     exact = c(
+      "exposure_timing",
       "initiation_timing",
       "intervention_start_timing",
       "treatment_start",
@@ -1442,6 +1448,601 @@ resolve_field <- function(study_rows, field_name) {
 }
 
 
+
+# ============================================================
+# 7B. Role-aware / derived characteristic helpers
+# ============================================================
+
+first_nonmissing_from_cols <- function(df, candidates) {
+
+  if (is.null(df) || nrow(df) == 0L) {
+    return(NA_character_)
+  }
+
+  cols <- candidates[candidates %in% names(df)]
+
+  if (length(cols) == 0L) {
+    return(NA_character_)
+  }
+
+  for (col_i in cols) {
+    values <- clean_value(df[[col_i]])
+    ok <- which(!is.na(values))
+    if (length(ok) > 0L) {
+      return(values[[ok[[1]]]])
+    }
+  }
+
+  NA_character_
+}
+
+
+normalize_group_role <- function(x) {
+
+  x <- tolower(stringr::str_squish(as.character(x)))
+
+  out <- rep(NA_character_, length(x))
+
+  out[
+    grepl(
+      "intervention|treatment|treated|exposed|experimental",
+      x,
+      perl = TRUE
+    )
+  ] <- "intervention"
+
+  out[
+    grepl(
+      "comparator|control|reference|usual care|standard care",
+      x,
+      perl = TRUE
+    )
+  ] <- "comparator"
+
+  out
+}
+
+
+group_rows_for_role <- function(study_rows, role) {
+
+  if (is.null(study_rows) || nrow(study_rows) == 0L) {
+    return(tibble::tibble())
+  }
+
+  role_col <- first_existing_col(
+    study_rows,
+    c(
+      "group_role",
+      "arm_role",
+      "role"
+    )
+  )
+
+  if (is.na(role_col)) {
+    return(tibble::tibble())
+  }
+
+  role_values <- normalize_group_role(
+    study_rows[[role_col]]
+  )
+
+  out <- study_rows[
+    !is.na(role_values) & role_values == role,
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(out) == 0L) {
+    return(tibble::tibble())
+  }
+
+  out |>
+    dplyr::arrange(.source_rank)
+}
+
+
+plain_number <- function(x) {
+
+  x <- clean_value(x)
+
+  if (length(x) == 0L || is.na(x[[1]])) {
+    return(FALSE)
+  }
+
+  grepl(
+    "^[-+]?[0-9]+(?:\\.[0-9]+)?$",
+    x[[1]],
+    perl = TRUE
+  )
+}
+
+
+first_numeric_token <- function(x) {
+
+  x <- clean_value(x)
+
+  if (length(x) == 0L || is.na(x[[1]])) {
+    return(NA_real_)
+  }
+
+  token <- stringr::str_extract(
+    x[[1]],
+    "[0-9]+(?:\\.[0-9]+)?"
+  )
+
+  suppressWarnings(
+    as.numeric(token)
+  )
+}
+
+
+format_age_from_group <- function(group_rows) {
+
+  age <- first_nonmissing_from_cols(
+    group_rows,
+    c(
+      "age",
+      "age_mean",
+      "mean_age",
+      "age_median",
+      "baseline_age"
+    )
+  )
+
+  if (is.na(age)) {
+    return(NA_character_)
+  }
+
+  sd <- first_nonmissing_from_cols(
+    group_rows,
+    c(
+      "age_sd",
+      "sd_age"
+    )
+  )
+
+  if (
+    !is.na(sd) &&
+    plain_number(age) &&
+    plain_number(sd)
+  ) {
+    return(
+      paste0(age, " ± ", sd)
+    )
+  }
+
+  age
+}
+
+
+format_female_from_group <- function(group_rows) {
+
+  n_text <- first_nonmissing_from_cols(
+    group_rows,
+    c(
+      "sample_size",
+      "group_n",
+      "n"
+    )
+  )
+
+  female <- first_nonmissing_from_cols(
+    group_rows,
+    c(
+      "female_n",
+      "female",
+      "women_n",
+      "women"
+    )
+  )
+
+  if (!is.na(female)) {
+
+    # Preserve already-informative count/percentage strings.
+    if (
+      grepl("%|/", female, perl = TRUE) ||
+      !plain_number(female)
+    ) {
+      return(female)
+    }
+
+    n_value <- first_numeric_token(n_text)
+    female_value <- suppressWarnings(as.numeric(female))
+
+    if (
+      !is.na(n_value) &&
+      n_value > 0 &&
+      !is.na(female_value) &&
+      female_value >= 0 &&
+      female_value <= n_value
+    ) {
+      pct <- 100 * female_value / n_value
+      return(
+        sprintf(
+          "%g/%g (%.1f%%)",
+          female_value,
+          n_value,
+          pct
+        )
+      )
+    }
+
+    return(female)
+  }
+
+  # Deterministic fallback: derive female count from total N and male count
+  # only when both are explicitly extractable.
+  male <- first_nonmissing_from_cols(
+    group_rows,
+    c(
+      "male_n",
+      "male",
+      "men_n",
+      "men"
+    )
+  )
+
+  n_value <- first_numeric_token(n_text)
+  male_value <- first_numeric_token(male)
+
+  if (
+    !is.na(n_value) &&
+    n_value > 0 &&
+    !is.na(male_value) &&
+    male_value >= 0 &&
+    male_value <= n_value
+  ) {
+
+    female_value <- n_value - male_value
+    pct <- 100 * female_value / n_value
+
+    return(
+      sprintf(
+        "%g/%g (%.1f%%)",
+        female_value,
+        n_value,
+        pct
+      )
+    )
+  }
+
+  NA_character_
+}
+
+
+extract_note_fragment <- function(x, keyword_pattern) {
+
+  x <- clean_value(x)
+
+  if (length(x) == 0L || all(is.na(x))) {
+    return(NA_character_)
+  }
+
+  x <- x[!is.na(x)]
+
+  for (txt in x) {
+
+    parts <- unlist(
+      strsplit(
+        txt,
+        "(?<=[.;])\\s+",
+        perl = TRUE
+      )
+    )
+
+    hit <- parts[
+      grepl(
+        keyword_pattern,
+        parts,
+        ignore.case = TRUE,
+        perl = TRUE
+      )
+    ]
+
+    if (length(hit) > 0L) {
+      return(
+        stringr::str_squish(hit[[1]])
+      )
+    }
+  }
+
+  NA_character_
+}
+
+
+derive_centers <- function(study_rows, explicit_value, study_design) {
+
+  if (!is.na(explicit_value) && explicit_value != "") {
+    return(explicit_value)
+  }
+
+  setting <- first_nonmissing_from_cols(
+    study_rows,
+    c(
+      "setting",
+      "study_setting",
+      "site_setting"
+    )
+  )
+
+  combined <- paste(
+    c(setting, study_design),
+    collapse = " "
+  )
+
+  explicit_count <- stringr::str_extract(
+    combined,
+    "\\b[0-9]+\\s*(?:centers?|centres?)\\b"
+  )
+
+  if (!is.na(explicit_count) && explicit_count != "") {
+    return(explicit_count)
+  }
+
+  if (
+    grepl(
+      "single[- ]?cent(?:er|re)",
+      combined,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+  ) {
+    return("1")
+  }
+
+  if (
+    grepl(
+      "multi[- ]?cent(?:er|re)",
+      combined,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+  ) {
+    return("Multicentre; number NR")
+  }
+
+  NA_character_
+}
+
+
+derive_adjustment <- function(study_rows, explicit_value) {
+
+  if (!is.na(explicit_value) && explicit_value != "") {
+    return(explicit_value)
+  }
+
+  candidates <- c(
+    first_nonmissing_from_cols(
+      study_rows,
+      c(
+        "study_design",
+        "analysis_population",
+        "extraction_notes",
+        "overall_extraction_notes"
+      )
+    ),
+    first_nonmissing_from_cols(
+      study_rows,
+      c(
+        "baseline_characteristics_notes"
+      )
+    )
+  )
+
+  txt <- paste(
+    candidates[!is.na(candidates)],
+    collapse = " "
+  )
+
+  if (txt == "") {
+    return(NA_character_)
+  }
+
+  if (
+    grepl(
+      "overlap weighting",
+      txt,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+  ) {
+    return("Propensity score overlap weighting")
+  }
+
+  if (
+    grepl(
+      "propensity score.*weight|propensity.*weight",
+      txt,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+  ) {
+    return("Propensity score weighting")
+  }
+
+  if (
+    grepl(
+      "propensity score matching|\\bPSM\\b",
+      txt,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+  ) {
+    return("Propensity score matching (PSM)")
+  }
+
+  if (
+    grepl(
+      "inverse probability.*weight|IPTW",
+      txt,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+  ) {
+    return("Inverse-probability weighting")
+  }
+
+  if (
+    grepl(
+      "multivariable|multivariate",
+      txt,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+  ) {
+    return("Multivariable adjustment")
+  }
+
+  NA_character_
+}
+
+
+resolve_group_baseline <- function(group_rows) {
+
+  if (is.null(group_rows) || nrow(group_rows) == 0L) {
+    return(
+      list(
+        n = NA_character_,
+        age = NA_character_,
+        female = NA_character_,
+        diabetes = NA_character_,
+        hypertension = NA_character_,
+        renal = NA_character_,
+        lvef_hf = NA_character_
+      )
+    )
+  }
+
+  notes <- first_nonmissing_from_cols(
+    group_rows,
+    c(
+      "baseline_characteristics_notes",
+      "baseline_notes",
+      "notes"
+    )
+  )
+
+  diabetes <- first_nonmissing_from_cols(
+    group_rows,
+    c(
+      "baseline_diabetes_status",
+      "diabetes_status",
+      "diabetes",
+      "diabetes_n",
+      "diabetes_percent"
+    )
+  )
+
+  hypertension <- first_nonmissing_from_cols(
+    group_rows,
+    c(
+      "baseline_hypertension_status",
+      "hypertension_status",
+      "hypertension",
+      "hypertension_n",
+      "hypertension_percent"
+    )
+  )
+
+  if (is.na(hypertension) && !is.na(notes)) {
+    hypertension <- extract_note_fragment(
+      notes,
+      "hypertension|\\bHTN\\b"
+    )
+  }
+
+  renal <- first_nonmissing_from_cols(
+    group_rows,
+    c(
+      "baseline_renal_function",
+      "renal_function",
+      "baseline_ckd",
+      "ckd",
+      "egfr",
+      "creatinine"
+    )
+  )
+
+  lvef_hf <- first_nonmissing_from_cols(
+    group_rows,
+    c(
+      "baseline_lvef",
+      "lvef",
+      "baseline_heart_failure",
+      "heart_failure",
+      "hf_status"
+    )
+  )
+
+  if (is.na(lvef_hf) && !is.na(notes)) {
+    lvef_hf <- extract_note_fragment(
+      notes,
+      "LVEF|ejection fraction|heart failure|\\bHF\\b"
+    )
+  }
+
+  list(
+    n = first_nonmissing_from_cols(
+      group_rows,
+      c(
+        "sample_size",
+        "group_n",
+        "n"
+      )
+    ),
+    age = format_age_from_group(group_rows),
+    female = format_female_from_group(group_rows),
+    diabetes = diabetes,
+    hypertension = hypertension,
+    renal = renal,
+    lvef_hf = lvef_hf
+  )
+}
+
+
+group_source_has_baseline_values <- function(group_rows) {
+
+  if (is.null(group_rows) || nrow(group_rows) == 0L) {
+    return(FALSE)
+  }
+
+  candidates <- c(
+    "sample_size",
+    "group_n",
+    "n",
+    "age",
+    "age_mean",
+    "age_median",
+    "female_n",
+    "female",
+    "male_n",
+    "male",
+    "baseline_renal_function",
+    "baseline_diabetes_status",
+    "baseline_hypertension_status",
+    "baseline_lvef",
+    "lvef",
+    "baseline_characteristics_notes"
+  )
+
+  cols <- candidates[candidates %in% names(group_rows)]
+
+  if (length(cols) == 0L) {
+    return(FALSE)
+  }
+
+  any(
+    vapply(
+      cols,
+      function(col_i) {
+        any(!is.na(clean_value(group_rows[[col_i]])))
+      },
+      logical(1)
+    )
+  )
+}
+
+
 # ============================================================
 # 8. Load included universe + extraction pool
 # ============================================================
@@ -1528,6 +2129,7 @@ resolved_rows <- lapply(
           "first_author",
           "first_author_name",
           "lead_author",
+          "authors",
           "author",
           "citation_short"
         )
@@ -1541,6 +2143,15 @@ resolved_rows <- lapply(
           NA_character_
         )
       }
+    }
+
+    if (
+      !is.na(first_author) &&
+      first_author != ""
+    ) {
+      first_author <- strip_first_author(
+        first_author
+      )
     }
 
     if (
@@ -1567,6 +2178,39 @@ resolved_rows <- lapply(
       }
     }
 
+    study_design <- get_value(
+      "study_design"
+    )
+
+    centers <- derive_centers(
+      study_rows,
+      get_value("centers"),
+      study_design
+    )
+
+    adjustment <- derive_adjustment(
+      study_rows,
+      get_value("adjustment")
+    )
+
+    intervention_group <- group_rows_for_role(
+      study_rows,
+      "intervention"
+    )
+
+    comparator_group <- group_rows_for_role(
+      study_rows,
+      "comparator"
+    )
+
+    intervention_baseline <- resolve_group_baseline(
+      intervention_group
+    )
+
+    comparator_baseline <- resolve_group_baseline(
+      comparator_group
+    )
+
     study_label <- if (
       !is.na(first_author) &&
       first_author != "" &&
@@ -1574,17 +2218,38 @@ resolved_rows <- lapply(
       publication_year != ""
     ) {
       paste(
-        strip_first_author(first_author),
+        first_author,
         publication_year
       )
     } else if (
       !is.na(first_author) &&
       first_author != ""
     ) {
-      strip_first_author(first_author)
+      first_author
     } else {
       key_i
     }
+
+    source_authors <- first_nonmissing_from_cols(
+      study_rows,
+      c(
+        "authors",
+        "author",
+        "first_author",
+        "lead_author"
+      )
+    )
+
+    source_intervention <- first_nonmissing_from_cols(
+      study_rows,
+      c(
+        "intervention_or_exposure",
+        "surgery_or_procedure",
+        "intervention_name",
+        "intervention_description",
+        "treatment_description"
+      )
+    )
 
     tibble::tibble(
       .study_key = key_i,
@@ -1593,27 +2258,27 @@ resolved_rows <- lapply(
       study_label = study_label,
 
       country = get_value("country"),
-      centers = get_value("centers"),
+      centers = centers,
       study_period = get_value("study_period"),
-      study_design = get_value("study_design"),
+      study_design = study_design,
       sample_size = get_value("sample_size"),
-      adjustment = get_value("adjustment"),
+      adjustment = adjustment,
       follow_up = get_value("follow_up"),
 
-      intervention_n = get_value("intervention_n"),
-      comparator_n = get_value("comparator_n"),
-      intervention_age = get_value("intervention_age"),
-      comparator_age = get_value("comparator_age"),
-      intervention_female = get_value("intervention_female"),
-      comparator_female = get_value("comparator_female"),
-      intervention_diabetes = get_value("intervention_diabetes"),
-      comparator_diabetes = get_value("comparator_diabetes"),
-      intervention_hypertension = get_value("intervention_hypertension"),
-      comparator_hypertension = get_value("comparator_hypertension"),
-      intervention_renal = get_value("intervention_renal"),
-      comparator_renal = get_value("comparator_renal"),
-      intervention_lvef = get_value("intervention_lvef"),
-      comparator_lvef = get_value("comparator_lvef"),
+      intervention_n = intervention_baseline$n,
+      comparator_n = comparator_baseline$n,
+      intervention_age = intervention_baseline$age,
+      comparator_age = comparator_baseline$age,
+      intervention_female = intervention_baseline$female,
+      comparator_female = comparator_baseline$female,
+      intervention_diabetes = intervention_baseline$diabetes,
+      comparator_diabetes = comparator_baseline$diabetes,
+      intervention_hypertension = intervention_baseline$hypertension,
+      comparator_hypertension = comparator_baseline$hypertension,
+      intervention_renal = intervention_baseline$renal,
+      comparator_renal = comparator_baseline$renal,
+      intervention_lvef = intervention_baseline$lvef_hf,
+      comparator_lvef = comparator_baseline$lvef_hf,
 
       intervention_name = get_value("intervention_name"),
       dose = get_value("dose"),
@@ -1623,7 +2288,13 @@ resolved_rows <- lapply(
       postprocedure_management = get_value("postprocedure_management"),
       intervention_duration = get_value("intervention_duration"),
       comparator_description = get_value("comparator_description"),
-      cointerventions = get_value("cointerventions")
+      cointerventions = get_value("cointerventions"),
+
+      .source_authors_present = !is.na(source_authors),
+      .source_group_baseline_present =
+        group_source_has_baseline_values(intervention_group) ||
+        group_source_has_baseline_values(comparator_group),
+      .source_intervention_present = !is.na(source_intervention)
     )
   }
 )
@@ -1732,7 +2403,7 @@ table2 <- resolved |>
 # Outcome tables, meta-analysis outputs, and old additional-analysis
 # workspaces are never used to create intervention rows.
 
-table3 <- resolved |>
+table3_full <- resolved |>
   dplyr::transmute(
     `Study` = to_nr(
       study_label
@@ -1765,6 +2436,122 @@ table3 <- resolved |>
       cointerventions
     )
   )
+
+# Universal evidence-adaptive presentation:
+# - Study, Intervention / exposure, and Comparator are always retained.
+# - Optional intervention-characteristic columns are retained only when at
+#   least one included study has a defensible non-NR value.
+# This avoids topic-specific hardcoding and prevents pharmacologic-only
+# columns from cluttering device/procedure reviews when no such data exist.
+table3_required_cols <- c(
+  "Study",
+  "Intervention / exposure",
+  "Comparator"
+)
+
+table3_optional_cols <- setdiff(
+  names(table3_full),
+  table3_required_cols
+)
+
+table3_informative_optional_cols <- table3_optional_cols[
+  vapply(
+    table3_full[table3_optional_cols],
+    function(x) {
+      any(
+        !is.na(x) &
+          trimws(as.character(x)) != "" &
+          as.character(x) != "NR"
+      )
+    },
+    logical(1)
+  )
+]
+
+table3_keep_cols <- names(table3_full)[
+  names(table3_full) %in%
+    c(
+      table3_required_cols,
+      table3_informative_optional_cols
+    )
+]
+
+table3 <- table3_full |>
+  dplyr::select(
+    dplyr::all_of(table3_keep_cols)
+  )
+
+
+
+# ============================================================
+# 12B. Structured-data mapping integrity gate
+# ============================================================
+
+mapping_failures <- character()
+
+for (i in seq_len(nrow(resolved))) {
+
+  key_i <- resolved$.study_key[[i]]
+
+  if (
+    isTRUE(resolved$.source_authors_present[[i]]) &&
+    identical(table1$`First author`[[i]], "NR")
+  ) {
+    mapping_failures <- c(
+      mapping_failures,
+      paste0(
+        key_i,
+        ": author metadata exists upstream but Table 1 First author resolved to NR."
+      )
+    )
+  }
+
+  if (
+    isTRUE(resolved$.source_group_baseline_present[[i]]) &&
+    all(
+      unlist(
+        table2[i, setdiff(names(table2), "Study"), drop = FALSE],
+        use.names = FALSE
+      ) == "NR"
+    )
+  ) {
+    mapping_failures <- c(
+      mapping_failures,
+      paste0(
+        key_i,
+        ": group/baseline data exist upstream but all Table 2 characteristic cells resolved to NR."
+      )
+    )
+  }
+
+  if (
+    isTRUE(resolved$.source_intervention_present[[i]]) &&
+    identical(table3$`Intervention / exposure`[[i]], "NR")
+  ) {
+    mapping_failures <- c(
+      mapping_failures,
+      paste0(
+        key_i,
+        ": intervention/procedure data exist upstream but Table 3 Intervention / exposure resolved to NR."
+      )
+    )
+  }
+}
+
+if (length(mapping_failures) > 0L) {
+  stop(
+    paste(
+      c(
+        "R/34 manuscript-table mapping integrity gate FAILED.",
+        "Structured extraction values were detected upstream but were lost during manuscript-table construction.",
+        "",
+        mapping_failures
+      ),
+      collapse = "\n"
+    ),
+    call. = FALSE
+  )
+}
 
 
 # ============================================================
@@ -2013,7 +2800,7 @@ instructions <- tibble::tibble(
   ),
   Guidance = c(
     "manuscript_tables_generated.xlsx is generated from the current structured Toolkit data and may be overwritten on rerun.",
-    "manuscript_tables_author_editable.xlsx is the author working copy and is never overwritten automatically once created.",
+    "manuscript_tables_author_editable.xlsx is the author working copy. It is refreshed automatically only when it still matches the prior generated workbook exactly; otherwise author edits are preserved.",
     "NR means the structured extraction data did not provide a defensible value. No value is invented.",
     "Authors may directly correct, add, delete, reformat, merge headers, and add footnotes or references in the author-editable workbook.",
     "After authors have begun manual editing, use the author-editable workbook as the manuscript working file; rerunning R/34 updates only the generated workbook."
@@ -2025,6 +2812,29 @@ openxlsx::writeData(
   "Author_Instructions",
   instructions
 )
+
+# Determine whether the existing author-editable workbook was still an
+# untouched copy of the previously generated workbook. If so, it is safe to
+# refresh it automatically after regeneration; if not, preserve author edits.
+author_was_in_sync <- FALSE
+
+if (
+  file.exists(author_xlsx) &&
+  file.exists(generated_xlsx)
+) {
+  author_md5_before <- unname(
+    tools::md5sum(author_xlsx)
+  )
+
+  generated_md5_before <- unname(
+    tools::md5sum(generated_xlsx)
+  )
+
+  author_was_in_sync <- identical(
+    author_md5_before,
+    generated_md5_before
+  )
+}
 
 openxlsx::saveWorkbook(
   wb,
@@ -2038,6 +2848,7 @@ openxlsx::saveWorkbook(
 # ============================================================
 
 author_copy_created <- FALSE
+author_copy_refreshed <- FALSE
 
 if (!file.exists(author_xlsx)) {
 
@@ -2048,12 +2859,32 @@ if (!file.exists(author_xlsx)) {
       overwrite = FALSE
     )
   )
+
+} else if (isTRUE(author_was_in_sync)) {
+
+  author_copy_refreshed <- isTRUE(
+    file.copy(
+      generated_xlsx,
+      author_xlsx,
+      overwrite = TRUE
+    )
+  )
 }
 
 
 # ============================================================
 # 17. Report
 # ============================================================
+
+nr_count_table1 <- sum(
+  table1 == "NR",
+  na.rm = TRUE
+)
+
+nr_count_table2 <- sum(
+  table2 == "NR",
+  na.rm = TRUE
+)
 
 nr_count_table3 <- sum(
   table3 == "NR",
@@ -2092,12 +2923,26 @@ report_lines <- c(
     nrow(table3)
   ),
   "",
-  "TABLE 3 QUALITY CHECK",
+  "TABLE QUALITY CHECK",
   "--------------------------------------------------",
+  paste0(
+    "Table 1 NR cells: ",
+    nr_count_table1
+  ),
+  paste0(
+    "Table 2 NR cells: ",
+    nr_count_table2
+  ),
   paste0(
     "Table 3 NR cells: ",
     nr_count_table3
   ),
+  "Mapping integrity gate: PASS — no detected upstream-to-table value loss.",
+  paste0(
+    "Table 3 retained columns: ",
+    paste(names(table3), collapse = " | ")
+  ),
+  "Table 3 optional columns that are entirely NR are omitted automatically.",
   "Table 3 is constructed only from included-study extraction records.",
   "Meta-analysis outputs and additional-analysis workspaces are excluded.",
   "",
@@ -2167,6 +3012,20 @@ cat(
 )
 
 cat(
+  "Table 1 NR cells: ",
+  nr_count_table1,
+  "\n",
+  sep = ""
+)
+
+cat(
+  "Table 2 NR cells: ",
+  nr_count_table2,
+  "\n",
+  sep = ""
+)
+
+cat(
   "Table 3 NR cells: ",
   nr_count_table3,
   "\n\n",
@@ -2191,9 +3050,13 @@ if (author_copy_created) {
   cat(
     "Author-editable workbook created.\n"
   )
+} else if (author_copy_refreshed) {
+  cat(
+    "Author-editable workbook refreshed automatically because it matched the prior generated workbook exactly.\n"
+  )
 } else {
   cat(
-    "Existing author-editable workbook preserved; it was NOT overwritten.\n"
+    "Existing author-editable workbook preserved because it may contain author edits.\n"
   )
 }
 

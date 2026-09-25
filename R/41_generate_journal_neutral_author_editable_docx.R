@@ -2,7 +2,7 @@
 # Universal SR-MA Agent Toolkit
 # R/41_generate_journal_neutral_author_editable_docx.R
 #
-# VERSION: 1.11.0
+# VERSION: 1.15.4
 #
 # PURPOSE
 # ------------------------------------------------------------
@@ -18,7 +18,9 @@
 #   4) appends figure legends and copies canonical figure files into a
 #      journal-neutral author-review package;
 #   5) optionally embeds raster figures when explicitly enabled;
-#   6) creates a complete export manifest/state/report for provenance.
+#   6) renders author-approved RoB judgements as complete traffic-light +
+#      summary composites for Word without changing any judgement;
+#   7) creates a complete export manifest/state/report for provenance.
 #
 # R/41 DOES NOT:
 #   - rewrite scientific prose;
@@ -793,6 +795,11 @@ results_draft_file <- file.path(
   "results_draft.md"
 )
 
+r39_manuscript_file <- file.path(
+  draft_root,
+  "manuscript_draft.md"
+)
+
 docx_file <- file.path(
   author_root,
   "manuscript_author_editable.docx"
@@ -984,6 +991,76 @@ submission_text <- read_text_file(
   submission_candidate_file
 )
 
+# R/41 must export the exact manuscript that R/40 validated.  The R/40 state
+# records the SHA-256 of the R/39 manuscript_draft.md that entered QC.  Refuse
+# export if that draft has changed since validation, or if the PASS-only
+# submission candidate no longer equals the deterministic marker-stripped
+# version produced by R/40.
+validated_r39_sha256 <- safe_chr(
+  get_nested(
+    qc_state,
+    "manuscript_qc.manuscript_sha256",
+    ""
+  ),
+  ""
+)
+
+if (
+  !file_nonempty(r39_manuscript_file) ||
+    !nzchar(validated_r39_sha256)
+) {
+  stop(
+    paste0(
+      "R/41 could not verify the R/40-validated R/39 manuscript source. ",
+      "Run R/40 again before DOCX export."
+    ),
+    call. = FALSE
+  )
+}
+
+current_r39_sha256 <- sha256_file(
+  r39_manuscript_file
+)
+
+if (!identical(current_r39_sha256, validated_r39_sha256)) {
+  stop(
+    paste0(
+      "R/39 manuscript_draft.md has changed since R/40 validation. ",
+      "R/41 will not export a stale or post-QC-modified manuscript. ",
+      "Run R/40 again."
+    ),
+    call. = FALSE
+  )
+}
+
+validated_r39_text <- read_text_file(
+  r39_manuscript_file
+)
+
+expected_submission_text <- stringr::str_replace_all(
+  validated_r39_text,
+  "<!--\\s*ARTIFACT:\\s*[A-Za-z0-9_-]+\\s*-->",
+  ""
+)
+
+expected_submission_text <- gsub(
+  "\\n[[:space:]]*\\n[[:space:]]*\\n+",
+  "\\n\\n",
+  expected_submission_text,
+  perl = TRUE
+)
+
+if (!identical(submission_text, expected_submission_text)) {
+  stop(
+    paste0(
+      "R/40 manuscript_submission_candidate.md does not match the validated ",
+      "R/39 manuscript after deterministic artifact-marker removal. ",
+      "Run R/40 again before DOCX export."
+    ),
+    call. = FALSE
+  )
+}
+
 if (
   grepl(
     "<!--\\s*ARTIFACT:",
@@ -1006,8 +1083,36 @@ if (
 # 5. Journal-neutral Markdown parsing
 # ============================================================
 
-strip_inline_markdown <- function(x) {
+
+normalize_publication_math <- function(x) {
   x <- as.character(x)
+
+  fixed_math <- c(
+    "\\(\\tau^2\\)" = "τ²",
+    "\\(I^2\\)" = "I²",
+    "\\(Q\\)" = "Q",
+    "\\(P\\)" = "P",
+    "\\tau^2" = "τ²",
+    "τ^2" = "τ²",
+    "I^2" = "I²"
+  )
+
+  for (needle in names(fixed_math)) {
+    x <- gsub(
+      needle,
+      fixed_math[[needle]],
+      x,
+      fixed = TRUE
+    )
+  }
+
+  x
+}
+
+strip_inline_markdown <- function(x) {
+  x <- normalize_publication_math(
+    as.character(x)
+  )
 
   # Preserve both visible label and URL for Markdown links.
   x <- gsub(
@@ -1068,6 +1173,16 @@ strip_inline_markdown <- function(x) {
 
 parse_markdown_blocks <- function(text) {
   text <- as.character(text)
+
+  # Restore a legacy flattened Markdown-heading boundary occasionally emitted
+  # as visible `nn###` / `nn##` text. This is formatting-only normalization:
+  # it changes no scientific words or values.
+  text <- gsub(
+    "[[:space:]]+nn(?=#{1,6}[[:space:]]+)",
+    "\n\n",
+    text,
+    perl = TRUE
+  )
 
   # Restore literal escaped line breaks that can otherwise appear as visible
   # "nn###" fragments in the author-editable Word manuscript.
@@ -1356,6 +1471,68 @@ if (length(markdown_blocks) == 0L) {
   )
 }
 
+
+# Remove stale parenthetical display-number callouts from the validated R/40
+# prose before R/41 assigns its own deterministic numbering. R/39 v2.3+ emits
+# no display numbers, but this keeps R/41 backward-safe for older drafts.
+strip_stale_display_references <- function(x) {
+  x <- as.character(x)
+
+  x <- gsub(
+    "[[:space:]]*\\((?:(?:Table|Figure)[[:space:]]+[0-9]+)(?:[[:space:]]*[,;][[:space:]]*(?:Table|Figure)[[:space:]]+[0-9]+)*\\)",
+    "",
+    x,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+
+  trimws(x)
+}
+
+for (i in seq_along(markdown_blocks)) {
+  markdown_blocks[[i]]$text <- strip_stale_display_references(
+    markdown_blocks[[i]]$text
+  )
+}
+
+# Normalize manuscript heading hierarchy without changing heading text. The
+# model-generated Markdown can occasionally mix # and ## levels across major
+# sections. Major manuscript sections are rendered at one consistent level;
+# their internal subsections are rendered one level below. The project title
+# remains the sole level-1/title block.
+normalize_heading_key <- function(x) {
+  x <- tolower(trimws(as.character(x)))
+  x <- sub("^[0-9]+(?:\\.[0-9]+)*\\.?\\s+", "", x, perl = TRUE)
+  trimws(x)
+}
+
+major_manuscript_sections <- c(
+  "abstract",
+  "introduction",
+  "methods",
+  "results",
+  "discussion",
+  "references",
+  "tables",
+  "figure legends",
+  "figures"
+)
+
+seen_major_section <- FALSE
+for (i in seq_along(markdown_blocks)) {
+  block <- markdown_blocks[[i]]
+  if (!identical(block$type, "heading")) next
+
+  key <- normalize_heading_key(block$text)
+
+  if (key %in% major_manuscript_sections) {
+    markdown_blocks[[i]]$level <- 2L
+    seen_major_section <- TRUE
+  } else if (isTRUE(seen_major_section)) {
+    markdown_blocks[[i]]$level <- 3L
+  }
+}
+
 heading_text <- vapply(
   markdown_blocks,
   function(block) {
@@ -1417,8 +1594,62 @@ required_artifact_cols <- c(
   "file_extension",
   "source_path",
   "source_relative_path",
-  "source_status"
+  "source_status",
+  "source_sha256",
+  "package_relative_path",
+  "package_sha256"
 )
+
+resolve_frozen_artifact_path <- function(
+    package_relative_path,
+    repo_root
+) {
+  rel <- safe_chr(
+    package_relative_path,
+    ""
+  )
+
+  if (!nzchar(rel)) {
+    return("")
+  }
+
+  normalize_slash(
+    normalizePath(
+      file.path(
+        repo_root,
+        rel
+      ),
+      winslash = "/",
+      mustWork = FALSE
+    )
+  )
+}
+
+hash_matches_expected <- function(
+    path,
+    expected_sha256
+) {
+  expected <- tolower(
+    safe_chr(
+      expected_sha256,
+      ""
+    )
+  )
+
+  if (
+    !nzchar(expected) ||
+      !file_nonempty(path)
+  ) {
+    return(FALSE)
+  }
+
+  identical(
+    tolower(
+      sha256_file(path)
+    ),
+    expected
+  )
+}
 
 if (nrow(artifact_registry) > 0L) {
   missing_cols <- setdiff(
@@ -1431,12 +1662,12 @@ if (nrow(artifact_registry) > 0L) {
   if (length(missing_cols) > 0L) {
     stop(
       paste0(
-        "manuscript_artifact_registry.csv is missing required column(s): ",
+        "manuscript_artifact_registry.csv is missing required frozen-artifact column(s): ",
         paste(
           missing_cols,
           collapse = ", "
         ),
-        "."
+        ". Re-run R/38 before R/41 so DOCX export can use hash-verified frozen artifacts."
       ),
       call. = FALSE
     )
@@ -1450,7 +1681,7 @@ if (nrow(artifact_registry) > 0L) {
         logical(1),
         default = FALSE
       ),
-      resolved_source_path = mapply(
+      resolved_live_source_path = mapply(
         resolve_registry_path,
         source_path,
         source_relative_path,
@@ -1459,12 +1690,73 @@ if (nrow(artifact_registry) > 0L) {
         ),
         USE.NAMES = FALSE
       ),
+      frozen_package_path = vapply(
+        package_relative_path,
+        resolve_frozen_artifact_path,
+        character(1),
+        repo_root = repo_root
+      ),
+      frozen_package_available = vapply(
+        frozen_package_path,
+        file_nonempty,
+        logical(1)
+      ),
+      frozen_package_hash_match = mapply(
+        hash_matches_expected,
+        frozen_package_path,
+        package_sha256,
+        USE.NAMES = FALSE
+      ),
+      live_source_hash_match = mapply(
+        hash_matches_expected,
+        resolved_live_source_path,
+        source_sha256,
+        USE.NAMES = FALSE
+      ),
+      resolved_source_path = ifelse(
+        frozen_package_available &
+          frozen_package_hash_match,
+        frozen_package_path,
+        ""
+      ),
       source_available_now = vapply(
         resolved_source_path,
         file_nonempty,
         logical(1)
+      ),
+      export_source_contract = ifelse(
+        source_available_now,
+        "R38_FROZEN_HASH_VERIFIED_COPY",
+        "UNVERIFIED_OR_MISSING_FROZEN_COPY"
       )
     )
+
+  frozen_integrity_failures <- artifact_registry |>
+    dplyr::filter(
+      toupper(
+        trimws(
+          as.character(source_status)
+        )
+      ) == "AVAILABLE",
+      artifact_type %in% c(
+        "table",
+        "figure"
+      ),
+      !source_available_now
+    )
+
+  if (nrow(frozen_integrity_failures) > 0L) {
+    stop(
+      paste0(
+        "R/41 frozen-artifact integrity gate failed for ",
+        nrow(frozen_integrity_failures),
+        " manuscript table/figure artifact(s). ",
+        "The R/38 frozen package copy is missing or its SHA-256 no longer matches ",
+        "manuscript_artifact_registry.csv. Re-run R/38 -> R/39 -> R/40 before export."
+      ),
+      call. = FALSE
+    )
+  }
 }
 
 results_draft_text <- read_text_file(
@@ -1723,6 +2015,53 @@ strip_existing_display_number <- function(
   )
 }
 
+
+clean_publication_artifact_title <- function(
+    title,
+    artifact_type
+) {
+  out <- strip_existing_display_number(
+    title,
+    artifact_type
+  )
+
+  # Remove directory-like/generic suffixes that are useful for artifact
+  # inventory but not for a manuscript caption.
+  out <- sub(
+    "[[:space:]]*[–—-][[:space:]]*Figures?[[:space:]]*$",
+    "",
+    out,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+
+  out <- gsub(
+    "\\bRobins[[:space:]]+i\\b",
+    "ROBINS-I",
+    out,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+
+  out <- gsub(
+    "\\bRob[[:space:]]+2\\b",
+    "RoB 2",
+    out,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+
+  out <- gsub(
+    "\\bmeta[[:space:]-]+analysis\\b",
+    "meta-analysis",
+    out,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+
+  trimws(out)
+}
+
 normalize_crossref_text <- function(x) {
   x <- strip_inline_markdown(
     safe_chr(
@@ -1801,18 +2140,6 @@ infer_artifact_role <- function(
     )
   )
 
-  if (
-    role %in% c(
-      "study_selection",
-      "study_characteristics",
-      "risk_of_bias",
-      "quantitative_result",
-      "diagnostic_result"
-    )
-  ) {
-    return(role)
-  }
-
   probe <- normalize_crossref_text(
     paste(
       safe_chr(title, ""),
@@ -1870,12 +2197,87 @@ infer_artifact_role <- function(
     return("study_characteristics")
   }
 
+  # Only after strong title/path semantics have been evaluated do we trust the
+  # registry role. This prevents a forest plot carried under a generic or stale
+  # registry role from surviving as a second, contradictory semantic figure.
+  if (
+    role %in% c(
+      "study_selection",
+      "study_characteristics",
+      "risk_of_bias",
+      "quantitative_result",
+      "diagnostic_result"
+    )
+  ) {
+    return(role)
+  }
+
   role
 }
 
 # ------------------------------------------------------------
 # 6.1.1 Semantic artifact deduplication
 # ------------------------------------------------------------
+
+publication_render_rank <- function(
+    artifact_type,
+    title,
+    source_relative_path
+) {
+  if (!identical(safe_chr(artifact_type, ""), "figure")) {
+    return(1L)
+  }
+
+  probe <- normalize_slash(
+    tolower(
+      paste(
+        safe_chr(title, ""),
+        safe_chr(source_relative_path, "")
+      )
+    )
+  )
+
+  # Prefer author/reporting/manuscript renderings over raw statistical-engine
+  # graphics when the registry exposes equivalent semantic figures. This is
+  # format/provenance ranking only; scientific content is not altered.
+  if (
+    grepl(
+      "robins[_ -]?i|rob[ _-]?2",
+      probe,
+      perl = TRUE
+    ) &&
+      grepl(
+        "traffic[_ -]?light[_ -]?and[_ -]?summary",
+        probe,
+        perl = TRUE
+      )
+  ) {
+    return(0L)
+  }
+
+  if (
+    grepl(
+      "(^|/|[[:space:]_])(publication|reporting|manuscript|forest_plots?|figures)(/|[[:space:]_]|$)",
+      probe,
+      perl = TRUE
+    )
+  ) {
+    return(1L)
+  }
+
+  if (
+    grepl(
+      "(^|/|[[:space:]_])(meta_analysis|meta-analysis|analysis_ready|raw|diagnostic)(/|[[:space:]_]|$)",
+      probe,
+      perl = TRUE
+    )
+  ) {
+    return(3L)
+  }
+
+  2L
+}
+
 
 if (nrow(publication_artifacts) > 0L) {
   publication_artifacts <- publication_artifacts |>
@@ -1922,12 +2324,32 @@ if (nrow(publication_artifacts) > 0L) {
   }
 }
 
+infer_risk_of_bias_tool <- function(title = "", source_relative_path = "") {
+  probe <- normalize_crossref_text(
+    paste(
+      safe_chr(title, ""),
+      safe_chr(source_relative_path, "")
+    )
+  )
+
+  if (grepl("\\brobins[ -]?i\\b|robins_i", probe, perl = TRUE)) {
+    return("robins_i")
+  }
+
+  if (grepl("\\brob[ -]?2\\b|rob2", probe, perl = TRUE)) {
+    return("rob2")
+  }
+
+  "risk_of_bias"
+}
+
 artifact_semantic_key <- function(
     artifact_type,
     inferred_role,
     resolved_analysis_group,
     artifact_id,
-    coverage_unit_id = ""
+    coverage_unit_id = "",
+    risk_of_bias_tool = ""
 ) {
   type <- safe_chr(
     artifact_type,
@@ -1955,6 +2377,29 @@ artifact_semantic_key <- function(
   ) {
     return(
       "figure::study_selection"
+    )
+  }
+
+  if (
+    identical(type, "figure") &&
+      identical(role, "risk_of_bias")
+  ) {
+    tool_key <- safe_chr(
+      risk_of_bias_tool,
+      "risk_of_bias"
+    )
+
+    if (!nzchar(tool_key)) {
+      tool_key <- "risk_of_bias"
+    }
+
+    return(
+      paste(
+        "figure",
+        "risk_of_bias",
+        tool_key,
+        sep = "::"
+      )
     )
   }
 
@@ -2023,6 +2468,16 @@ if (nrow(publication_artifacts) > 0L) {
 
   publication_artifacts <- publication_artifacts |>
     dplyr::mutate(
+      risk_of_bias_tool = ifelse(
+        artifact_type == "figure" & inferred_role == "risk_of_bias",
+        mapply(
+          infer_risk_of_bias_tool,
+          title,
+          source_relative_path,
+          USE.NAMES = FALSE
+        ),
+        ""
+      ),
       semantic_key = mapply(
         artifact_semantic_key,
         artifact_type,
@@ -2030,6 +2485,7 @@ if (nrow(publication_artifacts) > 0L) {
         resolved_analysis_group,
         artifact_id,
         coverage_unit_values,
+        risk_of_bias_tool,
         USE.NAMES = FALSE
       ),
       normalized_file_extension = tolower(
@@ -2040,6 +2496,13 @@ if (nrow(publication_artifacts) > 0L) {
             file_extension
           )
         )
+      ),
+      publication_render_rank = mapply(
+        publication_render_rank,
+        artifact_type,
+        title,
+        source_relative_path,
+        USE.NAMES = FALSE
       ),
       word_render_rank = dplyr::case_when(
         artifact_type != "figure" ~ 1L,
@@ -2071,6 +2534,8 @@ if (nrow(publication_artifacts) > 0L) {
     ) |>
     dplyr::arrange(
       semantic_key,
+      dplyr::desc(coverage_required),
+      publication_render_rank,
       word_render_rank,
       narrative_order,
       priority_rank,
@@ -2084,6 +2549,8 @@ if (nrow(publication_artifacts) > 0L) {
       semantic_key
     ) |>
     dplyr::arrange(
+      dplyr::desc(coverage_required),
+      publication_render_rank,
       word_render_rank,
       narrative_order,
       priority_rank,
@@ -2136,40 +2603,37 @@ artifact_anchor_text <- function(
 
   if (
     is.na(marker_position) ||
-      marker_position < 0L
+      marker_position < 1L
   ) {
     return("")
   }
 
-  marker_end <- marker_position +
-    nchar(token) -
-    1L
-
-  following_text <- substring(
-    results_text,
-    marker_end + 1L
-  )
-
-  next_marker <- regexpr(
-    "<!--\\s*ARTIFACT:",
-    following_text,
-    perl = TRUE
-  )[[1]]
-
-  if (
-    !is.na(next_marker) &&
-      next_marker > 0L
-  ) {
-    following_text <- substring(
-      following_text,
+  # R/39's contract places the coverage token IMMEDIATELY AFTER the prose that
+  # substantively represents the artifact. Therefore the authoritative anchor
+  # is the last substantive block BEFORE the marker, never the following block.
+  preceding_text <- if (marker_position > 1L) {
+    substr(
+      results_text,
       1L,
-      next_marker - 1L
+      marker_position - 1L
     )
+  } else {
+    ""
   }
 
-  following_blocks <- collapse_consecutive_duplicate_headings(
+  # Remove earlier coverage markers before Markdown parsing so they cannot be
+  # mistaken for visible prose.
+  preceding_text <- gsub(
+    "<!--\\s*ARTIFACT:[^>]*-->",
+    " ",
+    preceding_text,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+
+  preceding_blocks <- collapse_consecutive_duplicate_headings(
     parse_markdown_blocks(
-      following_text
+      preceding_text
     )
   )
 
@@ -2188,7 +2652,7 @@ artifact_anchor_text <- function(
           )
         )
     },
-    following_blocks
+    preceding_blocks
   )
 
   if (length(candidate_blocks) == 0L) {
@@ -2196,7 +2660,9 @@ artifact_anchor_text <- function(
   }
 
   safe_chr(
-    candidate_blocks[[1]]$text,
+    candidate_blocks[[
+      length(candidate_blocks)
+    ]]$text,
     ""
   )
 }
@@ -3148,6 +3614,153 @@ if (nrow(publication_artifacts) > 0L) {
   publication_artifacts$mapped_to_body <- logical(0)
 }
 
+# ------------------------------------------------------------
+# 6.1.2A Collapse mapped alternate figure renderings
+# ------------------------------------------------------------
+# Registry provenance can expose more than one forest/risk/PRISMA rendering of
+# the same semantic figure. After manuscript mapping, collapse only figures
+# that have the same semantic family, same mapped body block, same inferred
+# role, and the same resolved analysis group. Tables are never collapsed here.
+infer_figure_family <- function(title, source_relative_path = "") {
+  probe <- normalize_crossref_text(
+    paste(safe_chr(title, ""), safe_chr(source_relative_path, ""))
+  )
+
+  if (grepl("\\bprisma|flow diagram|study selection\\b", probe, perl = TRUE)) return("prisma")
+
+  if (grepl("\\brisk of bias|robins|rob 2|rob2\\b", probe, perl = TRUE)) {
+    tool_key <- infer_risk_of_bias_tool(
+      title,
+      source_relative_path
+    )
+    return(
+      paste0(
+        "risk_of_bias::",
+        tool_key
+      )
+    )
+  }
+
+  if (grepl("\\bfunnel\\b", probe, perl = TRUE)) return("funnel")
+  if (grepl("\\bleave one out|influence|baujat\\b", probe, perl = TRUE)) return("influence")
+  if (grepl("\\bforest\\b", probe, perl = TRUE)) return("forest")
+  "other"
+}
+
+figure_topic_signature <- function(title) {
+  probe <- normalize_crossref_text(
+    safe_chr(
+      title,
+      ""
+    )
+  )
+
+  probe <- gsub(
+    "\\b(forest|plots?|figures?|primary|meta|analysis|random|fixed|effects?|model|publication|reporting|manuscript|summary|results?)\\b",
+    " ",
+    probe,
+    perl = TRUE
+  )
+
+  probe <- gsub(
+    "[^a-z0-9]+",
+    " ",
+    probe,
+    perl = TRUE
+  )
+
+  trimws(
+    gsub(
+      "[[:space:]]+",
+      " ",
+      probe,
+      perl = TRUE
+    )
+  )
+}
+
+if (nrow(publication_artifacts) > 0L) {
+  publication_artifacts <- publication_artifacts |>
+    dplyr::mutate(
+      figure_family = ifelse(
+        artifact_type == "figure",
+        mapply(
+          infer_figure_family,
+          title,
+          source_relative_path,
+          USE.NAMES = FALSE
+        ),
+        ""
+      ),
+      figure_topic_signature = ifelse(
+        artifact_type == "figure" & figure_family == "forest",
+        vapply(
+          title,
+          figure_topic_signature,
+          character(1)
+        ),
+        ""
+      ),
+      figure_dedup_key = dplyr::case_when(
+        artifact_type != "figure" ~ "",
+        inferred_role == "quantitative_result" & figure_family == "forest" ~ paste(
+          manuscript_block_index,
+          inferred_role,
+          figure_family,
+          figure_topic_signature,
+          sep = "::"
+        ),
+        grepl("^risk_of_bias::", figure_family, perl = TRUE) ~ paste(
+          manuscript_block_index,
+          inferred_role,
+          figure_family,
+          sep = "::"
+        ),
+        TRUE ~ paste(
+          manuscript_block_index,
+          inferred_role,
+          resolved_analysis_group,
+          figure_family,
+          sep = "::"
+        )
+      )
+    )
+
+  table_rows_after_mapping <- publication_artifacts |>
+    dplyr::filter(artifact_type != "figure")
+
+  figure_rows_after_mapping <- publication_artifacts |>
+    dplyr::filter(artifact_type == "figure") |>
+    dplyr::arrange(
+      dplyr::desc(coverage_required),
+      publication_render_rank,
+      priority_rank,
+      word_render_rank,
+      narrative_order,
+      title,
+      artifact_id
+    ) |>
+    dplyr::group_by(
+      figure_dedup_key
+    ) |>
+    dplyr::slice_head(n = 1L) |>
+    dplyr::ungroup()
+
+  publication_artifacts <- dplyr::bind_rows(
+    table_rows_after_mapping,
+    figure_rows_after_mapping
+  ) |>
+    dplyr::arrange(
+      manuscript_block_index,
+      artifact_type,
+      priority_rank,
+      role_rank,
+      title,
+      artifact_id
+    )
+}
+
+
 if (
   nrow(publication_artifacts) > 0L &&
     any(
@@ -3732,6 +4345,30 @@ if (nrow(crossref_map) > 0L) {
   }
 }
 
+
+visible_manuscript_text <- paste(
+  vapply(
+    markdown_blocks,
+    function(block) safe_chr(block$text, ""),
+    character(1)
+  ),
+  collapse = "\n"
+)
+
+if (
+  grepl(
+    "\\b(?:SCR_[0-9]+|screening_id(?:::|\\b)|artifact_id(?:::|\\b))",
+    visible_manuscript_text,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+) {
+  stop(
+    "R/41 publication hygiene gate failed: internal machine identifier remains in visible manuscript prose.",
+    call. = FALSE
+  )
+}
+
 readr::write_csv(
   crossref_map,
   crossref_file,
@@ -3828,6 +4465,89 @@ read_table_artifact <- function(path) {
   NULL
 }
 
+compact_pairwise_table_for_word <- function(data) {
+  data <- as.data.frame(
+    data,
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+
+  if (ncol(data) <= 10L) return(data)
+
+  names_now <- names(data)
+  intervention_cols <- grep("^Intervention[[:space:]]+", names_now, value = TRUE)
+  comparator_cols <- grep("^Comparator[[:space:]]+", names_now, value = TRUE)
+
+  intervention_suffix <- sub("^Intervention[[:space:]]+", "", intervention_cols)
+  comparator_suffix <- sub("^Comparator[[:space:]]+", "", comparator_cols)
+  paired_suffix <- intervention_suffix[intervention_suffix %in% comparator_suffix]
+
+  if (length(paired_suffix) < 2L) return(data)
+
+  paired_original <- c(
+    paste0("Intervention ", paired_suffix),
+    paste0("Comparator ", paired_suffix)
+  )
+  base_cols <- names_now[!names_now %in% paired_original]
+
+  # When almost the whole table consists of intervention/comparator pairs,
+  # render one compact Intervention column and one Comparator column. Every
+  # original value remains visible and labeled, but Word no longer has to fit
+  # 12-20 narrow columns on a portrait page.
+  if (length(base_cols) <= 3L && length(paired_suffix) >= 3L) {
+    out <- data[, base_cols, drop = FALSE]
+
+    format_arm <- function(row_index, prefix) {
+      values <- vapply(
+        paired_suffix,
+        function(suffix) {
+          column <- paste0(prefix, " ", suffix)
+          value <- as.character(data[[column]][[row_index]])
+          if (is.na(value) || !nzchar(trimws(value))) value <- "NR"
+          paste0(suffix, ": ", value)
+        },
+        character(1)
+      )
+
+      paste(values, collapse = "\n")
+    }
+
+    out$Intervention <- vapply(
+      seq_len(nrow(data)),
+      format_arm,
+      character(1),
+      prefix = "Intervention"
+    )
+
+    out$Comparator <- vapply(
+      seq_len(nrow(data)),
+      format_arm,
+      character(1),
+      prefix = "Comparator"
+    )
+
+    return(out)
+  }
+
+  # Conservative fallback: collapse each pair into one characteristic column.
+  out <- data[, base_cols, drop = FALSE]
+
+  for (suffix in paired_suffix) {
+    i_col <- paste0("Intervention ", suffix)
+    c_col <- paste0("Comparator ", suffix)
+
+    i_val <- as.character(data[[i_col]])
+    c_val <- as.character(data[[c_col]])
+
+    out[[suffix]] <- paste0(
+      "Intervention: ", i_val,
+      "\nComparator: ", c_val
+    )
+  }
+
+  out
+}
+
 make_word_table <- function(
     data,
     font_size = 9
@@ -3837,6 +4557,36 @@ make_word_table <- function(
     stringsAsFactors = FALSE,
     check.names = FALSE
   )
+
+  data <- compact_pairwise_table_for_word(data)
+
+  table_visible_text <- paste(
+    unlist(data, use.names = FALSE),
+    collapse = " "
+  )
+
+  if (
+    grepl(
+      "\\b(?:SCR_[0-9]+|screening_id(?:::|\\b)|artifact_id(?:::|\\b))",
+      table_visible_text,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+  ) {
+    stop(
+      "R/41 publication hygiene gate failed: internal machine identifier remains in an editable manuscript table.",
+      call. = FALSE
+    )
+  }
+
+  # Slightly reduce table font only for still-wide tables after safe pairwise
+  # compaction; this is presentation-only and preserves every cell value.
+  effective_font_size <- font_size
+  if (ncol(data) >= 9L) {
+    effective_font_size <- min(font_size, 7)
+  } else if (ncol(data) >= 8L) {
+    effective_font_size <- min(font_size, 7.5)
+  }
 
   data[] <- lapply(
     data,
@@ -3877,7 +4627,7 @@ make_word_table <- function(
 
   ft <- flextable::fontsize(
     ft,
-    size = font_size,
+    size = effective_font_size,
     part = "all"
   )
 
@@ -4734,6 +5484,75 @@ fit_word_image_dimensions <- function(
     height = height_in
   )
 }
+
+# ------------------------------------------------------------
+# Universal Word-render finalization
+# ------------------------------------------------------------
+# Custom figure renderers are allowed to return only a valid image path.
+# Word export, however, also requires positive physical dimensions.  Resolve
+# missing dimensions here for every renderer (not only RoB) so future custom
+# renderers do not need to duplicate sizing logic.
+finalize_word_render_result <- function(
+    x,
+    fallback_path = "",
+    method_hint = "",
+    max_width = 6.2,
+    max_height = 8.0
+) {
+  normalized <- canonicalize_figure_render_result(
+    x,
+    fallback_path = fallback_path,
+    method_hint = method_hint
+  )
+
+  ok <- render_flag(normalized, "ok", FALSE)
+  path <- render_chr(normalized, "path", fallback_path)
+  method <- render_chr(normalized, "method", method_hint)
+  message <- render_chr(normalized, "message", "")
+  raw_class <- render_chr(normalized, "raw_return_class", "")
+  width <- render_num(normalized, "width", NA_real_)
+  height <- render_num(normalized, "height", NA_real_)
+
+  if (ok && file_nonempty(path) && (
+      is.na(width) || is.na(height) || width <= 0 || height <= 0
+  )) {
+    dimensions <- fit_word_image_dimensions(
+      path,
+      max_width = max_width,
+      max_height = max_height
+    )
+
+    width <- suppressWarnings(as.numeric(dimensions[["width"]]))[1]
+    height <- suppressWarnings(as.numeric(dimensions[["height"]]))[1]
+  }
+
+  if (ok && (
+      !file_nonempty(path) ||
+      is.na(width) || is.na(height) ||
+      width <= 0 || height <= 0
+  )) {
+    ok <- FALSE
+    dimension_message <- paste0(
+      "Prepared figure exists but Word image dimensions could not be resolved."
+    )
+    message <- if (nzchar(message)) {
+      paste(message, dimension_message)
+    } else {
+      dimension_message
+    }
+  }
+
+  figure_render_result(
+    ok = ok,
+    path = path,
+    method = method,
+    message = message,
+    width = width,
+    height = height,
+    raw_return_class = raw_class
+  )
+}
+
 
 # ------------------------------------------------------------
 # Managed optional renderer dependencies
@@ -5636,6 +6455,17 @@ render_pdf_first_page <- function(
           "pdftools"
         )
   ) {
+    # pdftools::pdf_convert() treats `filenames` as an sprintf template and
+    # internally calls sprintf(filenames, pages, format). Passing a literal
+    # destination path therefore produces the harmless warning
+    # "arguments not used by format". Use an explicit page/format template
+    # and let the normalization block below copy the rendered page back to
+    # the canonical `destination` path.
+    pdf_convert_template <- paste0(
+      tools::file_path_sans_ext(destination),
+      "_page_%d.%s"
+    )
+
     raw_return <- tryCatch(
       {
         suppressMessages(
@@ -5643,7 +6473,7 @@ render_pdf_first_page <- function(
             source,
             format = "png",
             pages = 1,
-            filenames = destination,
+            filenames = pdf_convert_template,
             dpi = dpi,
             verbose = FALSE
           )
@@ -6462,6 +7292,1331 @@ render_other_image_to_png <- function(
   )
 }
 
+# ------------------------------------------------------------
+# Universal publication RoB renderer
+# ------------------------------------------------------------
+# R/37 owns the author-approved scientific judgements. R/41 may render those
+# frozen categorical judgements for Word, but must never change or infer them.
+# This renderer intentionally keeps the full judgement legend even when a
+# category is absent from the current studies, and always combines the
+# traffic-light panel with the summary panel. This avoids the common plotting
+# behavior where unused categories disappear from the legend.
+
+rob_tool_display_name <- function(tool_key) {
+  switch(
+    safe_chr(tool_key, ""),
+    robins_i = "ROBINS-I",
+    rob2 = "RoB 2",
+    "Risk of bias"
+  )
+}
+
+rob_judgement_contract <- function(tool_key, include_na = FALSE) {
+  tool_key <- safe_chr(tool_key, "")
+
+  if (identical(tool_key, "robins_i")) {
+    levels <- c(
+      "Low",
+      "Moderate",
+      "Serious",
+      "Critical",
+      "No information"
+    )
+    colours <- c(
+      Low = "#02C100",
+      Moderate = "#E2DF07",
+      Serious = "#BF0000",
+      Critical = "#820000",
+      `No information` = "#4EA1F7"
+    )
+    symbols <- c(
+      Low = "+",
+      Moderate = "-",
+      Serious = "!",
+      Critical = "×",
+      `No information` = "?"
+    )
+  } else if (identical(tool_key, "rob2")) {
+    levels <- c(
+      "Low",
+      "Some concerns",
+      "High",
+      "No information"
+    )
+    colours <- c(
+      Low = "#02C100",
+      `Some concerns` = "#E2DF07",
+      High = "#BF0000",
+      `No information` = "#4EA1F7"
+    )
+    symbols <- c(
+      Low = "+",
+      `Some concerns` = "-",
+      High = "!",
+      `No information` = "?"
+    )
+  } else {
+    return(NULL)
+  }
+
+  if (isTRUE(include_na)) {
+    levels <- c(levels, "Not applicable")
+    colours <- c(colours, `Not applicable` = "#BDBDBD")
+    symbols <- c(symbols, `Not applicable` = "")
+  }
+
+  list(
+    levels = levels,
+    colours = colours[levels],
+    symbols = symbols[levels]
+  )
+}
+
+canonicalize_rob_judgement <- function(x, tool_key) {
+  raw <- tolower(
+    trimws(
+      safe_chr(
+        x,
+        ""
+      )
+    )
+  )
+
+  raw <- gsub(
+    "[_-]+",
+    " ",
+    raw,
+    perl = TRUE
+  )
+  raw <- gsub(
+    "[[:space:]]+",
+    " ",
+    raw,
+    perl = TRUE
+  )
+
+  if (!nzchar(raw)) return(NA_character_)
+
+  if (raw %in% c("n/a", "na", "not applicable", "x")) return("Not applicable")
+  if (raw %in% c("no information", "no info", "insufficient information", "n")) return("No information")
+
+  if (identical(tool_key, "robins_i")) {
+    if (raw %in% c("low", "low risk", "low risk of bias", "l")) return("Low")
+    if (raw %in% c("moderate", "moderate risk", "moderate risk of bias", "m")) return("Moderate")
+    if (raw %in% c("serious", "serious risk", "serious risk of bias", "s", "high")) return("Serious")
+    if (raw %in% c("critical", "critical risk", "critical risk of bias", "c")) return("Critical")
+  }
+
+  if (identical(tool_key, "rob2")) {
+    if (raw %in% c("low", "low risk", "low risk of bias", "l")) return("Low")
+    if (raw %in% c("some concerns", "some concern", "concerns", "s", "m")) return("Some concerns")
+    if (raw %in% c("high", "high risk", "high risk of bias", "h")) return("High")
+  }
+
+  NA_character_
+}
+
+find_column_by_normalized_name <- function(data, candidates) {
+  if (is.null(data) || ncol(data) == 0L) return("")
+
+  normalized <- tolower(
+    gsub(
+      "[^a-z0-9]+",
+      "",
+      names(data),
+      perl = TRUE
+    )
+  )
+
+  candidate_keys <- tolower(
+    gsub(
+      "[^a-z0-9]+",
+      "",
+      candidates,
+      perl = TRUE
+    )
+  )
+
+  hit <- match(candidate_keys, normalized)
+  hit <- hit[!is.na(hit)]
+
+  if (length(hit) == 0L) "" else names(data)[hit[[1]]]
+}
+
+prepare_rob_wide_data <- function(data, tool_key) {
+  if (is.null(data) || nrow(data) == 0L || ncol(data) == 0L) return(NULL)
+
+  study_col <- find_column_by_normalized_name(
+    data,
+    c(
+      "Study",
+      "study_label",
+      "study_name",
+      "author_year",
+      "citation",
+      "first_author_year",
+      "screening_label"
+    )
+  )
+
+  overall_col <- find_column_by_normalized_name(
+    data,
+    c(
+      "Overall",
+      "overall_judgement",
+      "overall_judgment",
+      "author_final_overall_judgement",
+      "final_overall_judgement",
+      "final_overall_judgment"
+    )
+  )
+
+  normalized_names <- tolower(
+    gsub(
+      "[^a-z0-9]+",
+      "",
+      names(data),
+      perl = TRUE
+    )
+  )
+
+  domain_idx <- grep(
+    "^d[0-9]+$",
+    normalized_names,
+    perl = TRUE
+  )
+
+  if (
+    nzchar(study_col) &&
+      nzchar(overall_col) &&
+      length(domain_idx) > 0L
+  ) {
+    domain_cols <- names(data)[domain_idx]
+    domain_num <- suppressWarnings(
+      as.integer(
+        sub(
+          "^d",
+          "",
+          normalized_names[domain_idx],
+          perl = TRUE
+        )
+      )
+    )
+    domain_cols <- domain_cols[order(domain_num)]
+
+    out <- data.frame(
+      Study = as.character(data[[study_col]]),
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
+
+    for (j in seq_along(domain_cols)) {
+      out[[paste0("D", j)]] <- vapply(
+        data[[domain_cols[[j]]]],
+        canonicalize_rob_judgement,
+        character(1),
+        tool_key = tool_key
+      )
+    }
+
+    out$Overall <- vapply(
+      data[[overall_col]],
+      canonicalize_rob_judgement,
+      character(1),
+      tool_key = tool_key
+    )
+
+    out <- out[
+      !is.na(out$Study) & nzchar(trimws(out$Study)),
+      ,
+      drop = FALSE
+    ]
+
+    if (nrow(out) > 0L) return(out)
+  }
+
+  # Long-format compatibility for future/alternate R/37 schemas.
+  domain_col <- find_column_by_normalized_name(
+    data,
+    c("domain", "domain_id", "domain_code")
+  )
+  judgement_col <- find_column_by_normalized_name(
+    data,
+    c(
+      "author_domain_judgement",
+      "author_domain_judgment",
+      "final_domain_judgement",
+      "final_domain_judgment",
+      "judgement",
+      "judgment"
+    )
+  )
+
+  if (
+    !nzchar(study_col) ||
+      !nzchar(domain_col) ||
+      !nzchar(judgement_col)
+  ) {
+    return(NULL)
+  }
+
+  studies <- unique(
+    trimws(
+      as.character(
+        data[[study_col]]
+      )
+    )
+  )
+  studies <- studies[nzchar(studies)]
+
+  domain_raw <- toupper(
+    trimws(
+      as.character(
+        data[[domain_col]]
+      )
+    )
+  )
+  domain_raw <- gsub(
+    "[^A-Z0-9]+",
+    "",
+    domain_raw,
+    perl = TRUE
+  )
+
+  domain_codes <- unique(
+    domain_raw[
+      grepl("^D[0-9]+$", domain_raw, perl = TRUE)
+    ]
+  )
+  domain_codes <- domain_codes[
+    order(
+      suppressWarnings(
+        as.integer(
+          sub("^D", "", domain_codes)
+        )
+      )
+    )
+  ]
+
+  if (length(studies) == 0L || length(domain_codes) == 0L) return(NULL)
+
+  out <- data.frame(
+    Study = studies,
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+
+  for (code in domain_codes) {
+    values <- rep(NA_character_, length(studies))
+
+    for (i in seq_along(studies)) {
+      hit <- which(
+        trimws(as.character(data[[study_col]])) == studies[[i]] &
+          domain_raw == code
+      )
+      if (length(hit) > 0L) {
+        values[[i]] <- canonicalize_rob_judgement(
+          data[[judgement_col]][hit[[1]]],
+          tool_key
+        )
+      }
+    }
+
+    out[[code]] <- values
+  }
+
+  overall_values <- rep(NA_character_, length(studies))
+  if (nzchar(overall_col)) {
+    for (i in seq_along(studies)) {
+      hit <- which(
+        trimws(as.character(data[[study_col]])) == studies[[i]]
+      )
+      if (length(hit) > 0L) {
+        nonblank <- trimws(as.character(data[[overall_col]][hit]))
+        nonblank <- nonblank[nzchar(nonblank)]
+        if (length(nonblank) > 0L) {
+          overall_values[[i]] <- canonicalize_rob_judgement(
+            nonblank[[1]],
+            tool_key
+          )
+        }
+      }
+    }
+  }
+
+  out$Overall <- overall_values
+  out
+}
+
+rob_domain_labels <- function(tool_key, domain_codes) {
+  if (identical(tool_key, "robins_i")) {
+    lookup <- c(
+      D1 = "Bias due to confounding",
+      D2 = "Bias due to selection of participants",
+      D3 = "Bias in classification of interventions",
+      D4 = "Bias due to deviations from intended interventions",
+      D5 = "Bias due to missing data",
+      D6 = "Bias in measurement of outcomes",
+      D7 = "Bias in selection of the reported result",
+      Overall = "Overall risk of bias"
+    )
+  } else if (identical(tool_key, "rob2")) {
+    lookup <- c(
+      D1 = "Randomization process",
+      D2 = "Deviations from intended interventions",
+      D3 = "Missing outcome data",
+      D4 = "Measurement of the outcome",
+      D5 = "Selection of the reported result",
+      Overall = "Overall risk of bias"
+    )
+  } else {
+    lookup <- c(Overall = "Overall risk of bias")
+  }
+
+  vapply(
+    domain_codes,
+    function(code) {
+      if (code %in% names(lookup)) lookup[[code]] else code
+    },
+    character(1)
+  )
+}
+
+find_frozen_rob_final_data <- function(artifact_registry, tool_key) {
+  if (is.null(artifact_registry) || nrow(artifact_registry) == 0L) return(NULL)
+
+  target_pattern <- switch(
+    safe_chr(tool_key, ""),
+    robins_i = "(^|/)robins[_-]?i_final\\.csv$",
+    rob2 = "(^|/)rob2_final\\.csv$",
+    ""
+  )
+
+  if (!nzchar(target_pattern)) return(NULL)
+
+  candidates <- artifact_registry |>
+    dplyr::filter(
+      source_available_now,
+      grepl(
+        target_pattern,
+        tolower(source_relative_path),
+        perl = TRUE
+      )
+    ) |>
+    dplyr::arrange(
+      source_relative_path
+    )
+
+  if (nrow(candidates) == 0L) return(NULL)
+
+  path <- candidates$resolved_source_path[[1]]
+  if (!file_nonempty(path)) return(NULL)
+
+  data <- tryCatch(
+    readr::read_csv(
+      path,
+      show_col_types = FALSE,
+      progress = FALSE
+    ),
+    error = function(e) NULL
+  )
+
+  if (is.null(data) || nrow(data) == 0L) return(NULL)
+
+  list(
+    path = path,
+    sha256 = sha256_file(path),
+    data = data
+  )
+}
+
+
+# Frozen R/37 publication-figure fallback -----------------------------------
+#
+# R/37 already creates tool-specific traffic-light / summary publication
+# artifacts from the author-final judgements.  R/41 must therefore not fail
+# merely because a future or legacy final-CSV schema cannot be normalized.
+# When deterministic re-rendering from the frozen categorical CSV is not
+# possible, use the frozen R/37 publication figure(s) themselves and append a
+# complete, fixed judgement legend.  This preserves the author-final science,
+# avoids schema coupling, and remains universal across ROBINS-I and RoB 2.
+
+find_frozen_rob_publication_sources <- function(artifact_registry, tool_key) {
+  if (is.null(artifact_registry) || nrow(artifact_registry) == 0L) {
+    return(list(combined = "", traffic = "", summary = ""))
+  }
+
+  token <- switch(
+    safe_chr(tool_key, ""),
+    robins_i = "robins[_-]?i",
+    rob2 = "rob2",
+    ""
+  )
+
+  if (!nzchar(token)) {
+    return(list(combined = "", traffic = "", summary = ""))
+  }
+
+  candidates <- artifact_registry |>
+    dplyr::filter(
+      source_available_now,
+      grepl(
+        token,
+        tolower(source_relative_path),
+        perl = TRUE
+      ),
+      grepl(
+        "\\.(pdf|png|jpe?g|svg)$",
+        tolower(source_relative_path),
+        perl = TRUE
+      )
+    ) |>
+    dplyr::mutate(
+      rob_render_rank = dplyr::case_when(
+        grepl(
+          "traffic[_-]?light[_-]?and[_-]?summary",
+          tolower(source_relative_path),
+          perl = TRUE
+        ) ~ 1L,
+        grepl(
+          "traffic[_-]?light",
+          tolower(source_relative_path),
+          perl = TRUE
+        ) ~ 2L,
+        grepl(
+          "summary",
+          tolower(source_relative_path),
+          perl = TRUE
+        ) ~ 3L,
+        TRUE ~ 9L
+      ),
+      rob_extension_rank = dplyr::case_when(
+        grepl("\\.png$", tolower(source_relative_path), perl = TRUE) ~ 1L,
+        grepl("\\.pdf$", tolower(source_relative_path), perl = TRUE) ~ 2L,
+        grepl("\\.jpe?g$", tolower(source_relative_path), perl = TRUE) ~ 3L,
+        grepl("\\.svg$", tolower(source_relative_path), perl = TRUE) ~ 4L,
+        TRUE ~ 9L
+      )
+    ) |>
+    dplyr::arrange(
+      rob_render_rank,
+      rob_extension_rank,
+      source_relative_path
+    )
+
+  if (nrow(candidates) == 0L) {
+    return(list(combined = "", traffic = "", summary = ""))
+  }
+
+  pick_path <- function(pattern) {
+    hit <- candidates |>
+      dplyr::filter(
+        grepl(
+          pattern,
+          tolower(source_relative_path),
+          perl = TRUE
+        )
+      )
+
+    if (nrow(hit) == 0L) return("")
+    path <- safe_chr(hit$resolved_source_path[[1]], "")
+    if (!file_nonempty(path)) "" else path
+  }
+
+  list(
+    combined = pick_path("traffic[_-]?light[_-]?and[_-]?summary"),
+    traffic = pick_path("traffic[_-]?light(?![_-]?and[_-]?summary)"),
+    summary = pick_path("(?<!and[_-])summary")
+  )
+}
+
+render_rob_source_for_composite <- function(
+    source,
+    render_root,
+    artifact_id,
+    display_number,
+    dpi = 300
+) {
+  if (!file_nonempty(source)) {
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_FROZEN_SOURCE",
+        message = "Frozen R/37 RoB publication source is missing or empty."
+      )
+    )
+  }
+
+  prepare_figure_for_word(
+    source = source,
+    render_root = render_root,
+    artifact_id = artifact_id,
+    display_number = display_number,
+    dpi = dpi,
+    max_width = 7.2,
+    max_height = 9.0,
+    semantic_candidates = character(0),
+    project_root = repo_root
+  )
+}
+
+compose_rob_pngs_with_full_legend <- function(
+    image_paths,
+    tool_key,
+    destination,
+    dpi = 300,
+    panel_labels = NULL,
+    panel_local_legends = TRUE
+) {
+  image_paths <- normalize_existing_paths(image_paths)
+
+  if (length(image_paths) == 0L) {
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_FROZEN_COMPOSITE",
+        message = "No prepared R/37 RoB image was available for composite rendering."
+      )
+    )
+  }
+
+  contract <- rob_judgement_contract(tool_key, include_na = FALSE)
+  if (is.null(contract)) {
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_FROZEN_COMPOSITE",
+        message = "Unsupported RoB tool for frozen publication-figure composition."
+      )
+    )
+  }
+
+  if (!ensure_figure_render_package("png", reason = "ROB_COMPOSITE_FULL_LEGEND")) {
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_FROZEN_COMPOSITE",
+        message = "Optional renderer package 'png' is unavailable for RoB composite assembly."
+      )
+    )
+  }
+
+  images <- lapply(
+    image_paths,
+    function(path) {
+      tryCatch(
+        png::readPNG(path),
+        error = function(e) NULL
+      )
+    }
+  )
+
+  keep <- !vapply(images, is.null, logical(1))
+  images <- images[keep]
+  image_paths <- image_paths[keep]
+
+  if (length(images) == 0L) {
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_FROZEN_COMPOSITE",
+        message = "Prepared R/37 RoB images could not be read for composition."
+      )
+    )
+  }
+
+  if (is.null(panel_labels) || length(panel_labels) != length(images)) {
+    panel_labels <- LETTERS[seq_along(images)]
+  }
+
+  aspects <- vapply(
+    images,
+    function(img) {
+      d <- dim(img)
+      if (length(d) < 2L || d[[2]] <= 0L) return(0.75)
+      max(0.28, min(1.70, d[[1]] / d[[2]]))
+    },
+    numeric(1)
+  )
+
+  width_px <- 3000L
+
+  # When individual traffic-light and summary panels are available, R/41
+  # replaces each panel's potentially incomplete auto-dropped legend with the
+  # full tool contract directly below that panel.  This is deliberately
+  # panel-local rather than a single detached legend at the bottom.
+  legend_band_fraction <- if (isTRUE(panel_local_legends)) 0.15 else 0.13
+  row_weights <- aspects + legend_band_fraction
+
+  height_px <- max(
+    1700L,
+    as.integer(width_px * sum(row_weights))
+  )
+
+  dir.create(dirname(destination), recursive = TRUE, showWarnings = FALSE)
+
+  grDevices::png(
+    filename = destination,
+    width = width_px,
+    height = height_px,
+    res = dpi,
+    bg = "white"
+  )
+
+  on.exit(
+    try(grDevices::dev.off(), silent = TRUE),
+    add = TRUE
+  )
+
+  grid::grid.newpage()
+
+  main_layout <- grid::grid.layout(
+    nrow = length(images),
+    ncol = 1L,
+    heights = grid::unit(row_weights, "null")
+  )
+
+  grid::pushViewport(
+    grid::viewport(layout = main_layout)
+  )
+
+  draw_complete_legend <- function(panel_index = 1L) {
+    n_levels <- length(contract$levels)
+    panel_type <- if (isTRUE(panel_index == 1L)) "traffic" else "summary"
+    legend_layout <- grid::grid.layout(
+      nrow = 1L,
+      ncol = n_levels + 1L,
+      widths = grid::unit(
+        c(1.15, rep(1, n_levels)),
+        "null"
+      )
+    )
+
+    grid::pushViewport(
+      grid::viewport(
+        x = grid::unit(0.5, "npc"),
+        y = grid::unit(0.50, "npc"),
+        width = grid::unit(0.96, "npc"),
+        height = grid::unit(0.86, "npc"),
+        layout = legend_layout
+      )
+    )
+
+    grid::pushViewport(
+      grid::viewport(layout.pos.row = 1L, layout.pos.col = 1L)
+    )
+    grid::grid.text(
+      "Judgement",
+      x = grid::unit(0.98, "npc"),
+      y = grid::unit(0.50, "npc"),
+      just = "right",
+      gp = grid::gpar(fontface = "bold", cex = 0.76)
+    )
+    grid::popViewport()
+
+    for (j in seq_along(contract$levels)) {
+      level <- contract$levels[[j]]
+
+      grid::pushViewport(
+        grid::viewport(layout.pos.row = 1L, layout.pos.col = j + 1L)
+      )
+
+      if (identical(panel_type, "traffic")) {
+        grid::grid.circle(
+          x = grid::unit(0.18, "npc"),
+          y = grid::unit(0.50, "npc"),
+          r = grid::unit(0.062, "npc"),
+          gp = grid::gpar(
+            fill = unname(contract$colours[[level]]),
+            col = "#555555",
+            lwd = 0.8
+          )
+        )
+      } else {
+        grid::grid.rect(
+          x = grid::unit(0.18, "npc"),
+          y = grid::unit(0.50, "npc"),
+          width = grid::unit(0.125, "npc"),
+          height = grid::unit(0.125, "npc"),
+          gp = grid::gpar(
+            fill = unname(contract$colours[[level]]),
+            col = "#555555",
+            lwd = 0.8
+          )
+        )
+      }
+
+      grid::grid.text(
+        level,
+        x = grid::unit(0.29, "npc"),
+        y = grid::unit(0.50, "npc"),
+        just = "left",
+        gp = grid::gpar(cex = 0.70)
+      )
+
+      grid::popViewport()
+    }
+
+    grid::popViewport()
+  }
+
+  for (i in seq_along(images)) {
+    grid::pushViewport(
+      grid::viewport(layout.pos.row = i, layout.pos.col = 1L)
+    )
+
+    panel_layout <- grid::grid.layout(
+      nrow = 2L,
+      ncol = 1L,
+      heights = grid::unit(
+        c(aspects[[i]], legend_band_fraction),
+        "null"
+      )
+    )
+
+    grid::pushViewport(
+      grid::viewport(layout = panel_layout)
+    )
+
+    # Main frozen R/37 panel.
+    grid::pushViewport(
+      grid::viewport(layout.pos.row = 1L, layout.pos.col = 1L)
+    )
+    grid::grid.raster(
+      images[[i]],
+      width = grid::unit(0.98, "npc"),
+      height = grid::unit(0.98, "npc"),
+      interpolate = TRUE
+    )
+
+    # Toolkit-generated legacy component panels may contain an auto-dropped
+    # legend showing only categories observed in the current data. When R/41
+    # has both canonical component panels, mask only that narrow legacy legend
+    # band and replace it with the complete contract below the panel. This is
+    # rendering-only; no RoB data or judgement is changed.
+    if (
+      isTRUE(panel_local_legends) &&
+        length(images) >= 2L
+    ) {
+      mask_y <- if (isTRUE(i == 1L)) 0.085 else 0.072
+      mask_height <- if (isTRUE(i == 1L)) 0.18 else 0.14
+      grid::grid.rect(
+        x = grid::unit(0.5, "npc"),
+        y = grid::unit(mask_y, "npc"),
+        width = grid::unit(1.02, "npc"),
+        height = grid::unit(mask_height, "npc"),
+        gp = grid::gpar(
+          fill = "white",
+          col = NA
+        )
+      )
+    }
+
+    # Add deterministic panel labels in the compositor so the fallback remains
+    # stable even when legacy R/37 source images do not carry A/B labels.
+    grid::grid.text(
+      panel_labels[[i]],
+      x = grid::unit(0.015, "npc"),
+      y = grid::unit(0.975, "npc"),
+      just = c("left", "top"),
+      gp = grid::gpar(fontface = "bold", cex = 1.00)
+    )
+    grid::popViewport()
+
+    # Complete legend directly below this panel. All judgement categories
+    # remain visible even when the current dataset contains zero observations
+    # in one or more categories.
+    grid::pushViewport(
+      grid::viewport(layout.pos.row = 2L, layout.pos.col = 1L)
+    )
+    draw_complete_legend(panel_index = i)
+    grid::popViewport()
+
+    grid::popViewport(2L)
+  }
+
+  grid::popViewport()
+
+  grDevices::dev.off()
+  on.exit(NULL, add = FALSE)
+
+  if (!file_nonempty(destination)) {
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_FROZEN_COMPOSITE",
+        message = "Frozen RoB composite with panel-local full judgement legends was not created."
+      )
+    )
+  }
+
+  figure_render_result(
+    ok = TRUE,
+    path = destination,
+    method = "R41_ROB_FROZEN_R37_PANELS_PLUS_LOCAL_FULL_LEGENDS",
+    message = paste0(
+      "Used frozen R/37 publication panel source(s) and rendered the complete ",
+      rob_tool_display_name(tool_key),
+      " judgement legend directly below every panel. No scientific judgement was recalculated."
+    ),
+    raw_return_class = "frozen_r37_publication_panels_plus_local_full_legends"
+  )
+}
+
+render_rob_from_frozen_publication_artifacts <- function(
+    artifact_registry,
+    tool_key,
+    destination,
+    dpi = 300
+) {
+  sources <- find_frozen_rob_publication_sources(
+    artifact_registry,
+    tool_key
+  )
+
+  # Prefer the two canonical component panels when both are available.
+  # This allows R/41 to enforce the complete judgement-colour contract at the
+  # exact legend location below BOTH the traffic-light and summary panels.
+  # A legacy combined artifact remains a compatibility fallback only.
+  traffic_source <- safe_chr(sources$traffic, "")
+  summary_source <- safe_chr(sources$summary, "")
+  combined_source <- safe_chr(sources$combined, "")
+
+  selected_sources <- if (
+    nzchar(traffic_source) &&
+      nzchar(summary_source)
+  ) {
+    c(traffic_source, summary_source)
+  } else if (nzchar(combined_source)) {
+    c(combined_source)
+  } else {
+    c(traffic_source, summary_source)
+  }
+
+  selected_sources <- selected_sources[nzchar(selected_sources)]
+
+  # A traffic-light component is mandatory for the publication RoB figure.
+  traffic_available <- nzchar(safe_chr(sources$combined, "")) ||
+    nzchar(safe_chr(sources$traffic, ""))
+
+  if (!traffic_available || length(selected_sources) == 0L) {
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_FROZEN_R37_FIGURE",
+        message = paste0(
+          "Frozen ",
+          rob_tool_display_name(tool_key),
+          " traffic-light publication artifact was not available."
+        )
+      )
+    )
+  }
+
+  prepared_paths <- character(0)
+
+  for (i in seq_along(selected_sources)) {
+    prepared <- render_rob_source_for_composite(
+      source = selected_sources[[i]],
+      render_root = dirname(destination),
+      artifact_id = paste0("rob_panel_", i),
+      display_number = i,
+      dpi = dpi
+    )
+
+    if (render_flag(prepared, "ok", FALSE)) {
+      p <- render_chr(prepared, "path", "")
+      if (file_nonempty(p)) {
+        prepared_paths <- c(prepared_paths, p)
+      }
+    }
+  }
+
+  if (length(prepared_paths) == 0L) {
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_FROZEN_R37_FIGURE",
+        message = "Frozen R/37 RoB publication source(s) could not be prepared for Word."
+      )
+    )
+  }
+
+  compose_rob_pngs_with_full_legend(
+    image_paths = prepared_paths,
+    tool_key = tool_key,
+    destination = destination,
+    dpi = dpi,
+    panel_labels = if (length(prepared_paths) >= 2L) {
+      LETTERS[seq_along(prepared_paths)]
+    } else {
+      "A"
+    },
+    panel_local_legends = TRUE
+  )
+}
+
+render_rob_publication_composite <- function(
+    artifact_registry,
+    tool_key,
+    destination,
+    dpi = 300
+) {
+  frozen <- find_frozen_rob_final_data(
+    artifact_registry,
+    tool_key
+  )
+
+  if (is.null(frozen)) {
+    frozen_figure_render <- render_rob_from_frozen_publication_artifacts(
+      artifact_registry = artifact_registry,
+      tool_key = tool_key,
+      destination = destination,
+      dpi = dpi
+    )
+
+    if (render_flag(frozen_figure_render, "ok", FALSE)) {
+      return(frozen_figure_render)
+    }
+
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_COMPOSITE",
+        message = paste0(
+          "No frozen final ",
+          rob_tool_display_name(tool_key),
+          " dataset was available for deterministic publication rendering, and the frozen R/37 figure fallback failed: ",
+          render_chr(frozen_figure_render, "message", "")
+        )
+      )
+    )
+  }
+
+  wide <- prepare_rob_wide_data(
+    frozen$data,
+    tool_key
+  )
+
+  if (is.null(wide) || nrow(wide) == 0L || ncol(wide) < 3L) {
+    frozen_figure_render <- render_rob_from_frozen_publication_artifacts(
+      artifact_registry = artifact_registry,
+      tool_key = tool_key,
+      destination = destination,
+      dpi = dpi
+    )
+
+    if (render_flag(frozen_figure_render, "ok", FALSE)) {
+      return(frozen_figure_render)
+    }
+
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_COMPOSITE",
+        message = paste0(
+          "Frozen final RoB data could not be normalized to Study + domain(s) + Overall, ",
+          "and the frozen R/37 traffic-light publication artifact fallback also failed: ",
+          render_chr(frozen_figure_render, "message", "")
+        )
+      )
+    )
+  }
+
+  domain_codes <- setdiff(
+    names(wide),
+    "Study"
+  )
+
+  observed <- unique(
+    unlist(
+      wide[domain_codes],
+      use.names = FALSE
+    )
+  )
+  observed <- observed[!is.na(observed) & nzchar(observed)]
+
+  include_na <- "Not applicable" %in% observed
+  contract <- rob_judgement_contract(
+    tool_key,
+    include_na = include_na
+  )
+
+  if (is.null(contract)) {
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_COMPOSITE",
+        message = "Unsupported RoB tool for deterministic publication rendering."
+      )
+    )
+  }
+
+  dir.create(
+    dirname(destination),
+    recursive = TRUE,
+    showWarnings = FALSE
+  )
+
+  study_n <- nrow(wide)
+  width_px <- 3000L
+  height_px <- max(
+    2200L,
+    1500L + 130L * study_n
+  )
+
+  grDevices::png(
+    filename = destination,
+    width = width_px,
+    height = height_px,
+    res = dpi
+  )
+
+  on.exit(
+    try(grDevices::dev.off(), silent = TRUE),
+    add = TRUE
+  )
+
+  graphics::layout(
+    matrix(c(1, 2), ncol = 1L),
+    heights = c(max(1.0, 0.55 + 0.18 * study_n), 1.45)
+  )
+
+  # Panel A: traffic-light plot.
+  graphics::par(
+    mar = c(6.5, 10.5, 3.5, 2.0),
+    xpd = NA
+  )
+
+  domain_n <- length(domain_codes)
+  graphics::plot(
+    NA,
+    xlim = c(0.5, domain_n + 0.5),
+    ylim = c(0.5, study_n + 0.5),
+    xaxt = "n",
+    yaxt = "n",
+    xlab = "Risk-of-bias domains",
+    ylab = "",
+    bty = "n",
+    main = paste0(
+      "A. ",
+      rob_tool_display_name(tool_key),
+      " traffic-light plot"
+    )
+  )
+
+  graphics::axis(
+    1,
+    at = seq_len(domain_n),
+    labels = domain_codes,
+    tick = FALSE,
+    line = -0.4
+  )
+  graphics::axis(
+    2,
+    at = seq_len(study_n),
+    labels = rev(wide$Study),
+    las = 1,
+    tick = FALSE,
+    cex.axis = 0.82
+  )
+
+  traffic_matrix <- as.matrix(
+    wide[rev(seq_len(study_n)), domain_codes, drop = FALSE]
+  )
+
+  for (r in seq_len(nrow(traffic_matrix))) {
+    for (c in seq_len(ncol(traffic_matrix))) {
+      judgement <- traffic_matrix[r, c]
+      if (is.na(judgement) || !judgement %in% names(contract$colours)) next
+
+      graphics::points(
+        c,
+        r,
+        pch = 21,
+        bg = contract$colours[[judgement]],
+        col = "#333333",
+        cex = 2.45,
+        lwd = 0.8
+      )
+      symbol <- contract$symbols[[judgement]]
+      if (nzchar(symbol)) {
+        graphics::text(
+          c,
+          r,
+          labels = symbol,
+          cex = 0.82,
+          font = 2
+        )
+      }
+    }
+  }
+
+  graphics::legend(
+    "bottom",
+    inset = c(0, -0.34),
+    legend = contract$levels,
+    pt.bg = unname(contract$colours),
+    col = "#333333",
+    pch = 21,
+    pt.cex = 1.55,
+    cex = 0.72,
+    horiz = TRUE,
+    bty = "n",
+    xpd = NA,
+    title = "Judgement"
+  )
+
+  # Panel B: unweighted domain-level summary. The full legend is always shown,
+  # including categories absent from the current data.
+  graphics::par(
+    mar = c(6.0, 15.0, 3.5, 2.0),
+    xpd = NA
+  )
+
+  counts <- matrix(
+    0,
+    nrow = length(contract$levels),
+    ncol = domain_n,
+    dimnames = list(
+      contract$levels,
+      domain_codes
+    )
+  )
+
+  for (j in seq_along(domain_codes)) {
+    values <- wide[[domain_codes[[j]]]]
+    values <- values[!is.na(values) & values %in% contract$levels]
+    if (length(values) == 0L) next
+    tab <- table(
+      factor(
+        values,
+        levels = contract$levels
+      )
+    )
+    counts[, j] <- as.numeric(tab)
+  }
+
+  denom <- colSums(counts)
+  proportions <- sweep(
+    counts,
+    2,
+    ifelse(denom > 0, denom, 1),
+    "/"
+  ) * 100
+
+  summary_labels <- rob_domain_labels(
+    tool_key,
+    domain_codes
+  )
+
+  graphics::barplot(
+    proportions,
+    horiz = TRUE,
+    col = unname(contract$colours),
+    border = NA,
+    names.arg = summary_labels,
+    las = 1,
+    xlim = c(0, 100),
+    xlab = "Percentage of studies",
+    main = paste0(
+      "B. ",
+      rob_tool_display_name(tool_key),
+      " summary"
+    ),
+    cex.names = 0.70
+  )
+  graphics::axis(
+    1,
+    at = c(0, 25, 50, 75, 100),
+    labels = paste0(c(0, 25, 50, 75, 100), "%")
+  )
+
+  graphics::legend(
+    "bottom",
+    inset = c(0, -0.28),
+    legend = contract$levels,
+    pt.bg = unname(contract$colours),
+    pch = 22,
+    pt.cex = 1.35,
+    col = "#555555",
+    cex = 0.72,
+    horiz = TRUE,
+    bty = "n",
+    xpd = NA,
+    title = "Judgement"
+  )
+
+  grDevices::dev.off()
+  on.exit(NULL, add = FALSE)
+
+  if (!file_nonempty(destination)) {
+    return(
+      figure_render_result(
+        ok = FALSE,
+        path = "",
+        method = "R41_ROB_COMPOSITE",
+        message = "Deterministic RoB composite render did not create a non-empty PNG."
+      )
+    )
+  }
+
+  figure_render_result(
+    ok = TRUE,
+    path = destination,
+    method = "R41_ROB_COMPOSITE_FROM_FROZEN_FINAL",
+    message = paste0(
+      "Rendered from frozen author-approved ",
+      rob_tool_display_name(tool_key),
+      " judgements; source SHA256=",
+      frozen$sha256,
+      ". Full judgement legend retained."
+    ),
+    raw_return_class = "deterministic_base_r_graphics"
+  )
+}
+
+publication_figure_title <- function(row) {
+  role <- safe_chr(
+    row$inferred_role[[1]],
+    ""
+  )
+
+  if (identical(role, "risk_of_bias")) {
+    tool_key <- safe_chr(
+      row$risk_of_bias_tool[[1]],
+      infer_risk_of_bias_tool(
+        row$title[[1]],
+        row$source_relative_path[[1]]
+      )
+    )
+
+    return(
+      paste0(
+        "Risk-of-bias assessment — ",
+        rob_tool_display_name(tool_key),
+        " traffic-light and summary"
+      )
+    )
+  }
+
+  clean_publication_artifact_title(
+    row$title[[1]],
+    "figure"
+  )
+}
+
 prepare_figure_for_word <- function(
     source,
     render_root,
@@ -7103,9 +9258,13 @@ add_manuscript_block <- function(
       !is.na(level) &&
         level == 3L
     ) {
+      # Some Word templates number Heading 2 with no suffix space
+      # (for example "3.1.Reporting"). A non-breaking leading space is
+      # preserved by Word and yields stable journal-neutral separation while
+      # remaining harmless in templates without automatic numbering.
       doc <- officer::body_add_par(
         doc,
-        value = text,
+        value = paste0("\u00A0", text),
         style = style_map$heading2
       )
       return(doc)
@@ -7281,7 +9440,7 @@ if (
       )
     }
 
-    clean_title <- strip_existing_display_number(
+    clean_title <- clean_publication_artifact_title(
       row$title[[1]],
       "table"
     )
@@ -7302,7 +9461,7 @@ if (
 
     doc <- officer::body_add_par(
       doc,
-      value = caption,
+      value = paste0("\u00A0", caption),
       style = style_map$heading2
     )
 
@@ -7465,22 +9624,78 @@ if (
       character(0)
     }
 
-    raw_prepared <- prepare_figure_for_word(
-      source = source,
-      render_root = figure_render_root,
-      artifact_id = row$artifact_id[[1]],
-      display_number = figure_number,
-      dpi = figure_dpi,
-      max_width = figure_max_width_in,
-      max_height = figure_max_height_in,
-      semantic_candidates = semantic_companion_paths,
-      project_root = repo_root
-    )
+    raw_prepared <- if (
+      identical(
+        safe_chr(row$inferred_role[[1]], ""),
+        "risk_of_bias"
+      )
+    ) {
+      rob_destination <- file.path(
+        figure_render_root,
+        paste0(
+          "Figure_",
+          sprintf("%03d", figure_number),
+          "_",
+          clean_file_component(row$artifact_id[[1]]),
+          "_rob_composite.png"
+        )
+      )
 
-    prepared <- canonicalize_figure_render_result(
+      rob_render <- render_rob_publication_composite(
+        artifact_registry = artifact_registry,
+        tool_key = safe_chr(
+          row$risk_of_bias_tool[[1]],
+          infer_risk_of_bias_tool(
+            row$title[[1]],
+            row$source_relative_path[[1]]
+          )
+        ),
+        destination = rob_destination,
+        dpi = figure_dpi
+      )
+
+      if (render_flag(rob_render, "ok", FALSE)) {
+        rob_render
+      } else {
+        warning(
+          paste0(
+            "R/41 could not regenerate the RoB composite from frozen final judgements; falling back to the frozen figure source. ",
+            render_chr(rob_render, "message", "")
+          )
+        )
+
+        prepare_figure_for_word(
+          source = source,
+          render_root = figure_render_root,
+          artifact_id = row$artifact_id[[1]],
+          display_number = figure_number,
+          dpi = figure_dpi,
+          max_width = figure_max_width_in,
+          max_height = figure_max_height_in,
+          semantic_candidates = semantic_companion_paths,
+          project_root = repo_root
+        )
+      }
+    } else {
+      prepare_figure_for_word(
+        source = source,
+        render_root = figure_render_root,
+        artifact_id = row$artifact_id[[1]],
+        display_number = figure_number,
+        dpi = figure_dpi,
+        max_width = figure_max_width_in,
+        max_height = figure_max_height_in,
+        semantic_candidates = semantic_companion_paths,
+        project_root = repo_root
+      )
+    }
+
+    prepared <- finalize_word_render_result(
       raw_prepared,
       fallback_path = "",
-      method_hint = "PREPARE_FIGURE_FOR_WORD"
+      method_hint = "PREPARE_FIGURE_FOR_WORD",
+      max_width = figure_max_width_in,
+      max_height = figure_max_height_in
     )
 
     prepared_ok <- render_flag(
@@ -7719,9 +9934,8 @@ if (
       row$display_number[[1]]
     )
 
-    clean_title <- strip_existing_display_number(
-      row$title[[1]],
-      "figure"
+    clean_title <- publication_figure_title(
+      row
     )
 
     legend <- if (nzchar(clean_title)) {
@@ -7810,9 +10024,8 @@ if (
       )
     }
 
-    clean_title <- strip_existing_display_number(
-      row$title[[1]],
-      "figure"
+    clean_title <- publication_figure_title(
+      row
     )
 
     figure_heading <- if (
@@ -8138,7 +10351,7 @@ if (!export_pass) {
 
 state <- list(
   manuscript_docx_export = list(
-    version = "1.11.0",
+    version = "1.15.4",
     generated_at = now_text(),
     project_id = project_id,
     project_title = project_title,
@@ -8161,6 +10374,19 @@ state <- list(
       submission_candidate_file
     ),
     source_manuscript_sha256 = candidate_sha256,
+    validated_r39_manuscript = normalize_slash(
+      r39_manuscript_file
+    ),
+    validated_r39_manuscript_sha256 = validated_r39_sha256,
+    r39_sha256_match_at_export = identical(
+      current_r39_sha256,
+      validated_r39_sha256
+    ),
+    submission_candidate_matches_r40_derivation = identical(
+      submission_text,
+      expected_submission_text
+    ),
+    artifact_export_source_contract = "R38_FROZEN_HASH_VERIFIED_COPY",
     output_docx = normalize_slash(
       docx_file
     ),
@@ -8171,8 +10397,8 @@ state <- list(
     cross_reference_count = nrow(
       crossref_map
     ),
-    numbering_contract = "FIRST_MENTION_IN_FINAL_MANUSCRIPT_BODY",
-    semantic_mapping_contract = "ANCHOR_TEXT_THEN_RESULTS_PROSE_THEN_HEADING_FALLBACK",
+    numbering_contract = "COVERAGE_TOKEN_PRECEDING_PROSE_ANCHOR_THEN_FIRST_MENTION_NUMBERING",
+    semantic_mapping_contract = "PRECEDING_COVERAGE_ANCHOR_THEN_RESULTS_PROSE_THEN_HEADING_FALLBACK",
     display_label_validation = "CASE_INSENSITIVE_BOUNDARY_AWARE_LABEL_MATCH_IN_MAPPED_BODY_BLOCK",
     internal_self_tests_enabled = run_internal_self_tests,
     table_artifacts_in_registry = nrow(
@@ -8210,7 +10436,8 @@ state <- list(
     figure_embedding_audit = normalize_slash(
       figure_embedding_audit_file
     ),
-    figure_render_contract = "SAFE_ACCESSOR_ONLY_NO_DIRECT_NAMED_SUBSCRIPT_AT_RENDER_BOUNDARIES",
+    figure_render_contract = "SAFE_ACCESSOR_ONLY_PLUS_UNIVERSAL_WORD_DIMENSION_FINALIZATION",
+    rob_publication_render_contract = "CSV_RECONSTRUCTION_OR_FROZEN_R37_TRAFFIC_LIGHT_COMPOSITE_PLUS_COMPLETE_FIXED_LEGEND",
     figure_render_directory = normalize_slash(
       figure_render_root
     ),
@@ -8251,6 +10478,7 @@ readme_lines <- c(
   "- Exported the exact R/40 PASS manuscript into editable Word format.",
   "- Appended eligible canonical tables as native editable Word tables when enabled.",
   "- Added figure legends when enabled.",
+  "- For supported risk-of-bias tools, rendered frozen author-approved traffic-light and summary panels with panel-specific judgement markers directly below each panel (circular markers for traffic-light panels and square markers for summary panels); no RoB judgement was recalculated or changed.",
   "- Discovered usable figure renderings independently of the R/38 coverage_required representative flag.",
   "- Preferred directly embeddable raster renderings after semantic figure deduplication.",
   "- Appended the actual numbered figure images at the end of the Word manuscript when enabled.",
@@ -8289,7 +10517,7 @@ report_lines <- c(
   "R/41 — Journal-Neutral Author-Editable DOCX Export",
   "",
   paste0(
-    "Version: 1.11.0"
+    "Version: 1.15.4"
   ),
   paste0(
     "Generated: ",
@@ -8314,6 +10542,21 @@ report_lines <- c(
     "Source manuscript SHA-256: ",
     candidate_sha256
   ),
+  paste0(
+    "Validated R/39 manuscript SHA-256 match: ",
+    identical(
+      current_r39_sha256,
+      validated_r39_sha256
+    )
+  ),
+  paste0(
+    "R/40 candidate deterministic derivation match: ",
+    identical(
+      submission_text,
+      expected_submission_text
+    )
+  ),
+  "Artifact export source: R/38 frozen hash-verified package copies",
   "",
   "EXPORT POLICY",
   "--------------------------------------------------",

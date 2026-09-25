@@ -2,7 +2,7 @@
 # Universal SR-MA Agent Toolkit
 # R/40_validate_manuscript_numerics_citations_consistency.R
 #
-# VERSION: 1.5.0
+# VERSION: 1.6.0
 #
 # PURPOSE
 # ------------------------------------------------------------
@@ -32,6 +32,14 @@
 #        machine-readable coverage marker;
 #      - markers are stripped from the PASS-only submission candidate.
 #
+#   5) DESCRIPTIVE-EVIDENCE / IDENTIFIER INTEGRITY
+#      - manuscript claims are checked against the full frozen R/38 Results
+#        evidence dossier, including descriptive tables and NR/N/A states;
+#      - contradictions between Table 1-3 evidence and manuscript prose are
+#        hard-gated as contradictions/unsupported claims;
+#      - internal screening/artifact identifiers are prohibited from
+#        submission-visible manuscript prose.
+#
 # GOVERNANCE
 # ------------------------------------------------------------
 # - R/27 is the canonical statistical engine.
@@ -54,6 +62,7 @@
 #   pubmed_reference_reverification.csv
 #   cross_section_consistency_audit.csv
 #   artifact_coverage_audit.csv
+#   machine_identifier_leak_audit.csv
 #   qc_summary.csv
 #   manuscript_qc.xlsx
 #   issues_for_author_review.md
@@ -964,6 +973,11 @@ artifact_coverage_file <- file.path(
   "artifact_coverage_audit.csv"
 )
 
+machine_identifier_audit_file <- file.path(
+  qc_root,
+  "machine_identifier_leak_audit.csv"
+)
+
 qc_summary_file <- file.path(
   qc_root,
   "qc_summary.csv"
@@ -1569,6 +1583,101 @@ artifact_coverage_audit <- if (
 readr::write_csv(
   artifact_coverage_audit,
   artifact_coverage_file,
+  na = ""
+)
+
+
+# ============================================================
+# 5.2 Submission-visible internal identifier leakage audit
+# ============================================================
+# Coverage markers are expected internal provenance tokens during R/39/R/40
+# and are stripped from the PASS-only submission candidate. They are removed
+# before this audit so that only accidental manuscript-visible identifiers fail.
+
+submission_visible_text_for_id_audit <- gsub(
+  "<!--\\s*ARTIFACT:\\s*[A-Za-z0-9_-]+\\s*-->",
+  " ",
+  manuscript_text,
+  perl = TRUE
+)
+
+submission_visible_text_for_id_audit <- remove_references_and_after(
+  submission_visible_text_for_id_audit
+)
+
+machine_identifier_patterns <- c(
+  screening_code = "\\bSCR_[A-Za-z0-9_-]+\\b",
+  screening_key_value = "\\bscreening_id\\s*(?:::|[:=])\\s*[A-Za-z0-9_:-]+",
+  compound_internal_label = "\\b(?:screening_id|study_id|record_id|report_id)::[A-Za-z0-9_:-]+\\b",
+  artifact_id = "\\bA_[A-Fa-f0-9]{8,32}\\b"
+)
+
+machine_identifier_rows <- list()
+
+for (pattern_name in names(machine_identifier_patterns)) {
+  pattern <- machine_identifier_patterns[[pattern_name]]
+
+  hits <- stringr::str_extract_all(
+    submission_visible_text_for_id_audit,
+    stringr::regex(
+      pattern,
+      ignore_case = TRUE
+    )
+  )[[1]]
+
+  hits <- unique(
+    trimws(
+      as.character(hits)
+    )
+  )
+
+  hits <- hits[
+    !is.na(hits) &
+      nzchar(hits)
+  ]
+
+  if (length(hits) == 0L) {
+    next
+  }
+
+  for (hit in hits) {
+    machine_identifier_rows[[
+      length(machine_identifier_rows) + 1L
+    ]] <- tibble::tibble(
+      pattern_name = pattern_name,
+      matched_text = hit,
+      status = "FAIL",
+      issue = paste0(
+        "Internal machine identifier leaked into submission-visible manuscript text: ",
+        hit
+      )
+    )
+  }
+}
+
+machine_identifier_audit <- if (
+  length(machine_identifier_rows) == 0L
+) {
+  tibble::tibble(
+    pattern_name = character(0),
+    matched_text = character(0),
+    status = character(0),
+    issue = character(0)
+  )
+} else {
+  dplyr::bind_rows(
+    machine_identifier_rows
+  ) |>
+    dplyr::distinct(
+      pattern_name,
+      matched_text,
+      .keep_all = TRUE
+    )
+}
+
+readr::write_csv(
+  machine_identifier_audit,
+  machine_identifier_audit_file,
   na = ""
 )
 
@@ -4670,8 +4779,11 @@ canonical_summary_text <- paste(
 consistency_system <- paste(
   "You are a final QC reviewer for a systematic review and meta-analysis manuscript.",
   "Audit ONLY the Abstract, Results, and Discussion supplied.",
-  "Use the canonical result facts as the source of truth.",
+  "Use BOTH the canonical numeric facts and the full frozen R/38 Results evidence dossier as sources of truth.",
+  "The R/38 dossier contains canonical descriptive/reporting tables as well as quantitative, diagnostic, study-selection, and risk-of-bias evidence.",
   "Identify direct contradictions, direction reversals, mismatched study counts or effect estimates, claims of significance inconsistent with confidence intervals/p-values, unsupported equivalence/no-difference claims, causal overstatement from observational evidence, and Discussion statements that materially distort the Results.",
+  "Also compare manuscript prose against descriptive table evidence study by study. Flag claims that give a value when the corresponding canonical table says NR/not reported, claims that say NR/not available when a value is present, N/A-versus-NR misuse that changes the scientific meaning (for example, a nonexistent comparator versus an unreported comparator), incorrect author/year or study labels, and mismatched intervention/comparator or baseline-characteristic descriptions.",
+  "A clear table-versus-prose mismatch or NR/N/A contradiction must be classified as CONTRADICTION or UNSUPPORTED_CLAIM, not POTENTIAL_AMBIGUITY.",
   "Do not criticize style.",
   "Do not require identical wording across sections.",
   "POTENTIAL_AMBIGUITY should be reserved for language that could mislead but is not a clear factual contradiction.",
@@ -4683,8 +4795,10 @@ consistency_user <- paste0(
   project_title,
   "\n\nR/38 STATUS:\n",
   r38_status,
-  "\n\nCANONICAL RESULT FACTS:\n",
+  "\n\nCANONICAL NUMERIC RESULT FACTS:\n",
   canonical_summary_text,
+  "\n\nFULL FROZEN R/38 RESULTS EVIDENCE DOSSIER (includes canonical descriptive tables):\n",
+  r38_results_text,
   "\n\nABSTRACT:\n",
   abstract_text,
   "\n\nRESULTS:\n",
@@ -4896,6 +5010,17 @@ artifact_coverage_fail_n <- if (
   0L
 }
 
+machine_identifier_fail_n <- if (
+  nrow(machine_identifier_audit) > 0L
+) {
+  sum(
+    machine_identifier_audit$status == "FAIL",
+    na.rm = TRUE
+  )
+} else {
+  0L
+}
+
 pubmed_fail_n <- if (
   nrow(pubmed_reverification) > 0L
 ) {
@@ -4938,7 +5063,8 @@ deterministic_pass <- (
   numeric_fail_n == 0L &&
   citation_fail_n == 0L &&
   pubmed_fail_n == 0L &&
-  artifact_coverage_fail_n == 0L
+  artifact_coverage_fail_n == 0L &&
+  machine_identifier_fail_n == 0L
 )
 
 semantic_pass <- (
@@ -4988,6 +5114,7 @@ qc_summary <- tibble::tibble(
   citation_integrity_failures = citation_fail_n,
   pubmed_reverification_failures = pubmed_fail_n,
   artifact_coverage_failures = artifact_coverage_fail_n,
+  machine_identifier_leak_failures = machine_identifier_fail_n,
   semantic_contradictions_or_unsupported = semantic_contradiction_n,
   semantic_potential_ambiguities = semantic_potential_n,
   deterministic_pass = deterministic_pass,
@@ -5169,6 +5296,31 @@ if (artifact_coverage_fail_n > 0L) {
   )
 }
 
+if (machine_identifier_fail_n > 0L) {
+  issue_lines <- c(
+    issue_lines,
+    "## Internal machine identifier leakage",
+    ""
+  )
+
+  for (i in seq_len(nrow(machine_identifier_audit))) {
+    issue_lines <- c(
+      issue_lines,
+      paste0(
+        "- **",
+        machine_identifier_audit$pattern_name[[i]],
+        "**: ",
+        machine_identifier_audit$issue[[i]]
+      )
+    )
+  }
+
+  issue_lines <- c(
+    issue_lines,
+    ""
+  )
+}
+
 if (
   semantic_contradiction_n > 0L ||
   semantic_potential_n > 0L
@@ -5230,12 +5382,13 @@ if (
   citation_fail_n == 0L &&
   pubmed_fail_n == 0L &&
   artifact_coverage_fail_n == 0L &&
+  machine_identifier_fail_n == 0L &&
   semantic_contradiction_n == 0L &&
   semantic_potential_n == 0L
 ) {
   issue_lines <- c(
     issue_lines,
-    "No numerical, citation-integrity, PubMed-verification, artifact-coverage, or cross-section consistency issue was detected.",
+    "No numerical, citation-integrity, PubMed-verification, artifact-coverage, machine-identifier, or cross-section consistency issue was detected.",
     ""
   )
 }
@@ -5305,6 +5458,7 @@ sheet_payloads <- list(
   Citation_Integrity = citation_integrity,
   PubMed_Reverification = pubmed_reverification,
   Artifact_Coverage = artifact_coverage_audit,
+  Machine_ID_Leakage = machine_identifier_audit,
   Cross_Section_Consistency = consistency_audit
 )
 
@@ -5342,7 +5496,7 @@ openxlsx::saveWorkbook(
 
 state <- list(
   manuscript_qc = list(
-    version = "1.5.0",
+    version = "1.6.0",
     generated_at = now_text(),
     project_id = project_id,
     project_title = project_title,
@@ -5356,6 +5510,7 @@ state <- list(
     citation_integrity_failures = citation_fail_n,
     pubmed_reverification_failures = pubmed_fail_n,
     artifact_coverage_failures = artifact_coverage_fail_n,
+    machine_identifier_leak_failures = machine_identifier_fail_n,
     semantic_contradictions_or_unsupported = semantic_contradiction_n,
     semantic_potential_ambiguities = semantic_potential_n,
     qc_model = qc_model,
@@ -5445,7 +5600,14 @@ report_lines <- c(
     artifact_coverage_fail_n
   ),
   "",
-  "ABSTRACT–RESULTS–DISCUSSION CONSISTENCY",
+  "INTERNAL IDENTIFIER LEAKAGE",
+  "--------------------------------------------------",
+  paste0(
+    "Machine identifier leakage failures: ",
+    machine_identifier_fail_n
+  ),
+  "",
+  "ABSTRACT–RESULTS–DISCUSSION / TABLE CONSISTENCY",
   "--------------------------------------------------",
   paste0(
     "Contradiction/unsupported-claim issues: ",
@@ -5555,7 +5717,10 @@ cat(
   "Artifact coverage failures: ",
   artifact_coverage_fail_n,
   "\n",
-  "Cross-section contradictions/unsupported claims: ",
+  "Machine identifier leakage failures: ",
+  machine_identifier_fail_n,
+  "\n",
+  "Cross-section/table contradictions/unsupported claims: ",
   semantic_contradiction_n,
   "\n",
   "Potential ambiguities: ",
