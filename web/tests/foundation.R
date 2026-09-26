@@ -1,0 +1,7 @@
+source("web/R/core.R")
+source("web/ui/app.R")
+settings <- web_settings(data_root = tempfile("foundation-"))
+app <- web_app(settings, "local-researcher")
+stopifnot(inherits(app, "shiny.appobj"))
+stopifnot(length(web_registry()) == 18L, sum(vapply(web_registry(), function(x) x$enabled, logical(1))) == 1L)
+cat("PASS: Shiny+bslib construction; semantic registry shape; isolated settings\n")

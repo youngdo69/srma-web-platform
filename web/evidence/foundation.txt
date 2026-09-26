@@ -1,0 +1,273 @@
+Loading required package: shiny
+
+Listening on http://127.0.0.1:3839
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+dpkg-query: package 'libjs-jquery' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+Warning: Error in if: argument is of length zero
+  1: shiny::runApp

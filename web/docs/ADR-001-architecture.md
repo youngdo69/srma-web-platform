@@ -1,0 +1,21 @@
+# ADR-001 — Platform boundary and local execution
+
+Accepted for Autonomous Block A, PM Revised Mission v1.1 (2026-09-26).
+
+UI (`web/ui`) → application (`web/R/service.R`) → durable state (`persistence.R`) and adapter (`adapter.R`). A separately launched `web/bin/worker.R` polls the operational database. The adapter starts a fresh `Rscript --vanilla` process; only `web/adapter/engine_entry.R` maps the semantic operation to the canonical engine script. Existing R/, START_HERE.R and scientific renv.lock are unchanged.
+
+`web/R/core.R` holds operational settings, structured errors/results and a fail-closed operation registry. Only `validate_search` is enabled. All required future semantic names exist but reject execution; this prevents premature bypass of scientific gates. The enabled check neither advances Runner state nor approves registration, screening, extraction or risk-of-bias decisions.
+
+The canonical configuration loader and path builder determine input locations. Application persistence stores immutable bytes and fingerprints; it does not parse PICO, choose search names, infer scientific policy or reimplement project initialization. Imported paths must remain relative and inside the project root. Import may create empty directories via the canonical path builder. No original input files are overwritten.
+
+PostgreSQL is the target operational database (DBI/RPostgreSQL and libpq environment). A common SQL schema with composite foreign keys plus dialect-specific transition/audit triggers supports isolated SQLite WAL development/testing. Portable UTC ISO strings and JSON text avoid provider-specific JSON operators. These values are application-validated; integer/relational constraints are database-enforced. SQLite tests do not prove PostgreSQL concurrency or migration behavior. Migration runs once before workers start, checks its checksum on reuse, and never applies destructive upgrades.
+
+The standalone worker offers bounded attempts, project-level serialization, atomic compare-and-set pickup and a fencing token on completion. State persists across UI disconnects. A stale attempt becomes FAILED after the timeout plus grace period; replay requires an explicit operator/service retry and is permitted only for the isolated, replay-safe structural check. Running cancellation is intentionally unavailable. This is not a claim of global exactly-once execution: a lost worker may leave a child process, but its isolated output cannot publish after its token expires.
+
+ProjectVersion captures declared input bytes. Each job gets a fresh copy, engine identity, input hashes, structured result and private technical logs. Artifact objects are immutable puts through a put/get port, currently a local directory. SQL registration and job completion commit atomically. An S3 implementation can use the same opaque key/checksum contract; no S3 service is needed. Interrupted writes may leave unreferenced objects; they are not exposed and no automatic destructive cleanup runs in this block.
+
+All application actions authorize workspace membership; cross-project/version relations use composite foreign keys. Gate decisions are version-scoped, attributed and immutable, with an append-only audit log. Additional local review requirements are supported; they are not substitutes for canonical engine gates. Required gates are rechecked during worker pickup. No scientific operations are enabled merely because a local gate is approved.
+
+Authentication is deliberately not implemented. A fixed operator-supplied local actor and loopback-only Shiny server are the Block A boundary. Do not expose this application remotely. Database and filesystem access are trusted operator privileges. Raw engine logs, paths, credentials and result diagnostics are excluded from normal UI projections. The object root is never served statically; downloads authorize the project and recheck checksums.
+
+Canonical scientific dependencies and platform development dependencies remain separate. Use a Web-specific library under `web/.library` and the supplied development dependency record. Tested runtime details and canonical-lock limitations are explicit in BASELINE.md. No credential/API is needed by the enabled operation.
