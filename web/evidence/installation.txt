@@ -1,0 +1,30 @@
+=======================================================
+SRMA Agent Toolkit Installation Check
+=======================================================
+
+Project folder: /workspace/scratch/f22ae3d8c5eb/source/srma-agent-toolkit
+Python version: 3.12.14
+
+1. Checking Python version
+[OK]   Python 3.10 or newer
+
+2. Checking folders
+[OK]   skills
+[OK]   harnesses
+[OK]   templates
+[OK]   scripts
+
+3. Checking files
+[OK]   README.md
+[OK]   AGENTS.md
+[OK]   CLAUDE.md
+[OK]   .gitignore
+[OK]   .env.example
+
+4. Checking local .env file
+[INFO] .env is not present yet.
+       This is acceptable until API keys are needed.
+
+=======================================================
+SUCCESS: The basic project structure is ready.
+=======================================================
