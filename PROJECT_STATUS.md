@@ -1,9 +1,9 @@
 # Active platform status — 2026-09-26
 
 Phase: Autonomous Block A.
-Current task: WEB-002 semantic adapter.
+Current task: WEB-003 persistent state model.
 Status: In progress.
-Last completed platform task: WEB-001 — PASS; WEB-000 also PASS.
+Last completed platform task: WEB-002 — PASS; WEB-000–001 also PASS.
 Next: architecture, adapter, persistent state and worker vertical slice.
 Blockers: none for bounded Block A. Canonical full renv restore remains unverified; see web/docs/BASELINE.md.
 Deferred: WEB-005 and later; existing scientific Human Gates remain unchanged.

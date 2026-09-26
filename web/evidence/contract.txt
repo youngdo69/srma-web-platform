@@ -1,0 +1,1 @@
+PASS: real semantic operation; 17 disabled contracts; missing input; unavailable runtime; provenance

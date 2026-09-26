@@ -1,0 +1,16 @@
+source("web/R/core.R"); source("web/R/adapter.R"); source("web/tests/fixture.R")
+s <- web_settings(data_root = tempfile("contract-"));p <- web_fixture(tempfile("contract-input-"))
+i <- web_engine_inspect(s,p)
+r <- srma_run(s,i$project_id,"validate_search",list(),"contract",p,"baseline",file.path(s$data_root,"run"))
+stopifnot(r$status=="COMPLETE",length(r$artifacts)==2L,length(r$provenance$engine_script_sha256)==1L)
+for (op in setdiff(names(web_registry()),"validate_search")) {
+ r <- srma_run(s,i$project_id,op,list(),"contract",p,"baseline",file.path(s$data_root,"unused"))
+ stopifnot(r$status=="FAILED",r$error_code=="VALIDATION_FAILED")
+}
+unlink(file.path(p,"search_strategies/pubmed_search.txt"))
+r <- srma_run(s,i$project_id,"validate_search",list(),"missing",p,"baseline",file.path(s$data_root,"missing"))
+stopifnot(r$status=="USER_ACTION_REQUIRED",r$error_code=="USER_ACTION_REQUIRED")
+s$rscript <- file.path(s$data_root,"missing-runtime")
+r <- srma_run(s,i$project_id,"validate_search",list(),"runtime",p,"baseline",file.path(s$data_root,"runtime"))
+stopifnot(r$status=="FAILED",r$error_code=="SYSTEM_FAILED")
+cat("PASS: real semantic operation; 17 disabled contracts; missing input; unavailable runtime; provenance\n")
