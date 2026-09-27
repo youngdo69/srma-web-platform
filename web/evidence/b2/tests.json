@@ -116,9 +116,11 @@
       "command": [
         "git",
         "diff",
-        "--check"
+        "--check",
+        "fb303704d7a7412eedf2d8736bd0de7886d1f8ef"
       ],
       "exit_code": 0
     }
-  ]
+  ],
+  "log_format": "Trailing output whitespace removed for diff hygiene; messages/results unchanged."
 }
