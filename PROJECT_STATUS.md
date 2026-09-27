@@ -1,3 +1,7 @@
+# C2 starting checkpoint — 2026-09-27
+
+In progress: WEB-012 Manuscript Builder. Isolated srma-c2/web/block-c2 starts clean at approved C1 045ce28. Canonical audit completed; implementation next. Prior C1 is unchanged. PostgreSQL, credentials, canonical runtime and AI/manuscript provider acceptance remain external pending. WEB-013/014 and deployment deferred.
+
 # C1 final checkpoint — 2026-09-27
 
 Status: C1 / WEB-011 IMPLEMENTATION COMPLETE; ready for PM/Reviewer acceptance before WEB-012. Baseline approved B2 17edbfd. Final code/test checkpoints 0a53db5 / 1240f3f. Source and locks unchanged; previous checkouts protected. Final E2E/security/UI/numeric consistency/durability and affected regressions PASS. No known remaining local implementation defect. Next: PM review and operator acceptance only; do not begin WEB-012. Outputs: web/docs/C1_*.md, web/evidence/c1, C1-001 incremental delivery and separate PM report.

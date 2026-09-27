@@ -1,3 +1,7 @@
+# PM C2-001 authorization — 2026-09-27
+
+Approved C1 045ce28. Implement WEB-012 only in isolated web/block-c2; preserve canonical science, upstream approvals and prior checkouts. Stop before WEB-013. Deliver C2-001 incremental bundle and PM report.
+
 # PM C1 v1.0 authorization — 2026-09-27
 
 Approved B2 17edbfd. Implement WEB-011 only in isolated web/block-c1. Preserve earlier checkouts and canonical scientific methodology. Stop before WEB-012.
