@@ -73,8 +73,8 @@ if(!is.na(key))Sys.setenv(OPENAI_API_KEY=key)
 probe<-s;web_science_settings<-original_science
 reject(web_b2_guard(con,probe,actor,ready$project_id,revision$version_id,"finalize_extraction"))
 web_science_settings<-function(settings,verify=TRUE)settings
-stopifnot(!isTRUE(web_registry()$run_meta_analysis$enabled))
-cat("PASS: all four AI operations fail closed without credentials; canonical runtime gate retained; WEB-011 disabled\n")
+reject(web_submit(con,s,actor,ready$project_id,ready$version_id,"run_meta_analysis"))
+cat("PASS: all four AI operations fail closed without credentials; canonical runtime gate retained; WEB-011 requires its own approved AnalysisVersion\n")
 # Real authenticated UI boundary and saved immutable decision. No UI/storage mocks.
 source("web/ui/evidence.R")
 ui_version<-checkpoints$SCREENING
