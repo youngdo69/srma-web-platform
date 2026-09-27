@@ -26,7 +26,7 @@ web_engine_inspect <- function(settings, root, configuration_only = FALSE) {
   result
 }
 # Semantic operation contract; callers cannot select scripts, paths or shell commands.
-srma_run <- function(settings, project_id, operation, payload, job_id, project_dir, engine_version, diagnostic_dir) {
+srma_run <- function(settings, project_id, operation, payload, job_id, project_dir, engine_version, diagnostic_dir, version_id = NULL) {
   reg <- web_registry()[[operation]]
   if (is.null(reg) || !isTRUE(reg$enabled) || length(payload))
     return(web_result(operation, project_id, job_id, "FAILED", "This operation is not enabled in this release.", engine_version, "VALIDATION_FAILED"))
@@ -39,12 +39,12 @@ srma_run <- function(settings, project_id, operation, payload, job_id, project_d
       "The scientific processing environment needs maintenance.", engine_version, "DEPENDENCY_FAILED"))
     settings <- scientific
   }
-  if(operation %in% names(web_b2_ai_operations())) {
-    if(!nzchar(Sys.getenv("OPENAI_API_KEY","")))return(web_result(operation,project_id,job_id,"USER_ACTION_REQUIRED","AI assistance requires operator credentials; use manual Human review.",engine_version,"USER_ACTION_REQUIRED"))
+  if(operation %in% names(web_b2_operations())) {
+    if(operation %in% names(web_b2_ai_operations()) && !nzchar(Sys.getenv("OPENAI_API_KEY","")))return(web_result(operation,project_id,job_id,"USER_ACTION_REQUIRED","AI assistance requires operator credentials; use manual Human review.",engine_version,"USER_ACTION_REQUIRED"))
     settings<-web_science_settings(settings)
   }
   web_engine_call(settings, list(action = operation, project_id = project_id, job_id = job_id,
-    project_dir = project_dir, engine_version = engine_version), diagnostic_dir)
+    project_dir = project_dir, engine_version = engine_version, version_id=version_id), diagnostic_dir)
 }
 
 web_science_settings <- function(settings, verify = TRUE) {

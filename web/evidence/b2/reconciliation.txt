@@ -1,0 +1,28 @@
+/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/bin/R: line 249: /workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/ldpaths: No such file or directory
+During startup - Warning message:
+In file(file, "rt") :
+  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory
+[1] 1
+[1] TRUE
+PASS: prepare_screening SCREENING 
+PASS: finalize_screening FULLTEXT 
+PASS: register_fulltext FULLTEXT 
+PASS: finalize_included_studies INCLUDED 
+PASS: prepare_extraction EXTRACTION 
+PASS: finalize_extraction VERIFIED 
+PASS: prepare_risk_of_bias ROB 
+PASS: finalize_evidence READY 
+PASS: B2 real canonical deterministic E2E; no provider or meta-analysis run
+PASS: unauthenticated/workspace/project/version/actor/session/CSRF isolation
+PASS: PDF registration/download/checksum; traversal, symlink, signature, size, unsupported type and report substitution rejected
+PASS: value provenance, independent verification, immutable versions/audit, no inherited gates, stale inclusion/extraction/result and RoB substitutions rejected
+PASS: all four AI operations fail closed without credentials; canonical runtime gate retained; WEB-011 disabled
+Loading required package: shiny
+
+Attaching package: ‘shiny’
+
+The following object is masked _by_ ‘.GlobalEnv’:
+
+    req
+
+PASS: Shiny screening display and authenticated Human decision/new version

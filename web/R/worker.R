@@ -48,7 +48,7 @@ web_worker_once <- function(con, settings) {
     web_exec(con, "UPDATE jobs SET progress=30,message=?message,heartbeat=?time,updated_at=?now WHERE id=?id AND state='RUNNING' AND worker_token=?token",
       message = web_registry()[[j$operation]]$progress, time = as.numeric(Sys.time()), now = web_now(), id = j$id, token = j$worker_token)
     web_audit(con, p, "JOB_PROGRESS", j$id, detail = list(progress = 30))
-    srma_run(settings, p$canonical_id, j$operation, list(), j$id, work, j$engine_id, file.path(attempt, "engine"))
+    srma_run(settings, p$canonical_id, j$operation, list(), j$id, work, j$engine_id, file.path(attempt, "engine"),version_id=j$version_id)
   }, error = function(e) web_result(j$operation, p$canonical_id, j$id, "FAILED",
        if (inherits(e, "srma_web_error")) conditionMessage(e) else "Processing could not finish. The operator can inspect the diagnostic record.",
        j$engine_id, if (inherits(e, "srma_web_error")) e$code else "SYSTEM_FAILED", conditionMessage(e)))

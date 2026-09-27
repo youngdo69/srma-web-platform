@@ -47,7 +47,7 @@ result <- tryCatch({
   manifest <- setNames(lapply(inputs, web_sha), inputs)
   if(request$action %in% names(web_b2_operations())) {
     source(file.path(request$engine_root,"web/adapter/evidence.R"))
-    web_b2_canonical(request,config,paths,root)
+    web_b2_canonical(request,config,paths,root,manifest)
   } else if (request$action %in% c("initialize_project", "prepare_manual_concepts", "activate_initialization")) {
     source(file.path(request$engine_root,"web/adapter/initialization.R"))
     produced <- web_initialization_action(request,config,root)

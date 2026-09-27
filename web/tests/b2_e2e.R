@@ -12,9 +12,10 @@ writeLines(unlist(lapply(c("Alpha","Alpha","Beta","Gamma"),function(t)c("TY  - J
 v<-web_upload_database(con,s,actor,v$project_id,v$version_id,"central",data.frame(name="export.ris",datapath=ris,size=file.info(ris)$size),upload_root)
 # Existing labeled B1 test seam only: development R/SQLite preflight, no canonical-runtime PASS.
 original_science<-web_science_settings;web_science_settings<-function(settings,verify=TRUE)settings
-j<-web_submit(con,s,actor,v$project_id,v$version_id,"validate_database_inputs");web_worker_once(con,s);web_science_settings<-original_science
+j<-web_submit(con,s,actor,v$project_id,v$version_id,"validate_database_inputs");web_worker_once(con,s)
 stopifnot(web_query(con,"SELECT state FROM jobs WHERE id=?j",j=j)$state=="COMPLETE")
 v<-web_b2_start(con,s,actor,v$project_id,v$version_id)
+checkpoints<-list(INPUT=v)
 context<-function()web_b2_context(con,s,actor,v$project_id,v$version_id)$packet
 step<-function(op){
  g<-web_query(con,"SELECT id FROM gates WHERE project_id=?p AND version_id=?v AND required_operation=?o AND status='PENDING'",p=v$project_id,v=v$version_id,o=op)
@@ -22,7 +23,7 @@ step<-function(op){
  j<-web_submit(con,s,actor,v$project_id,v$version_id,op);web_worker_once(con,s)
  x<-web_query(con,"SELECT * FROM jobs WHERE id=?j",j=j)
  if(x$state!="COMPLETE"){print(web_parse(x$result_json));stop(paste("STEP FAILED",op))}
- v<<-web_b2_accept(con,s,actor,v$project_id,v$version_id,j);cat("PASS:",op,context()$stage,"\n")
+ v<<-web_b2_accept(con,s,actor,v$project_id,v$version_id,j);checkpoints[[context()$stage]]<<-v;cat("PASS:",op,context()$stage,"\n")
 }
 edit<-function(table,i,values,who=actor){x<-context();v<<-web_b2_edit(con,s,who,v$project_id,v$version_id,table,x$tables[[table]][[i]]$.row_id,values)}
 step("prepare_screening");x<-context();stopifnot(length(x$tables$Reviewer_1)==3L)
@@ -32,7 +33,7 @@ step("finalize_screening")
 pdf<-file.path(upload_root,"synthetic.pdf");writeLines(c("%PDF-1.4","1 0 obj << /Type /Catalog >> endobj","trailer << /Root 1 0 R >>","%%EOF"),pdf)
 for(i in 1:3){x<-context();v<-web_b2_upload(con,s,actor,v$project_id,v$version_id,x$tables$Author_Final_Review[[i]]$.row_id,data.frame(name="synthetic.pdf",datapath=pdf,size=file.info(pdf)$size),upload_root)
  edit("Author_Final_Review",i,list(author_final_decision=if(i==3)"Exclude" else "Include",author_final_exclusion_reason=if(i==3)"Ineligible" else "",author_notes="Explicit synthetic full-text review",study_id=paste0("STUDY_",i)))}
-step("finalize_included_studies");stopifnot(length(context()$included_reports)==2)
+step("register_fulltext");step("finalize_included_studies");stopifnot(length(context()$included_reports)==2)
 step("prepare_extraction")
 for(i in 1:2){
  edit("Target_Study_Verification",i,list(study_design=if(i==1)"randomized trial" else "observational cohort",source_location="Page 1",source_evidence="Synthetic fixture, not clinical evidence"))
@@ -47,4 +48,6 @@ for(i in seq_along(x$tables$Overall_Review))edit("Overall_Review",i,list(author_
 step("finalize_evidence");stopifnot(context()$stage=="READY")
 cat("PASS: B2 real canonical deterministic E2E; no provider or meta-analysis run\n")
 if(nzchar(Sys.getenv("B2_TEST_STATE")))saveRDS(list(settings=s,version=v),Sys.getenv("B2_TEST_STATE"))
+if(identical(Sys.getenv("B2_EXTENDED"),"1"))source("web/tests/b2_reconciliation.R")
+web_science_settings<-original_science
 DBI::dbDisconnect(con)

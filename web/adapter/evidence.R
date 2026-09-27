@@ -21,7 +21,7 @@ web_b2_book <- function(path,tables,start=3L) {
  for(n in names(tables)){openxlsx::addWorksheet(wb,n);openxlsx::writeData(wb,n,web_b2_df(tables[[n]]),startRow=if(n %in% c("Reviewer_1","Reviewer_2"))4L else start)}
  openxlsx::saveWorkbook(wb,path,overwrite=TRUE)
 }
-web_b2_canonical <- function(request,config,paths,root) {
+web_b2_canonical <- function(request,config,paths,root,input_manifest) {
  source(file.path(request$engine_root,"web/R/evidence.R"))
  engine<-request$engine_root;x<-web_b2_packet(root);op<-request$action
  web_assert(op %in% names(web_b2_operations())&&x$stage==unname(web_b2_operations()[op]),"Evidence stage does not match operation.")
@@ -87,6 +87,10 @@ web_b2_canonical <- function(request,config,paths,root) {
    row<-c(list(screening_id=id,outcome_row_id=paste0(id,"_",length(outcomes)+1L)),row,list(analysis_group="",meta_analysis_role="",parent_analysis_group="",human_include_in_planned_analysis="No",verification_status="Needs clarification",verifier="",verified_at="",value_status="MISSING",transformation_rule="",raw_value="",.row_id=web_id(),.source="HUMAN ENTRY REQUIRED"));outcomes[[length(outcomes)+1L]]<-row}
   x$tables$Target_Study_Verification<-study;x$tables$Target_Outcome_Verification<-outcomes
   x$editable<-list(Target_Study_Verification=as.list(c(fields,"source_location","source_evidence")),Target_Outcome_Verification=as.list(c(outfields,"analysis_group","meta_analysis_role","parent_analysis_group","human_include_in_planned_analysis","value_status","transformation_rule","raw_value")))
+  for(t in c("Target_Study_Verification","Target_Outcome_Verification"))for(i in seq_along(x$tables[[t]])) {
+   r<-x$tables[[t]][[i]];src<-Filter(function(a)identical(a$screening_id,r$screening_id),x$tables$Author_Final_Review)[[1]]
+   r$.pdf_sha256<-src$.pdf_sha256;r$study_id<-src$study_id;x$tables[[t]][[i]]<-r
+  }
   x$stage<-"EXTRACTION"
  } else if(op=="finalize_extraction") {
   studies<-x$tables$Target_Study_Verification;outcomes<-x$tables$Target_Outcome_Verification
@@ -120,7 +124,7 @@ web_b2_canonical <- function(request,config,paths,root) {
   final<-e$import_and_finalize_author_workbook(book);e$validate_tool_domains(final,"RoB 2",e$rob2_domains);e$validate_tool_domains(final,"ROBINS-I",e$robins_domains)
   readr::write_csv(final,"results/risk_of_bias/rob_final_combined.csv")
   x$stage<-"READY"
-  jsonlite::write_json(list(status="human_verified_dataset",analysis_ready_manifest="data/processed/meta_analysis_ready/meta_analysis_manifest.csv",included="data/processed/full_text/included_studies.csv",crosswalk="data/processed/full_text/report_study_crosswalk.csv",rob="results/risk_of_bias/rob_final_combined.csv",engine=request$engine_version,source_job=request$job_id,unresolved=Filter(function(a)!identical(a$verification_status,"Verified"),x$tables$Target_Outcome_Verification)),"results/analysis_ready_evidence.json",auto_unbox=TRUE,pretty=TRUE)
+  jsonlite::write_json(list(status="human_verified_dataset",project_version=request$version_id,project=request$project_id,input_sha256=input_manifest,analysis_ready_manifest="data/processed/meta_analysis_ready/meta_analysis_manifest.csv",included="data/processed/full_text/included_studies.csv",crosswalk="data/processed/full_text/report_study_crosswalk.csv",rob="results/risk_of_bias/rob_final_combined.csv",engine=request$engine_version,source_job=request$job_id,unresolved_blocking=list(),not_selected=Filter(function(a)!identical(a$human_include_in_planned_analysis,"Yes"),x$tables$Target_Outcome_Verification)),"results/analysis_ready_evidence.json",auto_unbox=TRUE,pretty=TRUE)
  }
  # Absolute canonical PDF locations are ephemeral; retain canonical relative identity in the packet.
  for(t in names(x$tables))for(i in seq_along(x$tables[[t]]))for(n in names(x$tables[[t]][[i]]))if(is.character(x$tables[[t]][[i]][[n]]))x$tables[[t]][[i]][[n]]<-strip(x$tables[[t]][[i]][[n]])
@@ -131,5 +135,5 @@ web_b2_canonical <- function(request,config,paths,root) {
  keep<-grepl("^(data/raw/full_text/pdfs/|data/processed/|data/screening/|results/|config/generated/web_evidence[.]json$)",rel)&!grepl("(prompt|jsonl|raw_response|checkpoint)",rel,ignore.case=TRUE)
  outputs<-outputs[keep]
  web_result(op,request$project_id,request$job_id,"COMPLETE","Canonical processing finished. Save its results as a new evidence version, then review the next Human decision.",request$engine_version,
-  artifacts=lapply(outputs,function(p)list(path=web_inside(p,root),logical_name=basename(p),type="evidence")),provenance=list(stage=x$stage,R=R.version.string,source_kind="SYSTEM OUTPUT"))
+  artifacts=lapply(outputs,function(p)list(path=web_inside(p,root),logical_name=basename(p),type="evidence")),provenance=list(stage=x$stage,R=R.version.string,source_kind="SYSTEM OUTPUT",input_sha256=input_manifest,project_version=request$version_id))
 }

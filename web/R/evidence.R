@@ -40,11 +40,11 @@ web_b2_start <- function(con,settings,actor,project_id,version_id) {
 }
 web_b2_guard <- function(con,settings,actor,project_id,version_id,operation) {
  if(!operation %in% names(web_b2_operations()))return(invisible(TRUE))
+ c<-web_b2_context(con,settings,actor,project_id,version_id)
  if(operation %in% names(web_b2_ai_operations())) {
   web_assert(nzchar(Sys.getenv("OPENAI_API_KEY","")),"AI assistance requires an operator credential. Manual Human review remains available.","USER_ACTION_REQUIRED")
-  web_science_settings(settings)
  }
- c<-web_b2_context(con,settings,actor,project_id,version_id)
+ web_science_settings(settings)
  web_assert(identical(c$row$stage,unname(web_b2_operations()[[operation]])),"This operation does not match the selected evidence stage.")
  kind<-web_b2_gates()[operation]
  if(!is.na(kind))web_assert(nrow(web_query(con,"SELECT id FROM gates WHERE project_id=?p AND version_id=?v AND gate_type=?k AND required_operation=?op AND status='APPROVED'",p=project_id,v=version_id,k=unname(kind),op=operation))==1L,"Explicit Human approval of this exact version is required.","USER_ACTION_REQUIRED")
@@ -93,13 +93,38 @@ web_b2_edit <- function(con,settings,actor,project_id,version_id,table,row_id,va
   first<-x$tables$Reviewer_1[[i]];second<-x$tables$Reviewer_2[[i]]
   web_assert(!is.null(first$.actor)&&!is.null(second$.actor)&&!actor %in% c(first$.actor,second$.actor),"Complete both independent reviews before a separate adjudicator resolves conflicts.")
  }
+ before<-row
  for(n in names(values))row[[n]]<-values[[n]]
+ if(table %in% c("Target_Study_Verification","Target_Outcome_Verification")) {
+  if(is.null(row$.values))row$.values<-list()
+  for(n in setdiff(names(values),c("source_location","source_evidence","raw_value","transformation_rule","value_status"))) {
+   old<-before$.values[[n]]
+   row$.values[[n]]<-list(source_report=row$screening_id,source_pdf_sha256=row$.pdf_sha256,
+    reported_value=if(!is.null(old$reported_value))old$reported_value else values[[n]],
+    prior_value=before[[n]],human_value=values[[n]],status=row$value_status %||b2% "REPORTED",
+    location=row$source_location,evidence=row$source_evidence,raw_value=row$raw_value,transformation=row$transformation_rule,
+    actor=actor,at=web_now(),source_version=version_id,verification="UNVERIFIED")
+  }
+ }
  row$.actor<-actor;row$.timestamp<-web_now();row$.source<-"HUMAN DECISION"
  for(n in intersect(names(row),c("reviewer","adjudicator","author_reviewer","verifier")))row[[n]]<-actor
  for(n in intersect(names(row),c("screened_at","resolved_at","author_reviewed_at","verified_at")))row[[n]]<-row$.timestamp
  # Edits always clear verification; separate explicit verification is required.
  if(table %in% c("Target_Study_Verification","Target_Outcome_Verification")){row$verification_status<-"Needs clarification";row$.verified_by<-NULL}
- rows[[i]]<-row;x$tables[[table]]<-rows;x$stage<-spec$stage;x<-web_b2_invalidate_packet(x)
+ rows[[i]]<-row;x$tables[[table]]<-rows
+ if(table %in% c("Reviewer_1","Reviewer_2")) {
+  cr<-x$tables$Conflict_Resolution[[i]];cr$.actor<-NULL
+  for(k in c("final_decision","final_exclusion_reason","resolution_notes","adjudicator","resolved_at"))cr[[k]]<-""
+  x$tables$Conflict_Resolution[[i]]<-cr
+ }
+ if(table %in% c("Signalling_Questions","Domain_Review")) {
+  for(t in if(table=="Signalling_Questions")c("Domain_Review","Overall_Review") else "Overall_Review")
+   for(j in seq_along(x$tables[[t]]))if(identical(x$tables[[t]][[j]]$screening_id,row$screening_id)) {
+    x$tables[[t]][[j]]$.actor<-NULL
+    for(k in intersect(names(x$tables[[t]][[j]]),c("author_domain_judgement","author_final_overall_judgement")))x$tables[[t]][[j]][[k]]<-""
+   }
+ }
+ x$stage<-spec$stage;x<-web_b2_invalidate_packet(x)
  x$history<-c(x$history,list(list(event="HUMAN_EDIT",table=table,row_id=row_id,actor=actor,at=web_now(),source_version=version_id)))
  root<-tempfile("review-edit-",settings$data_root);dir.create(root);on.exit(unlink(root,recursive=TRUE));web_copy_version(con,settings,actor,project_id,version_id,root)
  web_b2_invalidate(root,x$stage);web_b2_write(root,x);web_b2_save_snapshot(con,settings,actor,project_id,version_id,root,x$stage)
@@ -112,7 +137,8 @@ web_b2_verify <- function(con,settings,actor,project_id,version_id,table,row_id,
  row<-x$tables[[table]][[i]]
  web_assert(!is.null(row$.actor)&&row$.actor!=actor,"A second person must independently verify extracted values.")
  web_assert(nzchar(row$source_location %||b2% "")&&nzchar(row$source_evidence %||b2% ""),"Record source location and evidence before verification.")
- row$verification_status<-"Verified";row$verifier<-actor;row$verified_at<-web_now();row$.verified_by<-actor;row$.verification_rationale<-rationale;x$tables[[table]][[i]]<-row
+ row$verification_status<-"Verified";row$verifier<-actor;row$verified_at<-web_now();row$.verified_by<-actor;row$.source<-"HUMAN VERIFIED";row$.verification_rationale<-rationale;
+ for(k in names(row$.values)){row$.values[[k]]$verification<-"HUMAN VERIFIED";row$.values[[k]]$verifier<-actor;row$.values[[k]]$verified_at<-web_now()};x$tables[[table]][[i]]<-row
  root<-tempfile("verify-edit-",settings$data_root);dir.create(root);on.exit(unlink(root,recursive=TRUE));web_copy_version(con,settings,actor,project_id,version_id,root);web_b2_write(root,x)
  web_b2_save_snapshot(con,settings,actor,project_id,version_id,root,"EXTRACTION")
 }
@@ -129,7 +155,7 @@ web_b2_upload <- function(con,settings,actor,project_id,version_id,row_id,upload
  root<-tempfile("pdf-version-",settings$data_root);dir.create(root);on.exit(unlink(root,recursive=TRUE));web_copy_version(con,settings,actor,project_id,version_id,root)
  row<-x$tables$Author_Final_Review[[i]];dest<-web_inside(file.path(root,row$.pdf_relative),root,exists=FALSE);dir.create(dirname(dest),recursive=TRUE,showWarnings=FALSE);web_assert(file.copy(source,dest,overwrite=TRUE),"PDF upload failed.")
  row$pdf_status<-"Available";row$retrieval_status<-"Available";row$pdf_path<-row$.pdf_relative;row$.pdf_sha256<-web_sha(dest);row$author_final_decision<-"";row$author_final_exclusion_reason<-"";row$.actor<-NULL
- x$tables$Author_Final_Review[[i]]<-row;x<-web_b2_invalidate_packet(x);web_b2_invalidate(root,"FULLTEXT");web_b2_write(root,x)
+ x$tables$Author_Final_Review[[i]]<-row;x$tables$AI_Eligibility<-NULL;x<-web_b2_invalidate_packet(x);web_b2_invalidate(root,"FULLTEXT");web_b2_write(root,x)
  saved<-web_b2_save_snapshot(con,settings,actor,project_id,version_id,root,"FULLTEXT")
  web_audit(con,web_authorize(con,actor,project_id),"FULLTEXT_UPLOADED",saved$version_id,actor,list(report=row$screening_id,sha256=row$.pdf_sha256,source_version=version_id))
  saved
@@ -156,7 +182,7 @@ web_b2_invalidate_packet <- function(x) {
  order<-c(SCREENING=1L,FULLTEXT=2L,INCLUDED=3L,EXTRACTION=4L,VERIFIED=5L,ROB=6L,READY=7L)
  specs<-web_b2_edit_spec();rank<-order[[x$stage]]
  for(t in names(x$tables)) {
-  stage<-if(!is.null(specs[[t]]))specs[[t]]$stage else if(t=="Study_Result_Manifest")"ROB" else NULL
+  stage<-if(!is.null(specs[[t]]))specs[[t]]$stage else if(t %in% c("Study_Result_Manifest","AI_Risk_of_Bias"))"ROB" else if(t=="AI_Eligibility")"FULLTEXT" else if(t %in% c("AI_study_characteristics","AI_group_characteristics","AI_outcome_data"))"EXTRACTION" else NULL
   if(!is.null(stage)&&order[[stage]]>rank)x$tables[[t]]<-NULL
  }
  if(rank<=2L){x$included_reports<-NULL;x$editable<-NULL}
@@ -166,7 +192,7 @@ web_b2_add_row <- function(con,settings,actor,project_id,version_id,row_id) {
  c<-web_b2_context(con,settings,actor,project_id,version_id);x<-c$packet
  web_assert(x$stage=="EXTRACTION","Add outcome/timepoint rows during draft extraction.")
  rows<-x$tables$Target_Outcome_Verification;i<-which(vapply(rows,function(a)identical(a$.row_id,row_id),logical(1)));web_assert(length(i)==1L,"Select an included report's existing outcome row.")
- row<-rows[[i]];row$.row_id<-web_id();row$outcome_row_id<-paste0(row$screening_id,"_",web_id());row$.actor<-NULL;row$.verified_by<-NULL;row$verification_status<-"Needs clarification";row$human_include_in_planned_analysis<-"No";row$verifier<-"";row$verified_at<-"";row$.source<-"HUMAN ENTRY REQUIRED"
+ row<-rows[[i]];row$.row_id<-web_id();row$outcome_row_id<-paste0(row$screening_id,"_",web_id());row$.actor<-NULL;row$.verified_by<-NULL;row$verification_status<-"Needs clarification";row$human_include_in_planned_analysis<-"No";row$verifier<-"";row$verified_at<-"";row$.source<-"HUMAN ENTRY REQUIRED";row$.timestamp<-NULL;row$.verification_rationale<-NULL;row$.values<-NULL
  x$tables$Target_Outcome_Verification<-c(rows,list(row))
  root<-tempfile("outcome-revision-",settings$data_root);dir.create(root);on.exit(unlink(root,recursive=TRUE));web_copy_version(con,settings,actor,project_id,version_id,root);web_b2_invalidate(root,"EXTRACTION");web_b2_write(root,x)
  web_b2_save_snapshot(con,settings,actor,project_id,version_id,root,"EXTRACTION")

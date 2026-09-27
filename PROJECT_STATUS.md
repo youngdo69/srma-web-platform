@@ -1,3 +1,7 @@
+# B2 v1.1 review/security checkpoint — 2026-09-27
+
+PASS: canonical manual E2E including PDF registry, independent extraction verification and both RoB instruments; targeted access/upload/version/revision/credential-negative tests; actual Shiny Human decision save. Added field provenance and downstream invalidation, retained production scientific-runtime gate. Source unchanged. Remaining: AI review UX/operator script, uncertainty guard, affected B1 regression and final self-review.
+
 # B2 v1.1 adoption checkpoint — 2026-09-27
 
 In progress: reviewed selective port into new srma-b2-v11 from approved fb303704. Last complete: B1 acceptance. Existing B2 work protected; current source is undergoing fresh targeted validation. Next: fix review findings, canonical manual E2E, UI/security tests. External PostgreSQL, credentialed B1/B2 AI and canonical runtime acceptance pending. No WEB-011.
