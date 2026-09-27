@@ -56,6 +56,24 @@ web_test_provider <- function(subject) {
 }
 web_request <- function(con, token, action, args = list(), csrf = NULL, expected_csrf = NULL, settings = NULL, upload_root = NULL) {
   identity <- web_session(con, token)
+  # Only named public request fields may cross into service functions.
+  # Upload size limits and other operator policy remain server-owned.
+  fields <- list(
+    projects = character(), workspaces = character(), logout = character(),
+    view = "project_id", configuration = c("project_id", "version_id"),
+    save_configuration = c("workspace_id", "values", "project_id", "version_id"),
+    submit = c("project_id", "version_id", "operation", "idempotency_key", "payload"),
+    download = c("project_id", "artifact_id", "destination"),
+    download_strategy = c("project_id", "version_id", "database", "destination"),
+    database_status = c("project_id", "version_id"),
+    database_info = c("project_id", "version_id"),
+    upload_database = c("project_id", "version_id", "database", "upload"))
+  web_assert(is.character(action) && length(action) == 1L && !is.na(action) && action %in% names(fields),
+    "This request is not available.")
+  web_assert(is.list(args) && (length(args) == 0L ||
+    (!is.null(names(args)) && all(!is.na(names(args)) & nzchar(names(args))) &&
+     !anyDuplicated(names(args)) && all(names(args) %in% fields[[action]]))),
+    "The request contains unsupported fields.")
   web_assert(is.list(args) && !any(c("actor", "user_id", "identity", "con", "settings", "upload_root", "private") %in% names(args)),
     "The request contains an unsupported identity field.")
   reads <- c("view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")

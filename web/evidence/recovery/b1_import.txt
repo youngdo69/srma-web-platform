@@ -1,0 +1,12 @@
+/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/bin/R: line 249: /workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/ldpaths: No such file or directory
+During startup - Warning message:
+In file(file, "rt") :
+  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory
+[1] 1
+[1] TRUE
+[1] TRUE
+PASS: actual canonical database registry and saved strategy display
+PASS: immutable export version, checksum, project binding, audit and new gates
+[1] TRUE
+PASS: traversal, unsupported type, path escape, symlink, size and project isolation rejected
+PASS: actual canonical preflight reports missing CENTRAL without generic file-not-found
