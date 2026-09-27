@@ -1,3 +1,7 @@
+# PM B2 v1.1 authorization — 2026-09-27
+
+Approved B1 fb303704. Implement WEB-009/010 only in a new isolated checkout. Selective salvage allowed; protect all prior checkouts. Stop before WEB-011, preserve scientific source and explicit Human Gates.
+
 # PM-authorized B1 strategy update — 2026-09-27
 
 Block A at 50f1e3b is PM APPROVED. Continue through B0 hardening and WEB-005–008 under Autonomous Block B1 Master Mission v1.0. Stop before WEB-009. Preserve the architecture and scientific baseline; dependency baseline changes require PM review. This supersedes the earlier WEB-005 deferral only within the approved B1 scope.

@@ -27,7 +27,8 @@ result <- tryCatch({
   }
   config <- e$load_project_config("config/project_config.yml", validate = TRUE, quiet = TRUE)
   paths <- e$build_project_paths(config, create_directories = TRUE, validate = TRUE)
-  configuration_only <- request$action %in% c("initialize_project", "prepare_manual_concepts", "activate_initialization", "inspect_configuration", "write_configuration", "database_context", "validate_database_inputs", "generate_search", "retrieve_pubmed")
+  source(file.path(request$engine_root,"web/R/evidence.R"))
+  configuration_only <- request$action %in% names(web_b2_operations()) || request$action %in% c("initialize_project", "prepare_manual_concepts", "activate_initialization", "inspect_configuration", "write_configuration", "database_context", "validate_database_inputs", "generate_search", "retrieve_pubmed")
   inputs <- c("config/project_config.yml", paths$search_terms_file)
   if (!configuration_only) inputs <- c(inputs,
     unlist(paths[paste0(e$get_enabled_databases(config, validate = FALSE), "_search")], use.names = FALSE))
@@ -44,7 +45,10 @@ result <- tryCatch({
   }
   inputs <- unique(vapply(inputs, function(p) substring(normalizePath(p, winslash = "/", mustWork = TRUE), nchar(root) + 2L), character(1)))
   manifest <- setNames(lapply(inputs, web_sha), inputs)
-  if (request$action %in% c("initialize_project", "prepare_manual_concepts", "activate_initialization")) {
+  if(request$action %in% names(web_b2_operations())) {
+    source(file.path(request$engine_root,"web/adapter/evidence.R"))
+    web_b2_canonical(request,config,paths,root)
+  } else if (request$action %in% c("initialize_project", "prepare_manual_concepts", "activate_initialization")) {
     source(file.path(request$engine_root,"web/adapter/initialization.R"))
     produced <- web_initialization_action(request,config,root)
     web_result(request$action,request$project_id,request$job_id,"COMPLETE",

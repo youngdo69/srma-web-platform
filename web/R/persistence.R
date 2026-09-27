@@ -75,9 +75,11 @@ web_migrate <- function(con, settings) {
     list(version = 2L, files = "002_identity.sql", delimiter = ";"),
     list(version = 3L, files = c("003_immutability.sqlite.sql", "003_immutability.postgres.sql"), delimiter = "-- NEXT"),
     list(version = 4L, files = "004_pipeline.sql", delimiter = ";"),
-    list(version=5L,files=c("005_pipeline_immutability.sqlite.sql","005_pipeline_immutability.postgres.sql"),delimiter="-- NEXT"))
+    list(version=5L,files=c("005_pipeline_immutability.sqlite.sql","005_pipeline_immutability.postgres.sql"),delimiter="-- NEXT"),
+    list(version=6L,files="006_evidence.sql",delimiter=";"),
+    list(version=7L,files=c("007_evidence_immutability.sqlite.sql","007_evidence_immutability.postgres.sql"),delimiter="-- NEXT"))
   history <- DBI::dbGetQuery(con, "SELECT * FROM schema_migrations WHERE version<>1")
-  web_assert(all(history$version %in% c(2L, 3L, 4L, 5L)), "Database migration history needs operator review.", "SYSTEM_FAILED")
+  web_assert(all(history$version %in% c(2L, 3L, 4L, 5L, 6L, 7L)), "Database migration history needs operator review.", "SYSTEM_FAILED")
   for (migration in migrations) {
     paths <- file.path(dir, migration$files)
     hashes <- vapply(paths, web_sha, character(1))

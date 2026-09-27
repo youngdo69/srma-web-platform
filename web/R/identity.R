@@ -59,6 +59,12 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
   # Only named public request fields may cross into service functions.
   # Upload size limits and other operator policy remain server-owned.
   fields <- list(
+    evidence_add_row=c("project_id","version_id","row_id"),
+    evidence_start=c("project_id","version_id"), evidence_view=c("project_id","version_id"),
+    evidence_accept=c("project_id","version_id","job_id"),
+    evidence_edit=c("project_id","version_id","table","row_id","values"),
+    evidence_verify=c("project_id","version_id","table","row_id","approved","rationale"),
+    evidence_upload=c("project_id","version_id","row_id","upload"),
     projects = character(), workspaces = character(), logout = character(),
     initialization_review=c("project_id","version_id","job_id"),
     manual_concepts=c("project_id","version_id","terms_yaml"),
@@ -80,12 +86,19 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     "The request contains unsupported fields.")
   web_assert(is.list(args) && !any(c("actor", "user_id", "identity", "con", "settings", "upload_root", "private") %in% names(args)),
     "The request contains an unsupported identity field.")
-  reads <- c("initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
+  reads <- c("evidence_view", "initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
   if (!action %in% reads)
     web_assert(is.character(csrf) && length(csrf) == 1L && !is.null(expected_csrf) && identical(csrf, expected_csrf),
       "Refresh this page before trying again.")
   actor <- identity$user_id
   switch(action,
+    evidence_add_row=do.call(web_b2_add_row,c(list(con=con,settings=settings,actor=actor),args)),
+    evidence_start=do.call(web_b2_start,c(list(con=con,settings=settings,actor=actor),args)),
+    evidence_view=do.call(web_b2_view,c(list(con=con,settings=settings,actor=actor),args)),
+    evidence_accept=do.call(web_b2_accept,c(list(con=con,settings=settings,actor=actor),args)),
+    evidence_edit=do.call(web_b2_edit,c(list(con=con,settings=settings,actor=actor),args)),
+    evidence_verify=do.call(web_b2_verify,c(list(con=con,settings=settings,actor=actor),args)),
+    evidence_upload=do.call(web_b2_upload,c(list(con=con,settings=settings,actor=actor,upload_root=upload_root),args)),
     projects = web_query(con, "SELECT p.id,p.title,p.workspace_id FROM projects p JOIN workspace_members m ON p.workspace_id=m.workspace_id WHERE m.user_id=?u ORDER BY p.created_at DESC", u = actor),
     workspaces = web_query(con, "SELECT w.id,w.name FROM workspaces w JOIN workspace_members m ON w.id=m.workspace_id WHERE m.user_id=?u", u = actor),
     initialization_review=do.call(web_initialization_review,c(list(con=con,settings=settings,actor=actor),args)),

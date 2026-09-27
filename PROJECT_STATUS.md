@@ -1,3 +1,7 @@
+# B2 v1.1 adoption checkpoint — 2026-09-27
+
+In progress: reviewed selective port into new srma-b2-v11 from approved fb303704. Last complete: B1 acceptance. Existing B2 work protected; current source is undergoing fresh targeted validation. Next: fix review findings, canonical manual E2E, UI/security tests. External PostgreSQL, credentialed B1/B2 AI and canonical runtime acceptance pending. No WEB-011.
+
 # B1 isolated candidate re-verification — 2026-09-27
 
 Candidate checkout: /workspace/scratch/284d178eb86f/srma-b1-canonical-candidate; branch web/b1-acceptance. Restored recovery bundle baseline, verified all 64 before-hashes, applied complete delta and verified all 64 after-hashes. Full tree matched 636e730; restored preserved B1 candidate 2bbe205, with identical tested implementation. This documentation-only checkpoint records fresh syntax/diff and five targeted B1 regressions, all PASS. Scientific manifest 98/98; 97 non-lock files unchanged; 79 existing lock records plus 27 additions. Both protected Block A and existing checkout with B2 work remain byte-for-byte unchanged. No B2 implementation performed in this mission. Evidence: web/evidence/reacceptance.

@@ -63,6 +63,10 @@ web_registry <- function() {
     registry[[op]]$blocked_reason <- "Configure the validated scientific runtime and provider credential; saved work is retained."
   }
   registry$validate_database_inputs$progress <- "Checking database inputs…"
+  if(exists("web_b2_operations",mode="function"))for(op in names(web_b2_operations())) {
+    label<-gsub("_"," ",op,fixed=TRUE)
+    registry[[op]]<-list(enabled=TRUE,replay_safe=FALSE,label=label,progress=paste0(label,"…"))
+  }
   registry
 }
 web_result <- function(operation, project_id, job_id, status, message, engine_version,

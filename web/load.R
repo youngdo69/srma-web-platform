@@ -2,6 +2,6 @@
 web_root <- normalizePath(Sys.getenv("SRMA_ENGINE_ROOT", getwd()), mustWork = TRUE)
 web_library <- Sys.getenv("SRMA_WEB_LIBRARY", file.path(web_root, "web/.library"))
 if (dir.exists(web_library)) .libPaths(c(web_library, .libPaths()))
-for (module in c("core", "adapter", "persistence", "storage", "service", "identity", "wizard", "database", "pipeline", "worker")) {
+for (module in c("core", "adapter", "persistence", "storage", "service", "identity", "wizard", "database", "pipeline", "evidence", "worker")) {
   source(file.path(web_root, "web/R", paste0(module, ".R")), local = TRUE)
 }

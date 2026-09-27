@@ -39,6 +39,10 @@ srma_run <- function(settings, project_id, operation, payload, job_id, project_d
       "The scientific processing environment needs maintenance.", engine_version, "DEPENDENCY_FAILED"))
     settings <- scientific
   }
+  if(operation %in% names(web_b2_ai_operations())) {
+    if(!nzchar(Sys.getenv("OPENAI_API_KEY","")))return(web_result(operation,project_id,job_id,"USER_ACTION_REQUIRED","AI assistance requires operator credentials; use manual Human review.",engine_version,"USER_ACTION_REQUIRED"))
+    settings<-web_science_settings(settings)
+  }
   web_engine_call(settings, list(action = operation, project_id = project_id, job_id = job_id,
     project_dir = project_dir, engine_version = engine_version), diagnostic_dir)
 }

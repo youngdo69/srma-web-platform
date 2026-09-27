@@ -67,6 +67,7 @@ web_import_project <- function(con, settings, actor, workspace_id, source_root, 
 web_submit <- function(con, settings, actor, project_id, version_id, operation = "validate_search", idempotency_key = web_id(), payload = list()) {
   project <- web_authorize(con, actor, project_id)
   reg <- web_registry()[[operation]]
+  web_b2_guard(con,settings,actor,project_id,version_id,operation)
   web_pipeline_prerequisites(settings, operation)
   web_require_activated(con,project_id,version_id,operation)
   web_assert(!is.null(reg) && length(payload) == 0L, "This operation is not enabled in this release.")
@@ -109,6 +110,8 @@ web_require_gate <- function(con, actor, project_id, version_id, gate_type, oper
 web_decide_gate <- function(con, actor, project_id, gate_id, decision, rationale = "") {
   project <- web_authorize(con, actor, project_id)
   web_assert(decision %in% c("APPROVED", "REJECTED"), "A human review decision is required.")
+  gate<-web_query(con,"SELECT gate_type FROM gates WHERE id=?g AND project_id=?p",g=gate_id,p=project_id)
+  if(nrow(gate)&&startsWith(gate$gate_type,"b2_"))web_assert(is.character(rationale)&&length(rationale)==1L&&!is.na(rationale)&&nzchar(trimws(rationale)),"Provide a rationale for this explicit evidence approval.")
   web_tx(con, function() {
     count <- web_exec(con, "UPDATE gates SET status=?d,decision=?d,reviewer_id=?u,decided_at=?now,rationale=?r WHERE id=?g AND project_id=?p AND status='PENDING'",
       d = decision, u = actor, now = web_now(), r = rationale, g = gate_id, p = project_id)
