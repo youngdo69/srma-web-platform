@@ -1,0 +1,118 @@
+[
+  {
+    "test": "syntax",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "-e",
+      "f<-list.files(\"web\",pattern=\"[.]R$\",recursive=TRUE,full.names=TRUE);invisible(lapply(f,parse));cat(\"PASS:\",length(f),\"Web R files parsed\\n\")"
+    ],
+    "exit_code": 0,
+    "seconds": 0.42,
+    "tail": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/bin/R: line 249: /workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/ldpaths: No such file or directory",
+      "During startup - Warning message:",
+      "In file(file, \"rt\") :",
+      "  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory",
+      "PASS: 53 Web R files parsed"
+    ]
+  },
+  {
+    "test": "diff",
+    "command": [
+      "git",
+      "-c",
+      "core.whitespace=cr-at-eol",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.01,
+    "tail": []
+  },
+  {
+    "test": "b1_pipeline",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_pipeline.R"
+    ],
+    "exit_code": 0,
+    "seconds": 18.24,
+    "tail": [
+      "PASS: synthetic raw artifact binding, real store/checksum verification and cross-version/path rejection (not scientific retrieval evidence)",
+      "[1] \"7d284deaa357bcd1020f8326e91f3c97\"",
+      "PASS: contract fixtures prove exact-version and pinned-source binding; stale retrieval cannot join newer search; REVIEW_REQUIRED blocks retrieval",
+      "PASS: explicitly selected search/raw contract outputs and two uploads form new immutable input versions with provenance and pending gates; approved source snapshot unchanged",
+      "PASS: synthetic status contract preserves PASS, REVIEW_REQUIRED and structured failure; no scientific QC claim"
+    ]
+  },
+  {
+    "test": "b1_pipeline_inputs",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_pipeline_inputs.R"
+    ],
+    "exit_code": 0,
+    "seconds": 12.29,
+    "tail": [
+      "PASS: actual canonical database registry and saved strategy display",
+      "PASS: immutable export version, checksum, project binding, audit and new gates",
+      "PASS: traversal, unsupported type, path escape, symlink, size and project isolation rejected",
+      "PASS: actual canonical preflight reports missing CENTRAL without generic file-not-found",
+      "PASS: DEVELOPMENT R actual canonical preflight through worker, missing input action, complete inputs, artifact checksums, idempotence and pending gates; no scientific-runtime acceptance claimed"
+    ]
+  },
+  {
+    "test": "b1_pipeline_ui",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_pipeline_ui.R"
+    ],
+    "exit_code": 0,
+    "seconds": 15.92,
+    "tail": [
+      "In file(file, \"rt\") :",
+      "  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory",
+      "Loading required package: shiny",
+      "PASS: authenticated Shiny wizard saves, overview resumes, edit creates version, review gates persist, unvalidated preflight fails closed",
+      "PASS: UI manual concept save, canonical review, explicit confirmation, new approved version, credential fail-closed dispatch"
+    ]
+  },
+  {
+    "test": "b1_request_policy",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_request_policy.R"
+    ],
+    "exit_code": 0,
+    "seconds": 0.66,
+    "tail": [
+      "In file(file, \"rt\") :",
+      "  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory",
+      "[1] 1",
+      "[1] 1",
+      "PASS: upload policy override, private/identity fields, unnamed and duplicate fields rejected; valid reads/logout preserved"
+    ]
+  },
+  {
+    "test": "b1_security",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_security.R"
+    ],
+    "exit_code": 0,
+    "seconds": 4.68,
+    "tail": [
+      "[1] 1",
+      "PASS: session-scoped workspace, project, job and artifact isolation; actor tampering",
+      "Loading required package: shiny",
+      "PASS: Shiny session mutation CSRF rejection, logout and safe error message",
+      "PASS: actual Shiny upload context writes exclusively inside session-owned root"
+    ]
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "baseline": "148cb68f9175b9c57403fd06e708e4e96e4697da",
+  "payload_commit": "636e730e228010b7c67db185f23c00c38c3298db",
+  "historical_target_recovered": false,
+  "recovery_archive_sha256": "27424d74f8b9b9d2d4d29527a5a722595af08e646dd7f9f14595fa5efdaf4722",
+  "recovery_source_files_verified": 271,
+  "baseline_conditions_verified": 64,
+  "after_hashes_verified": 64,
+  "protected_block_a_head": "3137017a6a2fefa40deb1e00ca96435fa6f542aa"
+}

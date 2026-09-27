@@ -1,3 +1,19 @@
+# B1 canonical reconstruction candidate — 2026-09-27
+
+Status: B1 CANONICAL CANDIDATE; PM acceptance pending.
+Current task: reconstruction/final acceptance only. No WEB-009/B2 authorization.
+Recovered original baseline 148cb68 from the PM-authorized self-contained bundle.
+Applied all 64 B1-001 files after exact before-hash validation; every after-hash passed.
+Reconstructed implementation commit: 636e730e228010b7c67db185f23c00c38c3298db. Historical target 851ba15 was not recoverable.
+Targeted pipeline, manual-input, approval UI, request-policy and security tests PASS on development R/SQLite; 53 Web R files parse.
+Scientific integrity: 97 unchanged non-lock files; 79 existing package records preserved, 27 approved additions.
+External gates: POSTGRESQL_EXTERNAL_ACCEPTANCE_PENDING; CREDENTIALED_ACCEPTANCE_PENDING; CANONICAL_RUNTIME_ACCEPTANCE_PENDING.
+No actual implementation defect found. Development runtime startup configuration warnings remain; no canonical-runtime acceptance claimed.
+Next: PM/Reviewer acceptance and external gates only. Existing Block A checkout preserved unchanged.
+Evidence: web/evidence/reconstruction. Implementation bytes unchanged from delivered/tested payload; this status/evidence update is documentation only.
+
+Historical status follows.
+
 # B1 Completion Mission v1.2 — 2026-09-27
 
 Status: B1 IMPLEMENTATION COMPLETE; external acceptance pending. This supersedes the historical recovery status below. B2 and WEB-009 remain unauthorized.
