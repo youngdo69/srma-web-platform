@@ -1,0 +1,1 @@
+PASS: 98 canonical source hashes, both locks byte-identical to approved B2, no scientific changes/deletions, diff check

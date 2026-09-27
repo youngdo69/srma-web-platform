@@ -1,0 +1,313 @@
+/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/bin/R: line 249: /workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/ldpaths: No such file or directory
+During startup - Warning message:
+In file(file, "rt") :
+  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory
+[1] 1
+[1] TRUE
+PASS: prepare_screening SCREENING
+PASS: finalize_screening FULLTEXT
+PASS: register_fulltext FULLTEXT
+PASS: finalize_included_studies INCLUDED
+PASS: prepare_extraction EXTRACTION
+PASS: finalize_extraction VERIFIED
+PASS: prepare_risk_of_bias ROB
+PASS: finalize_evidence READY
+PASS: C1 synthetic fixture traversed real B2 Human-approved READY evidence
+# A tibble: 1 × 18
+  analysis_group meta_analysis_role analysis_set_type is_composite
+  <chr>          <chr>              <chr>             <chr>
+1 primary_rct    primary            standalone        No
+# ℹ 14 more variables: parent_analysis_group <chr>,
+#   source_analysis_groups <chr>, study_count <chr>, outcome_row_count <chr>,
+#   study_design <chr>, outcome <chr>, timepoint <chr>, data_type <chr>,
+#   effect_measure <chr>, meta_input_type <chr>, suggested_model <chr>,
+#   combine_with_other_analysis_groups <chr>, next_action <chr>,
+#   dataset_file <chr>
+PASS: frozen synthetic canonical-engine numeric reference
+PASS: canonical primary model -> CSV/PDF/XLSX consistency -> Human approved immutable result
+PASS: workspace/project/version/row, actor/reviewer/script/runtime injection, CSRF, immutable AnalysisVersion
+PASS: approval non-inheritance, result substitution, authorized CSV/XLSX/PDF downloads and checksum rejection
+PASS: linked sensitivity with independent plan/result gates; primary immutable
+$operation
+[1] "run_meta_analysis"
+
+$project_id
+[1] "b2-synthetic"
+
+$job_id
+[1] "bd72e07749142a0e3aaecd95534c7d91"
+
+$status
+[1] "USER_ACTION_REQUIRED"
+
+$user_message
+[1] "The canonical analysis was not estimable or its inputs need review. Inspect the execution report and revise the evidence/plan."
+
+$error_code
+[1] "ANALYSIS_NOT_ESTIMABLE"
+
+$technical
+$technical$diagnostic
+NULL
+
+
+$engine_version
+[1] "snapshot-f9f69c9d095c050b"
+
+$artifacts
+$artifacts[[1]]
+$artifacts[[1]]$artifact_id
+[1] "a68f15b2ba0a6872781bff26fe1d35a4"
+
+$artifacts[[1]]$logical_name
+[1] "meta_analysis_execution_summary.csv"
+
+$artifacts[[1]]$checksum
+[1] "dbe015c05d45bbfdda5c9e5f4010b69ee89aee0bbf4da2d9f32cf5e3358b1881"
+
+$artifacts[[1]]$relative_path
+[1] "results/meta_analysis/meta_analysis_execution_summary.csv"
+
+
+$artifacts[[2]]
+$artifacts[[2]]$artifact_id
+[1] "5901eaff33ab2dd71fffb3d0aeb6ecf4"
+
+$artifacts[[2]]$logical_name
+[1] "meta_analysis_execution_summary.xlsx"
+
+$artifacts[[2]]$checksum
+[1] "cbb36a09620bd1ab323599d4aebd14e0c7637cd36aa396176edc1d2182ef34f3"
+
+$artifacts[[2]]$relative_path
+[1] "results/meta_analysis/meta_analysis_execution_summary.xlsx"
+
+
+$artifacts[[3]]
+$artifacts[[3]]$artifact_id
+[1] "d2927f0baa9b9d50633417769e51898e"
+
+$artifacts[[3]]$logical_name
+[1] "selected_input.csv"
+
+$artifacts[[3]]$checksum
+[1] "b410c90465276f9b8cf12498a2b3493b4821b7a239df2b574c77789bb5ef0546"
+
+$artifacts[[3]]$relative_path
+[1] "results/web_analysis/selected_input.csv"
+
+
+$artifacts[[4]]
+$artifacts[[4]]$artifact_id
+[1] "30fa29017715082ae36d7d746479d85c"
+
+$artifacts[[4]]$logical_name
+[1] "result.json"
+
+$artifacts[[4]]$checksum
+[1] "805ea898e98901679335c7855f3e47cc4dff3585d5745e4690515680c6e23446"
+
+$artifacts[[4]]$relative_path
+[1] "results/web_analysis/result.json"
+
+
+
+$warnings
+list()
+
+$started_at
+[1] "2026-09-27T13:14:35.292127Z"
+
+$finished_at
+[1] "2026-09-27T13:14:35.292158Z"
+
+$provenance
+$provenance$analysis_id
+[1] "0b80ca8137619b55484dbc2b5a0746a5"
+
+$provenance$evidence_version
+[1] "b06b7066be645f3630818881590e8f1e"
+
+$provenance$plan_sha256
+[1] "208f960587805e572c2f02a501b4f84c07424e3a823b4e1d0b75d1f605e8276b"
+
+$provenance$R
+[1] "R version 4.3.3 (2024-02-29)"
+
+$provenance$input_hashes
+$provenance$input_hashes$`config/project_config.yml`
+[1] "ea9e2ba65edc2b618461678191a8fafce01b3ad3edb315562a8b1c370eb8fb2e"
+
+$provenance$input_hashes$`config/search_terms.yml`
+[1] "323243f24ac297a56301bd90df2f047c5706b3061d1bfdf8b5cc28d54dafe959"
+
+$provenance$input_hashes$`config/generated/web_analysis.json`
+[1] "319f36c93d811e16cd37553df5ca51be888b092b6bf5386f977fbd88aba649db"
+
+$provenance$input_hashes$`config/generated/web_evidence.json`
+[1] "7d860660e29bcebfc100d74d16d61fea6b8d0fe65c6be7f7e79986f65d956b90"
+
+$provenance$input_hashes$`data/processed/deduplicated_records.csv`
+[1] "376866dd3fdab56d425f7bcf9471305d38ec041dd8fe397ad20628c54bad2b9d"
+
+$provenance$input_hashes$`data/processed/deduplication_map.csv`
+[1] "ef465fc1329d47c3f9ee8bce94899bccec779dc99fd5c2cd615aaf2c75949885"
+
+$provenance$input_hashes$`data/processed/full_text/excluded_after_full_text.csv`
+[1] "8674d6b993445654ccfc25ca02bf4ec64d7e8b7f6bc4cc60e8db123722070ccb"
+
+$provenance$input_hashes$`data/processed/full_text/final_full_text_eligibility.csv`
+[1] "43a8afa34f701c6a59b4f47809875c8be503a40873adc998c6231f4fa257f005"
+
+$provenance$input_hashes$`data/processed/full_text/full_text_registry.csv`
+[1] "d6f09d685e6294c888fb245a7c476a0d0d6d5570e73f4f8a11003dad40941114"
+
+$provenance$input_hashes$`data/processed/full_text/included_studies.csv`
+[1] "a5f5e415286bbaf149a97aeaf7243188585e3280ff3a7ff116cdb4d039c6d167"
+
+$provenance$input_hashes$`data/processed/full_text/report_study_crosswalk.csv`
+[1] "07ff174e104b8072306389cb24bee3c03591ac9a332f9000ae13157dbfa1c1cb"
+
+$provenance$input_hashes$`data/processed/full_text/unmatched_full_text_pdfs.csv`
+[1] "c21166e140f107c20b176a1868bfb2b2faa62a4762eabfb9b99e81b58c436bd1"
+
+$provenance$input_hashes$`data/processed/merged_records.csv`
+[1] "054c5e2e448e7b07718ccb560de27d1a5c443f7a8398a8c37df250d61298cb43"
+
+$provenance$input_hashes$`data/processed/meta_analysis_ready/human_verified_planned_analysis_outcomes.csv`
+[1] "3df5e659be617b46232481182091ec9354802a82623c9ff31fd1daaf2fa50317"
+
+$provenance$input_hashes$`data/processed/meta_analysis_ready/meta_analysis_manifest.csv`
+[1] "a13763c556e5a76f182733ce688343c30af070dd212c9b9b62ddcbf427bf96d8"
+
+$provenance$input_hashes$`data/processed/meta_analysis_ready/meta_analysis_ready_primary_rct.csv`
+[1] "3df5e659be617b46232481182091ec9354802a82623c9ff31fd1daaf2fa50317"
+
+$provenance$input_hashes$`data/processed/prisma_counts.csv`
+[1] "455c09ba10fc95a6d76376441aeeec2195d52fb390f4060d0b8ab4f8cd252487"
+
+$provenance$input_hashes$`data/processed/removed_duplicates.csv`
+[1] "f92a490ce65c0c0ada95ae515812a06adabfc07ccd8ab26b249709fd340dfb52"
+
+$provenance$input_hashes$`data/raw/central/central.ris`
+[1] "4cdf51025d9d6dc5509ad4176563e18a3728f9c581cd0096d285e7392f625953"
+
+$provenance$input_hashes$`data/raw/full_text/pdfs/SCR_000001.pdf`
+[1] "56c2ac043c28d3543275a6f50b593a6beb0b6888ed8159ac02e3e7f4a32ccb26"
+
+$provenance$input_hashes$`data/raw/full_text/pdfs/SCR_000002.pdf`
+[1] "56c2ac043c28d3543275a6f50b593a6beb0b6888ed8159ac02e3e7f4a32ccb26"
+
+$provenance$input_hashes$`data/raw/full_text/pdfs/SCR_000003.pdf`
+[1] "56c2ac043c28d3543275a6f50b593a6beb0b6888ed8159ac02e3e7f4a32ccb26"
+
+$provenance$input_hashes$`data/raw/full_text/pdfs/SCR_000004.pdf`
+[1] "56c2ac043c28d3543275a6f50b593a6beb0b6888ed8159ac02e3e7f4a32ccb26"
+
+$provenance$input_hashes$`data/screening/final_title_abstract_screening.csv`
+[1] "90cf27bc8ce9ac0d1a8e517204503b0a1d4c14b29814e1e3c8ec588b7a1333fd"
+
+$provenance$input_hashes$`data/screening/included_for_full_text_review.csv`
+[1] "43967c9540ca8f9fcd8d092daea42e6ce3f04dc38ad8a87462d19f2227713f8f"
+
+$provenance$input_hashes$`results/analysis_ready_evidence.json`
+[1] "df0b6273908146176526292e6590550a6011cc0ff06e08a5037019659c257644"
+
+$provenance$input_hashes$`results/extraction/targeted_human_verification/targeted_human_verification.xlsx`
+[1] "c20a3219e17614ecadfe3637ffa71b5756f68ad83091ab712e92eff888ea0b94"
+
+$provenance$input_hashes$`results/full_text/full_text_eligibility_agent.xlsx`
+[1] "a08c15b24291e5710a1f6e854cd946cb50d330886d8725b86dd1a80a3fd2688a"
+
+$provenance$input_hashes$`results/full_text/full_text_eligibility_final.xlsx`
+[1] "32ebd38c6f060573859e7bda4fc9ad590917eccc70020b9df95ccd2656256a3c"
+
+$provenance$input_hashes$`results/full_text/full_text_registry.xlsx`
+[1] "5f177e338b5b8c209436fc61178bb370feeca9c8ea130cf857bb0103e135691a"
+
+$provenance$input_hashes$`results/logs/final_title_abstract_screening_report.txt`
+[1] "aa5c4cb7d18414be5b0641b4310b29295b713c07bde88600746dde238bfa4655"
+
+$provenance$input_hashes$`results/logs/full_text_registry_intake_report.txt`
+[1] "35d9a90f462912afae0dcc8bedcee94478d0dfaa7e90a74a6c629893a6968a91"
+
+$provenance$input_hashes$`results/logs/human_verified_extraction_finalization_report.txt`
+[1] "65deb46b40009f41a72ca64594a92e5ecc9ad440de2aeb08da9e292280cebad0"
+
+$provenance$input_hashes$`results/logs/import_merge_deduplication_report.txt`
+[1] "2ba569fe7d5ed99eabe4b4d45f2f794fa90b9de6db90dbd54403286770f59e18"
+
+$provenance$input_hashes$`results/logs/included_studies_finalization_report.txt`
+[1] "5de5e524cf92411c3160d464a29d5078fe0ccc8c34a814bc471bef208ef1b2c4"
+
+$provenance$input_hashes$`results/logs/screening_workbook_report.txt`
+[1] "25a9ccd707e10820d532c589e3a3b2e1d8f1c7b5968ba0e2f3c2ab10ee699b3c"
+
+$provenance$input_hashes$`results/meta_analysis_ready/meta_analysis_ready_datasets.xlsx`
+[1] "04f1d62556c182175e2b50361f15e4b2a4da69a0deca687648d6f69ba23c2d8e"
+
+$provenance$input_hashes$`results/risk_of_bias/agent_tasks/SCR_000001_rob_agent_task.md`
+[1] "2ec98508fe9dae73c83d9b587c1c7a845ad1d3bffbffa43d50e4b795d4c7aaae"
+
+$provenance$input_hashes$`results/risk_of_bias/agent_tasks/SCR_000002_rob_agent_task.md`
+[1] "e8bf9d9faa8d4dc9bfe3da0badded6e197c42afef2eb4a296419183b1a100405"
+
+$provenance$input_hashes$`results/risk_of_bias/agent_tasks/SCR_000003_rob_agent_task.md`
+[1] "9aa1a9de08506af4093f2e89a725bed726b0ca80e430e7e81c19d6a7037ed01a"
+
+$provenance$input_hashes$`results/risk_of_bias/risk_of_bias_author_editable.xlsx`
+[1] "0b76d14b8abef1992c1c1b5da6038f5b9bb038ac8b25ea7deb1ae96d9133517e"
+
+$provenance$input_hashes$`results/risk_of_bias/risk_of_bias_generated.xlsx`
+[1] "f09ba11ed0768061598629ff27b3dd2f72575eaca2577438c26e6f78cec8949d"
+
+$provenance$input_hashes$`results/risk_of_bias/rob_agent_tasks.csv`
+[1] "10bde12680a5f474ba47d51954f7a12eaa8e005bf3a4c71dc09542398daf8e99"
+
+$provenance$input_hashes$`results/risk_of_bias/rob_final_combined.csv`
+[1] "6dc08d8bed8b6d942ca7f564cb75bbfd194110f02a4096a6de2f3b37e6b1152a"
+
+$provenance$input_hashes$`results/risk_of_bias/rob_study_result_manifest.csv`
+[1] "576b8be14e9f7d2d132130b68536662dc3d54d0d2246983cca9dc8cc62da438a"
+
+$provenance$input_hashes$`results/risk_of_bias/rob_validation_report.txt`
+[1] "9983fccceda1ef5cfad8fd3ddaad80b63848c64e04272e6a7011978a8a14d2f7"
+
+$provenance$input_hashes$`results/screening/completed_screening_workbook.xlsx`
+[1] "5b7de8b492f86381fce0996b98980bf17817a30b51ccc2392bf2dc2370435aed"
+
+$provenance$input_hashes$`results/screening/screening_workbook.xlsx`
+[1] "4925fb46db86d361f577a0dab5e92f1e7f1223aa2d606077355b62d17dd43138"
+
+$provenance$input_hashes$`results/screening/title_abstract_screening_agent.xlsx`
+[1] "c8866b5ce939ec4e1234412226fb2ca155ac74449ccd5a97739bb1182c57696a"
+
+$provenance$input_hashes$`search_strategies/central_search.txt`
+[1] "4043179674b494a851b6d79c2ef99af2cc26f5b9ab9bc3bdcdfc7c4821a9a551"
+
+
+$provenance$result_sha256
+[1] "805ea898e98901679335c7855f3e47cc4dff3585d5745e4690515680c6e23446"
+
+$provenance$project_version_id
+[1] "0e1ae077c6133f32182289dcd2cbbaba"
+
+$provenance$attempt
+[1] 1
+
+$provenance$source_job_ids
+list()
+
+
+PASS: canonical one-study non-estimable status; approval blocked
+PASS: canonical exploratory funnel/Egger/configured moderator outputs; underpowered warnings retained
+Loading required package: shiny
+
+Attaching package: ‘shiny’
+
+The following object is masked _by_ ‘.GlobalEnv’:
+
+    req
+
+PASS: Shiny canonical result/forest display and explicit-method plan save through authenticated requests
+PASS: stale evidence and downstream reuse blocked; historical approved result unchanged

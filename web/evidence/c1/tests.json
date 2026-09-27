@@ -7,16 +7,16 @@
   "working_directory": "/workspace/scratch/284d178eb86f/srma-c1",
   "tests": [
     {
-      "command": "C1_TEST_ROOT=/workspace/scratch/284d178eb86f/c1-evidence/accepted-state Rscript --vanilla web/tests/c1_fixture.R",
+      "command": "C1_TEST_ROOT=/workspace/scratch/284d178eb86f/c1-evidence/accepted-state /workspace/scratch/f22ae3d8c5eb/runtime/Rscript --vanilla web/tests/c1_fixture.R",
       "result": "PASS (exit 0)",
       "reason": "Complete changed WEB-011 state/engine/numeric/UI/security flow, using explicit test-only development seam",
-      "log": "c1-accepted.log"
+      "log": "c1-accepted.txt"
     },
     {
-      "command": "B2_EXTENDED=1 Rscript --vanilla web/tests/b2_e2e.R",
+      "command": "B2_EXTENDED=1 /workspace/scratch/f22ae3d8c5eb/runtime/Rscript --vanilla web/tests/b2_e2e.R",
       "result": "PASS (exit 0)",
       "reason": "Shared service, request, worker and engine dispatcher integration; preserve B2 workflows",
-      "log": "b2-regression.log"
+      "log": "b2-regression.txt"
     },
     {
       "test": "b1_pipeline",
@@ -82,7 +82,7 @@
       "exit_code": 0
     },
     {
-      "command": "Rscript --vanilla -e 'f<-list.files(\"web\",pattern=\"[.]R$\",recursive=TRUE,full.names=TRUE);invisible(lapply(f,parse));cat(\"PASS syntax\",length(f),\"files\\n\")'",
+      "command": "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript --vanilla -e 'f<-list.files(\"web\",pattern=\"[.]R$\",recursive=TRUE,full.names=TRUE);invisible(lapply(f,parse));cat(\"PASS syntax\",length(f),\"files\\n\")'",
       "result": "PASS 67 R files",
       "reason": "All changed source/test syntax"
     },
