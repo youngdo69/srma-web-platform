@@ -1,3 +1,20 @@
+# B1 Completion Mission v1.2 — 2026-09-27
+
+Status: B1 IMPLEMENTATION COMPLETE; external acceptance pending. This supersedes the historical recovery status below. B2 and WEB-009 remain unauthorized.
+Current phase: B1 implementation complete, awaiting PM review and external acceptance.
+Last completed task: version-scoped canonical initialization/manual concepts → explicit human review → immutable activation → guarded search/PubMed handoff → manual database inputs → canonical preflight.
+Completed outputs: web/R/pipeline.R; canonical initialization adapter; provenance migrations 004–005; authenticated review/search UI; operator acceptance command; new integration tests; web/docs/B1_COMPLETION_REPORT.md and evidence/completion-001.
+Dependency change: PM-approved additive lock preserves all 79 existing records and adds 27. Dedicated commit e3ce298; line endings normalized in 4da521f; scientific source manifest updated. 97 other scientific files unchanged.
+Verification: local development R 4.3.3/SQLite regression suites PASS, including 27 integrated groups, actual canonical decision patches/activation, UI review, manual preflight worker, version/query/artifact isolation, two-worker process test and editable DOCX table API smoke. Synthetic orchestration fixtures are not scientific QC or PubMed acceptance evidence.
+External acceptance: POSTGRESQL_EXTERNAL_ACCEPTANCE_PENDING; CREDENTIALED_ACCEPTANCE_PENDING; canonical R 4.6.1/106-package renv synchronization and full scientific dependency acceptance pending. Actual R11/R16 negative acceptance could not run because development rentrez/dotenv/httr2 are missing. No real PubMed records retrieved. Development R41 namespace inventory lacks openxlsx. No clean restore/START_HERE/canonical DOCX/manuscript PASS claimed.
+Current next task: PM review; operator scientific-runtime, PostgreSQL and credentialed acceptance using web/docs/B1_EXTERNAL_ACCEPTANCE.md. No deployment.
+Remaining implementation defects: none known after local verification; credentialed and PostgreSQL behavior remain externally unverified.
+Deferred: WEB-009+, B2, production OIDC selection, push/merge/tag/deployment.
+Delivery: numbered incremental package B1-001 based on recovery commit 148cb68; full replacement contents only for changed/new files, with hash manifest. Original repository and recovery archive preserved.
+Last updated: 2026-09-27.
+
+Historical records follow; their PASS/FAIL statements are not current-session evidence.
+
 # Current B1 recovery checkpoint — 2026-09-27
 
 Status: INCOMPLETE. No B2 authorization.

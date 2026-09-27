@@ -1,6 +1,7 @@
 test_library <- Sys.getenv("SRMA_WEB_LIBRARY", "web/.library")
 if (dir.exists(test_library)) .libPaths(c(normalizePath(test_library), .libPaths()))
-source("web/R/core.R"); source("web/R/adapter.R"); source("web/tests/fixture.R")
+source("web/load.R")
+source("web/tests/fixture.R")
 s <- web_settings(data_root = tempfile("contract-"));p <- web_fixture(tempfile("contract-input-"))
 i <- web_engine_inspect(s,p)
 r <- srma_run(s,i$project_id,"validate_search",list(),"contract",p,"baseline",file.path(s$data_root,"run"))

@@ -1,0 +1,68 @@
+{
+  "current_R": "4.3.3",
+  "required_R": "4.6.1",
+  "locked_packages": 106,
+  "configured_scientific_runner_present": false,
+  "configured_scientific_library_present": false,
+  "provider_credential_present": false,
+  "development_namespace_inventory": {
+    "renv": {
+      "namespace_available": false,
+      "version": null
+    },
+    "rentrez": {
+      "namespace_available": false,
+      "version": null
+    },
+    "dotenv": {
+      "namespace_available": false,
+      "version": null
+    },
+    "httr2": {
+      "namespace_available": false,
+      "version": null
+    },
+    "officer": {
+      "namespace_available": true,
+      "version": "0.6.4"
+    },
+    "flextable": {
+      "namespace_available": true,
+      "version": "0.9.4"
+    },
+    "yaml": {
+      "namespace_available": true,
+      "version": "2.3.8"
+    },
+    "readr": {
+      "namespace_available": true,
+      "version": "2.1.5"
+    },
+    "dplyr": {
+      "namespace_available": true,
+      "version": "1.1.4"
+    },
+    "tibble": {
+      "namespace_available": true,
+      "version": "3.2.1"
+    },
+    "stringr": {
+      "namespace_available": true,
+      "version": "1.5.1"
+    },
+    "digest": {
+      "namespace_available": true,
+      "version": "0.6.34"
+    },
+    "openxlsx": {
+      "namespace_available": false,
+      "version": null
+    }
+  },
+  "renv_synchronization": "NOT_EXECUTED: canonical isolated runtime unavailable",
+  "START_HERE_environment_only": "NOT_EXECUTED: canonical isolated runtime unavailable",
+  "scientific_DOCX_smoke": "NOT_EXECUTED: canonical isolated runtime unavailable",
+  "manuscript_scientific_regression": "NOT_EXECUTED; not implied by dependency testing",
+  "PostgreSQL": "POSTGRESQL_EXTERNAL_ACCEPTANCE_PENDING; existing root-only infrastructure limitation, not retried",
+  "credentialed_path": "CREDENTIALED_ACCEPTANCE_PENDING"
+}

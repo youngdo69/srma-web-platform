@@ -1,0 +1,47 @@
+/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/bin/R: line 249: /workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/ldpaths: No such file or directory
+During startup - Warning message:
+In file(file, "rt") :
+  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory
+$operation
+[1] "generate_search"
+
+$project_id
+NULL
+
+$job_id
+NULL
+
+$status
+[1] "FAILED"
+
+$user_message
+[1] "Processing could not finish. The diagnostic record is available to the operator."
+
+$error_code
+[1] "ENGINE_FAILED"
+
+$technical
+$technical$diagnostic
+[1] "R/11 requires packages recorded in renv.lock but currently unavailable: rentrez, dotenv, httr2\nRun source(\"START_HERE.R\") so the complete renv environment is restored. "
+
+
+$engine_version
+NULL
+
+$artifacts
+list()
+
+$warnings
+list()
+
+$started_at
+[1] "2026-09-27T08:42:11.985106Z"
+
+$finished_at
+[1] "2026-09-27T08:42:12.447889Z"
+
+$provenance
+list()
+
+Error: r$status == "USER_ACTION_REQUIRED" is not TRUE
+Execution halted

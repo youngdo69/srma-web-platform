@@ -7,6 +7,8 @@ web_database_info <- function(con, settings, actor, project_id, version_id, priv
     dest <- file.path(root, p); dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
     web_assert(file.copy(file.path(version$root, p), dest), "Inputs could not be prepared.", "SYSTEM_FAILED")
   }
+  for(j in web_pipeline_sources(con,project_id,version_id,"validate_database_inputs"))
+    web_overlay_job(con,settings,actor,project_id,version_id,j,root)
   result <- web_engine_call(settings, list(action = "database_context", project_dir = root))
   if (result$status != "COMPLETE") web_error(result$error_code, result$user_message, result$technical$diagnostic)
   if (!private) result$databases <- lapply(result$databases, function(x) {x$target <- NULL; x})
@@ -33,6 +35,14 @@ web_upload_database <- function(con, settings, actor, project_id, version_id, da
   for (p in names(version$manifest)) {
     dest <- file.path(root, p); dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
     web_assert(file.copy(file.path(version$root, p), dest), "Inputs could not be prepared.", "SYSTEM_FAILED")
+  }
+  sources <- web_pipeline_sources(con,project_id,version_id,"validate_database_inputs")
+  for(j in sources) web_overlay_job(con,settings,actor,project_id,version_id,j,root)
+  if(length(sources)) {
+    dir.create(file.path(root,"config/generated"),recursive=TRUE,showWarnings=FALSE)
+    yaml::write_yaml(list(source_version=version_id,source_jobs=as.list(sources),
+      reason="Explicit export upload into the selected immutable input version; approvals are not inherited."),
+      file.path(root,"config/generated/web_import_provenance.yml"))
   }
   hash <- web_sha(source)
   target <- web_inside(file.path(root, spec$target), root, exists = FALSE)

@@ -27,6 +27,7 @@ web_worker_once <- function(con, settings) {
   work <- file.path(attempt, "project")
   dir.create(work, recursive = TRUE, mode = "0700")
   web_exec(con, "UPDATE jobs SET diagnostic_locator=?loc WHERE id=?id AND worker_token=?token", loc = relative, id = j$id, token = j$worker_token)
+  sources <- data.frame(source_job_id=character())
   result <- tryCatch({
     web_assert(identical(web_register_engine(con, settings), j$engine_id), "The registered engine is unavailable.", "SYSTEM_FAILED")
     v <- web_query(con, "SELECT * FROM project_versions WHERE id=?v AND project_id=?p", v = j$version_id, p = j$project_id)
@@ -39,6 +40,10 @@ web_worker_once <- function(con, settings) {
       dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
       web_assert(file.copy(source, dest), "Could not prepare project inputs.", "SYSTEM_FAILED")
     }
+    sources <- web_query(con,"SELECT source_job_id FROM job_sources WHERE job_id=?j AND project_id=?p AND version_id=?v",j=j$id,p=j$project_id,v=j$version_id)
+    owner <- web_query(con,"SELECT user_id FROM workspace_members WHERE workspace_id=?w LIMIT 1",w=p$workspace_id)$user_id
+    for(source in sources$source_job_id) web_overlay_job(con,settings,owner,j$project_id,j$version_id,source,work)
+    web_require_activated(con,j$project_id,j$version_id,j$operation)
     web_exec(con, "UPDATE jobs SET progress=30,message=?message,heartbeat=?time,updated_at=?now WHERE id=?id AND state='RUNNING' AND worker_token=?token",
       message = web_registry()[[j$operation]]$progress, time = as.numeric(Sys.time()), now = web_now(), id = j$id, token = j$worker_token)
     web_audit(con, p, "JOB_PROGRESS", j$id, detail = list(progress = 30))
@@ -50,9 +55,10 @@ web_worker_once <- function(con, settings) {
   stored <- tryCatch({
     if (result$status %in% c("COMPLETE", "USER_ACTION_REQUIRED")) lapply(result$artifacts, function(a) {
       web_inside(a$path, work)
+      web_no_file_secrets(a$path,settings$engine_root)
       id <- web_id()
       obj <- web_store(settings)$put(a$path, paste0(j$project_id, "/", id))
-      c(list(id = id, logical_name = a$logical_name, type = a$type), obj)
+      c(list(id = id, logical_name = a$logical_name, type = a$type, relative_path = substring(normalizePath(a$path),nchar(normalizePath(work))+2L)), obj)
     }) else list()
   }, error = identity)
   if (inherits(stored, "error")) {
@@ -70,9 +76,10 @@ web_worker_once <- function(con, settings) {
         id = a$id, p = j$project_id, v = j$version_id, j = j$id, name = a$logical_name, type = a$type,
         n = version, sha = a$checksum, loc = a$locator, e = j$engine_id, now = web_now())
     }
-    result$artifacts <- lapply(stored, function(a) list(artifact_id = a$id, logical_name = a$logical_name, checksum = a$checksum))
+    result$artifacts <- lapply(stored, function(a) list(artifact_id = a$id, logical_name = a$logical_name, checksum = a$checksum, relative_path = a$relative_path))
     result$provenance$project_version_id <- j$version_id
     result$provenance$attempt <- j$attempts
+    result$provenance$source_job_ids <- as.list(sources$source_job_id)
     web_exec(con, "UPDATE jobs SET state=?s,message=?m,progress=?progress,result_json=?result,heartbeat=?time,updated_at=?now WHERE id=?id AND state='RUNNING' AND worker_token=?token",
       s = result$status, m = result$user_message, progress = if (result$status == "COMPLETE") 100L else 30L,
       result = as.character(web_json(result)), time = as.numeric(Sys.time()), now = web_now(), id = j$id, token = j$worker_token)

@@ -1,0 +1,33 @@
+/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/bin/R: line 249: /workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/ldpaths: No such file or directory
+During startup - Warning message:
+In file(file, "rt") :
+  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory
+PASS: scientific source manifest unchanged: 98 files
+ [1] ""
+ [2] "Canonical search-strategy inputs"
+ [3] "--------------------------------"
+ [4] "PubMed: /tmp/RtmpFys9AZ/canonical-smoke-84e6ebb5a/search_strategies/pubmed_search.txt"
+ [5] ""
+ [6] "===================================================="
+ [7] "Search Strategy Validation"
+ [8] "===================================================="
+ [9] ""
+[10] "# A tibble: 1 × 5"
+[11] "  database total_checks passed_checks failed_checks overall_pass"
+[12] "  <chr>           <int>         <int>         <int> <lgl>       "
+[13] "1 PubMed             12            12             0 TRUE        "
+[14] ""
+[15] "PASS: All local search-strategy checks passed."
+[16] ""
+[17] "Reports saved:"
+[18] "- /tmp/RtmpFys9AZ/canonical-smoke-84e6ebb5a/results/logs/search_strategy_validation.csv "
+[19] "- /tmp/RtmpFys9AZ/canonical-smoke-84e6ebb5a/results/logs/search_strategy_validation_report.txt "
+[20] ""
+[21] "Next step: "
+[22] "1. Test each search in its actual database. "
+[23] "2. Record the search date and number of results. "
+[24] "3. Save the finalized search strategies. "
+[25] ""
+[26] "PASS: R/12 canonical-path validation completed successfully."
+PASS: real engine smoke; 2 generated artifacts; 2 duplicate-block regression assertions
+PASS: canonical R syntax: 78 files

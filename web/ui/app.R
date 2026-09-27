@@ -7,6 +7,7 @@ web_app <- function(settings) {
     session$onSessionEnded(function() DBI::dbDisconnect(con))
     token <- shiny::reactiveVal(NULL); notice <- shiny::reactiveVal("")
     refresh <- shiny::reactiveVal(0L); editing <- shiny::reactiveVal(NULL)
+    draft_review <- shiny::reactiveVal(NULL)
     csrf <- web_secret()
     upload_root <- NULL
     safe <- function(expr) tryCatch(expr, error = function(e) {
@@ -49,7 +50,11 @@ web_app <- function(settings) {
           shiny::tabPanel("Search / Study Import", shiny::uiOutput("search_import")),
           shiny::tabPanel("Results / Artifacts", shiny::selectInput("artifact", "Available output", character()),
             shiny::downloadButton("download", "Download selected output")),
-          shiny::tabPanel("Human Review Required", shiny::tableOutput("gates"),
+          shiny::tabPanel("Human Review Required",
+            shiny::h3("Canonical configuration and concepts"),
+            shiny::selectInput("draft_job", "Draft source for selected version", c("Human-provided saved draft"="")),
+            shiny::actionButton("load_draft", "Load draft for review"), shiny::uiOutput("canonical_review"),
+            shiny::tableOutput("gates"),
             shiny::selectInput("review_gate", "Pending review for selected version", character()),
             shiny::selectInput("review_decision", "Your decision", c("Choose a decision" = "", "Approve" = "APPROVED", "Reject" = "REJECTED")),
             shiny::textAreaInput("review_rationale", "Reason and supporting protocol registration reference, where applicable"),
@@ -69,7 +74,7 @@ web_app <- function(settings) {
     shiny::observeEvent(list(input$project, refresh()), {
       shiny::req(token(), input$project)
       x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
-      shiny::updateSelectInput(session, "version", choices = setNames(x$versions$id, paste("Version", x$versions$version)))
+      shiny::updateSelectInput(session, "version", choices = if(nrow(x$versions))setNames(x$versions$id, paste("Version", x$versions$version)) else character())
     })
     output$overview <- shiny::renderText({x <- state(); shiny::req(x); x$project$title})
     output$workflow <- shiny::renderTable({
@@ -83,7 +88,7 @@ web_app <- function(settings) {
         "Your validation check is waiting or running. You may leave this page. When it finishes, review the report under Results / Artifacts and follow any database input instructions."
       else "Review the project metadata and protocol decisions. Existing canonical search strategies can be checked here; a draft with no strategies needs search preparation first. Next, review the report and database-specific import requirements."
     })
-    output$jobs <- shiny::renderTable({x <- state(); shiny::req(x); x$jobs[, c("state", "message", "progress"), drop = FALSE]})
+    output$jobs <- shiny::renderTable({x <- state(); shiny::req(x); x$jobs[x$jobs$version_id==input$version, c("state", "message", "progress"), drop = FALSE]})
     output$gates <- shiny::renderTable({
       x <- state(); shiny::req(x, input$version)
       gates <- x$gates[x$gates$version_id == input$version, , drop = FALSE]
@@ -98,7 +103,7 @@ web_app <- function(settings) {
       operations <- c(generate_search = "search generation", retrieve_pubmed = "PubMed retrieval")
       label <- unname(labels[pending$gate_type]); label[is.na(label)] <- "Human review"
       step <- unname(operations[pending$required_operation]); step[is.na(step)] <- "the next workflow step"
-      shiny::updateSelectInput(session, "review_gate", choices = setNames(pending$id, paste(label, "before", step)),
+      shiny::updateSelectInput(session, "review_gate", choices = if(nrow(pending))setNames(pending$id, paste(label, "before", step)) else character(),
         selected = shiny::isolate(input$review_gate))
     })
     shiny::observeEvent(input$record_review, {
@@ -197,17 +202,26 @@ web_app <- function(settings) {
       shiny::updateSelectInput(session, "workspace", selected = projects$workspace_id[projects$id == input$project])
       shiny::updateTabsetPanel(session, "page", selected = "New Systematic Review")
     })
-    database_info <- shiny::eventReactive(list(input$project, input$version), {
+    database_info <- shiny::reactive({
+      shiny::invalidateLater(3000,session)
       shiny::req(token(), input$project, input$version)
       safe(request("database_info", list(project_id = input$project, version_id = input$version)))
     })
     output$search_import <- shiny::renderUI({
       info <- database_info(); shiny::req(info)
       shiny::tagList(
-        shiny::p("Search generation and automated PubMed retrieval remain disabled pending upstream integration validation. Canonical database preflight is available when the scientific environment is configured."),
+        shiny::p("Prepare canonical concepts, review and activate a new version, record its required protocol decisions, then generate searches. PubMed retrieval requires canonical quality PASS for the exact saved query."),
+        shiny::actionButton("initialize_project", "Prepare canonical draft"),
+        shiny::p("If the operator has not configured the scientific runtime and provider credential, your saved work is retained. You may enter human-provided concepts below."),
+        shiny::textAreaInput("manual_terms", "Human-provided canonical search concepts (YAML)", rows=10),
+        shiny::p("Supply the canonical project, search concepts and validation fields. Terms and controlled vocabulary must be explicitly chosen by you; the application does not invent synonyms."),
+        shiny::actionButton("save_terms", "Save human-provided draft as new version"),
+        shiny::actionButton("generate_search", "Generate searches for approved version"),
+        shiny::actionButton("retrieve_pubmed", "Retrieve quality-approved PubMed query"),
+        shiny::textOutput("quality_status"),
         lapply(info, function(db) shiny::tagList(
           shiny::h3(db$label),
-          shiny::p(if (db$mode == "automated") "PubMed records are retrieved automatically after canonical search quality checks. Retrieval is not enabled yet."
+          shiny::p(if (db$mode == "automated") "Request PubMed retrieval after the exact query passes canonical quality checks."
             else paste0("Run the displayed ", db$label, " strategy in the database, export all results as ", db$format, ", and upload the export below.")),
           shiny::p(if (db$input_present) "Input saved. Canonical preflight must confirm validity." else "Input still required."),
           shiny::tags$label("Canonical saved search strategy — copy for database use"),
@@ -224,6 +238,57 @@ web_app <- function(settings) {
         shiny::actionButton("preflight", "Check database inputs"),
         shiny::tableOutput("database_validation"),
         shiny::p("Each upload creates a new immutable version. Preflight never starts merge, deduplication or screening."))
+    })
+    shiny::observeEvent(list(input$project,input$version), {draft_review(NULL)})
+    shiny::observe({
+      x<-state();shiny::req(x,input$version)
+      jobs<-x$jobs[x$jobs$version_id==input$version & x$jobs$operation=="initialize_project" & x$jobs$state=="COMPLETE",,drop=FALSE]
+      shiny::updateSelectInput(session,"draft_job",choices=c("Human-provided saved draft"="",if(nrow(jobs))setNames(jobs$id,paste("Prepared draft",jobs$created_at)) else character()),selected=shiny::isolate(input$draft_job))
+    })
+    shiny::observeEvent(input$load_draft, {
+      shiny::req(input$project,input$version)
+      review<-safe(request("initialization_review",list(project_id=input$project,version_id=input$version,
+        job_id=if(is.null(input$draft_job)||!nzchar(input$draft_job))NULL else input$draft_job)))
+      draft_review(review)
+    })
+    output$canonical_review<-shiny::renderUI({
+      r<-draft_review();shiny::req(r)
+      shiny::tagList(shiny::h4("Proposed configuration"),shiny::tags$pre(r$config),
+        shiny::h4("Proposed search concepts"),shiny::tags$pre(r$terms),
+        lapply(seq_along(r$decisions),function(i){d<-r$decisions[[i]];shiny::tagList(
+          shiny::h4(d$question),shiny::p(d$why_it_matters),
+          shiny::p(paste("Canonical recommendation:",d$recommended_option)),shiny::p(d$recommendation_rationale),
+          shiny::selectInput(paste0("canonical_decision_",i),"Your explicit choice",c("Choose an option"="",unlist(d$suggested_options))))}),
+        shiny::textAreaInput("activation_rationale","Review rationale"),
+        shiny::checkboxInput("approve_canonical","I reviewed this configuration, these concepts and all listed decisions",FALSE),
+        shiny::actionButton("activate_canonical","Approve and activate as a new saved version"))
+    })
+    shiny::observeEvent(input$activate_canonical, {
+      r<-draft_review();shiny::req(r,input$project,input$version)
+      if(!identical(r$project_id,input$project)||!identical(r$version_id,input$version)) {notice("Reload the draft for this selected version.");return()}
+      selections<-setNames(lapply(seq_along(r$decisions),function(i)input[[paste0("canonical_decision_",i)]]),
+        vapply(r$decisions,`[[`,character(1),"decision_id"))
+      saved<-safe(request("activate_draft",list(project_id=r$project_id,version_id=r$version_id,job_id=r$job_id,
+        selections=selections,rationale=input$activation_rationale,human_approved=isTRUE(input$approve_canonical))))
+      if(!is.null(saved)){draft_review(NULL);refresh(refresh()+1L);notice("Approved canonical inputs saved as a new immutable version. Select it and record its protocol decisions before search generation.")}
+    })
+    shiny::observeEvent(input$save_terms, {
+      shiny::req(input$project,input$version,input$manual_terms)
+      saved<-safe(request("manual_concepts",list(project_id=input$project,version_id=input$version,terms_yaml=input$manual_terms)))
+      if(!is.null(saved)){refresh(refresh()+1L);notice("Human-provided draft saved. Select the new version and load it under Human Review Required.")}
+    })
+    for(op in c("initialize_project","generate_search","retrieve_pubmed")) local({
+      operation<-op
+      shiny::observeEvent(input[[operation]],{
+        shiny::req(input$project,input$version)
+        id<-safe(request("submit",list(project_id=input$project,version_id=input$version,operation=operation)))
+        if(!is.null(id))notice("Version-bound request saved. Review its status and registered outputs.")
+      })
+    })
+    output$quality_status<-shiny::renderText({
+      x<-state();shiny::req(x,input$version)
+      j<-x$jobs[x$jobs$version_id==input$version & x$jobs$operation=="generate_search",,drop=FALSE]
+      if(!nrow(j))"No generated search quality result for this version." else paste(j$state[1],j$message[1])
     })
     output$database_validation <- shiny::renderTable({
       shiny::invalidateLater(2000, session); shiny::req(token(), input$project, input$version)

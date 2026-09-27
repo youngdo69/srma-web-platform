@@ -1,6 +1,6 @@
 test_library <- Sys.getenv("SRMA_WEB_LIBRARY", "web/.library")
 if (dir.exists(test_library)) .libPaths(c(normalizePath(test_library), .libPaths()))
-for (x in c("core","adapter","persistence","storage","service")) source(file.path("web/R",paste0(x,".R")))
+source("web/load.R")
 source("web/tests/fixture.R")
 s <- web_settings(data_root=tempfile("state-"));c <- web_db(s);web_migrate(c,s);web_migrate(c,s);web_local_identity(c)
 v <- web_import_project(c,s,"local-researcher","local-workspace",web_fixture(tempfile("state-input-")))

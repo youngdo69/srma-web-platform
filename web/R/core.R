@@ -54,6 +54,14 @@ web_registry <- function() {
     registry[[name]]$label <- labels[[name]]
     registry[[name]]$blocked_reason <- "This step needs validated scientific runtime and canonical workflow integration before it can be enabled. Your saved inputs are retained."
   }
+  configured <- nzchar(Sys.getenv("SRMA_SCIENTIFIC_RSCRIPT")) && file.exists(Sys.getenv("SRMA_SCIENTIFIC_RSCRIPT")) &&
+    nzchar(Sys.getenv("SRMA_SCIENTIFIC_LIBRARY")) && dir.exists(Sys.getenv("SRMA_SCIENTIFIC_LIBRARY"))
+  for(op in c("initialize_project","generate_search","retrieve_pubmed")) {
+    registry[[op]]$enabled <- configured
+    registry[[op]]$replay_safe <- FALSE
+    registry[[op]]$progress <- paste0(registry[[op]]$label,"…")
+    registry[[op]]$blocked_reason <- "Configure the validated scientific runtime and provider credential; saved work is retained."
+  }
   registry$validate_database_inputs$progress <- "Checking database inputs…"
   registry
 }
@@ -63,4 +71,43 @@ web_result <- function(operation, project_id, job_id, status, message, engine_ve
        user_message = message, error_code = code, technical = list(diagnostic = diagnostic),
        engine_version = engine_version, artifacts = artifacts, warnings = list(),
        started_at = started, finished_at = web_now(), provenance = provenance)
+}
+
+# Operator credentials never enter requests, snapshots, published results or logs.
+web_operator_secrets <- function(engine_root) {
+  cfg <- yaml::read_yaml(file.path(engine_root,"config/initialization_agent.yml"))
+  keys <- unique(c(cfg$initialization_agent$provider$api_key_env,"NCBI_API_KEY"))
+  values <- Sys.getenv(keys,unset="")
+  unname(values[nzchar(values)])
+}
+web_redact <- function(value,engine_root) {
+  secrets <- web_operator_secrets(engine_root)
+  redact <- function(x) {
+    if(is.list(x))return(lapply(x,redact))
+    if(is.character(x))for(secret in secrets)x<-gsub(secret,"[REDACTED]",x,fixed=TRUE)
+    x
+  }
+  redact(value)
+}
+web_no_secrets <- function(value,engine_root) {
+  text<-as.character(web_json(value))
+  web_assert(!any(vapply(web_operator_secrets(engine_root),function(s)grepl(s,text,fixed=TRUE),logical(1))),
+    "Remove private credentials from project inputs; credentials belong in the operator environment.")
+  invisible(TRUE)
+}
+web_no_file_secrets <- function(path,engine_root) {
+  secrets<-web_operator_secrets(engine_root)
+  if(!length(secrets))return(invisible(TRUE))
+  con<-file(path,"rb");on.exit(close(con));tail<-raw()
+  repeat {
+    chunk<-readBin(con,"raw",n=65536L);if(!length(chunk))break
+    bytes<-c(tail,chunk)
+    for(secret in secrets) {
+      needle<-charToRaw(secret); starts<-which(bytes==needle[1])
+      found<-any(vapply(starts,function(i)i+length(needle)-1L<=length(bytes)&&identical(bytes[i:(i+length(needle)-1L)],needle),logical(1)))
+      web_assert(!found,"An output contains a private credential and cannot be saved.","SYSTEM_FAILED")
+    }
+    tail<-tail(bytes,max(nchar(secrets,type="bytes")))
+  }
+  invisible(TRUE)
 }

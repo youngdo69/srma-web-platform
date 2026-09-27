@@ -27,7 +27,7 @@ result <- tryCatch({
   }
   config <- e$load_project_config("config/project_config.yml", validate = TRUE, quiet = TRUE)
   paths <- e$build_project_paths(config, create_directories = TRUE, validate = TRUE)
-  configuration_only <- request$action %in% c("inspect_configuration", "write_configuration", "database_context", "validate_database_inputs", "generate_search", "retrieve_pubmed")
+  configuration_only <- request$action %in% c("initialize_project", "prepare_manual_concepts", "activate_initialization", "inspect_configuration", "write_configuration", "database_context", "validate_database_inputs", "generate_search", "retrieve_pubmed")
   inputs <- c("config/project_config.yml", paths$search_terms_file)
   if (!configuration_only) inputs <- c(inputs,
     unlist(paths[paste0(e$get_enabled_databases(config, validate = FALSE), "_search")], use.names = FALSE))
@@ -35,6 +35,7 @@ result <- tryCatch({
     # Preserve verified uploaded/generated inputs when editing a saved version.
     extra <- list.files(root, recursive = TRUE, full.names = TRUE)
     extra <- extra[!dir.exists(extra)]
+    extra <- extra[!grepl("^(R/|prompts/)|(^|/)(initialization_agent|human_decision_policy)\\.yml$",sub(paste0(root,"/"),"",extra,fixed=TRUE))]
     inputs <- unique(c(inputs, extra))
   }
   for (p in inputs) {
@@ -43,16 +44,16 @@ result <- tryCatch({
   }
   inputs <- unique(vapply(inputs, function(p) substring(normalizePath(p, winslash = "/", mustWork = TRUE), nchar(root) + 2L), character(1)))
   manifest <- setNames(lapply(inputs, web_sha), inputs)
-  if (request$action %in% c("generate_search", "retrieve_pubmed")) {
+  if (request$action %in% c("initialize_project", "prepare_manual_concepts", "activate_initialization")) {
+    source(file.path(request$engine_root,"web/adapter/initialization.R"))
+    produced <- web_initialization_action(request,config,root)
+    web_result(request$action,request$project_id,request$job_id,"COMPLETE",
+      "Canonical draft processing finished. Explicit human review is required before search generation.",request$engine_version,
+      artifacts=produced$outputs,provenance=list(input_hashes=manifest,R=R.version.string))
+  } else if (request$action %in% c("generate_search", "retrieve_pubmed")) {
     source(file.path(request$engine_root, "web/adapter/search.R"))
     produced <- web_canonical_search(request$action, e, paths, root, request$engine_root)
-    web_result(request$action, request$project_id, request$job_id,
-      if (isTRUE(produced$ready)) "COMPLETE" else "USER_ACTION_REQUIRED",
-      if (isTRUE(produced$ready)) "Canonical processing finished. Review the outputs before continuing."
-      else "Search quality still requires upstream review. Retrieval remains blocked.", request$engine_version,
-      code = if (!isTRUE(produced$ready)) "USER_ACTION_REQUIRED" else NULL,
-      artifacts = produced$outputs, provenance = list(input_hashes = manifest,
-        engine_script_sha256 = produced$script_hash, R = R.version.string))
+    web_search_result(request,produced,manifest)
   } else if (request$action %in% c("database_context", "validate_database_inputs")) {
     source(file.path(request$engine_root, "web/adapter/database.R"))
     databases <- web_database_context(e, config, paths, root, request$engine_root)
@@ -88,13 +89,15 @@ result <- tryCatch({
   }
 }, error = function(e) {
   code <- if (inherits(e, "srma_web_error")) e$code else if (request$action == "inspect") "VALIDATION_FAILED" else "ENGINE_FAILED"
+  if(grepl("requires packages recorded in renv.lock but currently unavailable",conditionMessage(e),fixed=TRUE))code<-"DEPENDENCY_FAILED"
   # The known validator intentionally raises on structural validation failures.
   if (grepl("canonical-path validation failed", conditionMessage(e), fixed = TRUE)) code <- "VALIDATION_FAILED"
   web_result(request$action, request$project_id, request$job_id,
     if (code == "USER_ACTION_REQUIRED") "USER_ACTION_REQUIRED" else "FAILED",
-    switch(code, USER_ACTION_REQUIRED = "Add the configured search inputs before continuing.",
+    switch(code, USER_ACTION_REQUIRED = if (inherits(e,"srma_web_error")) conditionMessage(e) else "Add the configured search inputs before continuing.",
       VALIDATION_FAILED = "Check the project configuration and search inputs, then submit a corrected version.",
       DEPENDENCY_FAILED = "The processing environment needs maintenance.", "Processing could not finish. The diagnostic record is available to the operator."),
     request$engine_version, code, paste(conditionMessage(e), if (!is.null(e$diagnostic)) e$diagnostic else ""), started = started)
 })
+result <- web_redact(result, request$engine_root)
 jsonlite::write_json(result, args[[2L]], auto_unbox = TRUE, null = "null", pretty = TRUE)

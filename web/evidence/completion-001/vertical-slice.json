@@ -1,0 +1,76 @@
+{
+  "operation": "validate_search",
+  "job_id": "32bcc9299c3cc39ad445bab0ff41d678",
+  "project_id": "b48e15ee93bdcbc0bc0378c38749d2f4",
+  "version_id": "d3bf0fd823a0b982bcdea37de5976a47",
+  "final_state": "COMPLETE",
+  "attempts": 1,
+  "events": [
+    {
+      "event_type": "JOB_QUEUED",
+      "detail_json": "[]",
+      "created_at": "2026-09-27T08:48:03.559706Z"
+    },
+    {
+      "event_type": "JOB_RUNNING",
+      "detail_json": "{\"worker_token\":\"809e374b72a6950ea71f4a2b3234f1ce\"}",
+      "created_at": "2026-09-27T08:48:04.239643Z"
+    },
+    {
+      "event_type": "JOB_PROGRESS",
+      "detail_json": "{\"progress\":30}",
+      "created_at": "2026-09-27T08:48:04.310039Z"
+    },
+    {
+      "event_type": "JOB_COMPLETE",
+      "detail_json": "{\"artifacts\":2,\"attempt\":1}",
+      "created_at": "2026-09-27T08:48:05.185394Z"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "5ddf1d1b7915f108bf92e09fe7891c26",
+      "logical_name": "search_strategy_validation.csv",
+      "version": 1,
+      "checksum": "759589d572dc625673688c7039dbfc17e85721e4617d0476279f4e76ceb03cd9",
+      "job_id": "32bcc9299c3cc39ad445bab0ff41d678",
+      "engine_id": "snapshot-f9f69c9d095c050b",
+      "approval_state": "UNREVIEWED"
+    },
+    {
+      "id": "e86c681bd8677bfecb1823d5d508e83b",
+      "logical_name": "search_strategy_validation_report.txt",
+      "version": 1,
+      "checksum": "97bb57feb1216fa18ddfaa369a8443c9ae440b9ad00b62c40b656ae02140c17e",
+      "job_id": "32bcc9299c3cc39ad445bab0ff41d678",
+      "engine_id": "snapshot-f9f69c9d095c050b",
+      "approval_state": "UNREVIEWED"
+    }
+  ],
+  "download_paths": [
+    "downloads/search_strategy_validation.csv",
+    "downloads/search_strategy_validation_report.txt"
+  ],
+  "provenance": {
+    "input_hashes": {
+      "config/project_config.yml": "863a9d36bb93d8104792b2b62ce0f9645de02c184027d1a068eac7207d313cde",
+      "config/search_terms.yml": "323243f24ac297a56301bd90df2f047c5706b3061d1bfdf8b5cc28d54dafe959",
+      "search_strategies/pubmed_search.txt": "4043179674b494a851b6d79c2ef99af2cc26f5b9ab9bc3bdcdfc7c4821a9a551"
+    },
+    "engine_script_sha256": "89e1de3c40413c5dc4b2bf0d3515fa7360b7052e752442715b1c8816878ee101",
+    "R": "R version 4.3.3 (2024-02-29)",
+    "project_version_id": "d3bf0fd823a0b982bcdea37de5976a47",
+    "attempt": 1,
+    "source_job_ids": []
+  },
+  "engine_release": [
+    {
+      "id": "snapshot-f9f69c9d095c050b",
+      "source_commit": "4da521f0f6713f9717017b0a831e00ca8a863f66",
+      "source_hash": "f9f69c9d095c050b8ee87f1826c341b28feb9d96d1eab96451d2ab46ed1fb541"
+    }
+  ],
+  "application_http_status": 200,
+  "application_exited_before_execution": true,
+  "parallel_workers": 2
+}

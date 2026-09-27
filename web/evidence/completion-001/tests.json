@@ -1,0 +1,191 @@
+[
+  {
+    "test": "baseline",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/baseline.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  {
+    "test": "foundation",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/foundation.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  {
+    "test": "b1",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "-e",
+      "source(\"web/tests/b1.R\");cat(\"PASS: B1 script reached end\\n\")"
+    ],
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  {
+    "test": "b1_import",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_import.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  {
+    "test": "b1_request_policy",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_request_policy.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  {
+    "test": "b1_review_ui",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_review_ui.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  {
+    "test": "b1_pipeline_inputs",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_pipeline_inputs.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  {
+    "test": "b1_pipeline_guard",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_pipeline_guard.R"
+    ],
+    "exit_code": 77,
+    "result": "NOT_EXECUTED_DEPENDENCY"
+  },
+  {
+    "test": "contract",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/contract.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS",
+    "previous_exit_code": 1
+  },
+  {
+    "test": "state",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/state.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS",
+    "previous_exit_code": 1
+  },
+  {
+    "test": "run",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/run.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS",
+    "previous_exit_code": 1
+  },
+  {
+    "test": "b1_security",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_security.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS",
+    "previous_exit_code": 1
+  },
+  {
+    "test": "b1_ui",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_ui.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS",
+    "previous_exit_code": 1
+  },
+  {
+    "test": "b1_pipeline",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_pipeline.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS",
+    "previous_exit_code": 0
+  },
+  {
+    "test": "b1_pipeline_ui",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_pipeline_ui.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  {
+    "test": "vertical",
+    "command": [
+      "python3",
+      "web/tests/vertical.py"
+    ],
+    "exit_code": 0,
+    "result": "PASS",
+    "scope": "Development R / SQLite only; environment status is inventory, not scientific acceptance"
+  },
+  {
+    "test": "environment_status",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_environment_status.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS",
+    "scope": "Development R / SQLite only; environment status is inventory, not scientific acceptance"
+  },
+  {
+    "test": "development_docx",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_development_docx.R"
+    ],
+    "exit_code": 0,
+    "result": "PASS",
+    "scope": "Development R / SQLite only; environment status is inventory, not scientific acceptance"
+  }
+]

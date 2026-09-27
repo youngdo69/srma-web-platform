@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "scope": "Development-runtime editable Word table API smoke only",
+  "R": "R version 4.3.3 (2024-02-29)",
+  "officer": "0.6.4",
+  "flextable": "0.9.4",
+  "docx_sha256": "fb7e1020a3c294c066a924337fdffb225c5eee35fe8f95b524764496906f2bad",
+  "canonical_lock_acceptance": false,
+  "R41_workflow_executed": false,
+  "scientific_manuscript_regression": false
+}

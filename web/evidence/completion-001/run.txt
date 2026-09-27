@@ -1,0 +1,34 @@
+/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/bin/R: line 249: /workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/ldpaths: No such file or directory
+During startup - Warning message:
+In file(file, "rt") :
+  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory
+PASS: schema creation and migration idempotence
+[1] 1
+PASS: real canonical configuration import
+PASS: registry fails closed for unsupported operations and nonempty payload
+PASS: all five structured errors are distinct
+PASS: queue idempotency and active-request deduplication
+PASS: database rejects invalid transition
+PASS: unauthorized project and job access rejected
+PASS: real engine worker completes and publishes two artifacts
+PASS: authorized download checksum and safe application projection
+PASS: database reopen resumes project and job
+PASS: terminal job cannot be rerun or cancelled
+PASS: human gate blocks before queue and preserves decision audit
+PASS: artifact versions are attributable and monotonic
+PASS: gate created after queue is checked at worker pickup
+PASS: new input version does not inherit old gate decisions
+PASS: cross-project version, artifact and gate references rejected
+PASS: snapshot tampering is detected
+PASS: bad real search syntax yields validation failure without raw error leakage
+PASS: path traversal and symlink escape rejected
+PASS: lease recovery, bounded safe retry and queue cancellation
+PASS: artifact checksum tampering blocks downloads
+PASS: audit update and deletion rejected
+PASS: Shiny bslib application can construct
+Loading required package: shiny
+PASS: Shiny server queues through the authorized service
+PASS: storage failure cannot publish partial registry entries
+PASS: actual second-workspace actor cannot access the first project
+PASS: migration checksum mismatch fails closed
+RESULT: 27 test groups passed; 0 failed

@@ -21,7 +21,7 @@ web_local_identity <- function(con) {
       DBI::dbExecute(con, "INSERT INTO workspace_members VALUES('local-workspace','local-researcher')")
   })
 }
-web_import_project <- function(con, settings, actor, workspace_id, source_root, configuration_only = FALSE, draft_gates = FALSE) {
+web_import_project <- function(con, settings, actor, workspace_id, source_root, configuration_only = FALSE, draft_gates = FALSE, transaction = web_tx) {
   web_assert(nrow(web_query(con, "SELECT user_id FROM workspace_members WHERE workspace_id=?w AND user_id=?u", w = workspace_id, u = actor)) == 1L,
     "This workspace is not accessible.")
   engine <- web_register_engine(con, settings)
@@ -33,12 +33,13 @@ web_import_project <- function(con, settings, actor, workspace_id, source_root, 
   # Only canonical config + declared inputs enter an immutable version. Never copy .env.
   for (p in unlist(info$inputs, use.names = FALSE)) {
     source <- web_inside(file.path(source_root, p), source_root)
+    web_no_file_secrets(source,settings$engine_root)
     dest <- web_inside(file.path(target, p), target, exists = FALSE)
     dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
     web_assert(file.copy(source, dest), "Project inputs could not be saved.", "SYSTEM_FAILED")
     web_assert(identical(web_sha(dest), info$manifest[[p]]), "Project input changed during import; import it again.")
   }
-  web_tx(con, function() {
+  transaction(con, function() {
     existing <- web_query(con, "SELECT * FROM projects WHERE workspace_id=?w AND canonical_id=?c", w = workspace_id, c = info$project_id)
     if (!nrow(existing)) {
       project_id <- web_id()
@@ -66,6 +67,8 @@ web_import_project <- function(con, settings, actor, workspace_id, source_root, 
 web_submit <- function(con, settings, actor, project_id, version_id, operation = "validate_search", idempotency_key = web_id(), payload = list()) {
   project <- web_authorize(con, actor, project_id)
   reg <- web_registry()[[operation]]
+  web_pipeline_prerequisites(settings, operation)
+  web_require_activated(con,project_id,version_id,operation)
   web_assert(!is.null(reg) && length(payload) == 0L, "This operation is not enabled in this release.")
   web_assert(isTRUE(reg$enabled), if (!is.null(reg$blocked_reason)) reg$blocked_reason else "This operation is not enabled in this release.")
   web_assert(is.character(idempotency_key) && length(idempotency_key) == 1L && nzchar(idempotency_key) && nchar(idempotency_key) <= 128L, "Invalid request identifier.")
@@ -78,12 +81,14 @@ web_submit <- function(con, settings, actor, project_id, version_id, operation =
     existing <- web_query(con, "SELECT id FROM jobs WHERE project_id=?p AND version_id=?v AND operation=?o AND (idempotency_key=?k OR state IN ('QUEUED','RUNNING')) ORDER BY created_at LIMIT 1",
       p = project_id, v = version_id, o = operation, k = idempotency_key)
     if (nrow(existing)) return(existing$id)
+    sources <- web_pipeline_sources(con,project_id,version_id,operation)
     blocked <- web_gate_open(con, project_id, version_id, operation)
     state <- if (blocked) "USER_ACTION_REQUIRED" else "QUEUED"
     id <- web_id()
     web_exec(con, "INSERT INTO jobs(id,project_id,version_id,engine_id,operation,idempotency_key,state,message,progress,created_at,updated_at) VALUES(?id,?p,?v,?e,?o,?k,?s,?m,0,?now,?now)",
       id = id, p = project_id, v = version_id, e = engine, o = operation, k = idempotency_key, s = state,
       m = if (blocked) "Human review is required before this step can continue." else paste0("Waiting: ", reg$label, "…"), now = web_now())
+    for(source in sources) web_exec(con,"INSERT INTO job_sources VALUES(?j,?p,?v,?s)",j=id,p=project_id,v=version_id,s=source)
     web_audit(con, project, paste0("JOB_", state), id, actor)
     id
   })
@@ -141,6 +146,6 @@ web_view <- function(con, actor, project_id) {
   list(project = p[, c("id", "title"), drop = FALSE],
     gates = web_query(con, "SELECT id,gate_type,required_operation,status,version_id FROM gates WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
     versions = web_query(con, "SELECT id,version,created_at FROM project_versions WHERE project_id=?p ORDER BY version DESC", p = project_id),
-    jobs = web_query(con, "SELECT id,operation,state,message,progress,created_at FROM jobs WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
+    jobs = web_query(con, "SELECT id,version_id,operation,state,message,progress,created_at FROM jobs WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
     artifacts = web_query(con, "SELECT id,logical_name,version,approval_state,created_at FROM artifacts WHERE project_id=?p AND status='AVAILABLE' ORDER BY created_at DESC", p = project_id))
 }

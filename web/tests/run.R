@@ -14,7 +14,7 @@ reject <- function(expr, pattern = NULL) {
 }
 settings <- web_settings(data_root = tempfile("srma-tests-"))
 con <- web_db(settings)
-check("schema creation and migration idempotence", {web_migrate(con, settings); web_migrate(con, settings); stopifnot(length(DBI::dbListTables(con)) == 13L)})
+check("schema creation and migration idempotence", {web_migrate(con, settings); web_migrate(con, settings); stopifnot(length(DBI::dbListTables(con)) == 15L, all(c("version_origins","job_sources") %in% DBI::dbListTables(con)), identical(sort(DBI::dbGetQuery(con,"SELECT version FROM schema_migrations")$version),1:5))})
 web_local_identity(con)
 actor <- "local-researcher"
 fixture <- web_fixture(tempfile("input-"))

@@ -60,6 +60,9 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
   # Upload size limits and other operator policy remain server-owned.
   fields <- list(
     projects = character(), workspaces = character(), logout = character(),
+    initialization_review=c("project_id","version_id","job_id"),
+    manual_concepts=c("project_id","version_id","terms_yaml"),
+    activate_draft=c("project_id","version_id","job_id","selections","rationale","human_approved"),
     decide_gate = c("project_id", "gate_id", "decision", "rationale"),
     view = "project_id", configuration = c("project_id", "version_id"),
     save_configuration = c("workspace_id", "values", "project_id", "version_id"),
@@ -77,7 +80,7 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     "The request contains unsupported fields.")
   web_assert(is.list(args) && !any(c("actor", "user_id", "identity", "con", "settings", "upload_root", "private") %in% names(args)),
     "The request contains an unsupported identity field.")
-  reads <- c("view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
+  reads <- c("initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
   if (!action %in% reads)
     web_assert(is.character(csrf) && length(csrf) == 1L && !is.null(expected_csrf) && identical(csrf, expected_csrf),
       "Refresh this page before trying again.")
@@ -85,6 +88,9 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
   switch(action,
     projects = web_query(con, "SELECT p.id,p.title,p.workspace_id FROM projects p JOIN workspace_members m ON p.workspace_id=m.workspace_id WHERE m.user_id=?u ORDER BY p.created_at DESC", u = actor),
     workspaces = web_query(con, "SELECT w.id,w.name FROM workspaces w JOIN workspace_members m ON w.id=m.workspace_id WHERE m.user_id=?u", u = actor),
+    initialization_review=do.call(web_initialization_review,c(list(con=con,settings=settings,actor=actor),args)),
+    manual_concepts=do.call(web_manual_concepts,c(list(con=con,settings=settings,actor=actor),args)),
+    activate_draft=do.call(web_activate_draft,c(list(con=con,settings=settings,actor=actor),args)),
     view = do.call(web_view, c(list(con = con, actor = actor), args)),
     decide_gate = do.call(web_decide_gate, c(list(con = con, actor = actor), args)),
     configuration = do.call(web_edit_configuration, c(list(con = con, settings = settings, actor = actor), args)),

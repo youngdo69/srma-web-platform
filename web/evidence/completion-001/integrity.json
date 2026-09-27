@@ -1,0 +1,14 @@
+{
+  "baseline": "148cb68f9175b9c57403fd06e708e4e96e4697da",
+  "registered_scientific_files": 98,
+  "preserved_scientific_source_files": 97,
+  "approved_changed_files": [
+    "renv.lock"
+  ],
+  "dependency_records_preserved": 79,
+  "dependency_records_added": 27,
+  "removed": [],
+  "changed_existing_records": [],
+  "top_level_metadata_preserved": true,
+  "result": "PASS"
+}

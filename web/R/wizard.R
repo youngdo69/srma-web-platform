@@ -36,10 +36,9 @@ web_save_configuration <- function(con, settings, actor, workspace_id, values, p
     web_assert(project$workspace_id == workspace_id && project$canonical_id == values$project.project_id,
       "Keep the project identifier and workspace when editing a saved review.")
     version <- web_version_root(con, settings, actor, project_id, version_id)
-    for (p in names(version$manifest)) {
-      dest <- file.path(root, p); dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
-      web_assert(file.copy(file.path(version$root, p), dest), "Inputs could not be prepared.", "SYSTEM_FAILED")
-    }
+    # A metadata edit starts a fresh scientific draft. Generated queries/raw exports
+    # cannot silently survive a change in eligibility or research question.
+    web_copy_version(con,settings,actor,project_id,version_id,root,core_only=TRUE)
   } else web_assert(!nrow(web_query(con, "SELECT id FROM projects WHERE workspace_id=?w AND canonical_id=?c", w = workspace_id, c = values$project.project_id)),
     "This project identifier already exists. Open it to create a new version.")
   result <- web_engine_call(settings, list(action = "write_configuration", project_dir = root, values = values))

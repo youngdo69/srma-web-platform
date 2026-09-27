@@ -2,16 +2,18 @@
   "date": "2026-09-26",
   "source": "PM-authorized srma-agent-toolkit.zip",
   "source_sha256": "ad25745510ee314654b27e56e8807cb55f8d7a4b47bf8b35ef0cb4dac13afee9",
-  "commit": "e7b98da4cfd01abbfccc86205f670209eba6ae12",
+  "commit": "4da521f0f6713f9717017b0a831e00ca8a863f66",
   "original_branch": "main",
   "branch": "web/block-a",
   "source_status": "clean after core.autocrlf=true; pre-normalization differences exclusively CRLF",
-  "engine_version": "git:e7b98da",
+  "engine_version": "git:4da521f",
   "runner_version_note": "Header says 3.0.9; runtime state says 3.0.12. Commit plus source hashes are authoritative.",
   "lock_R": "4.6.1",
   "original_lock_sha256": "17223d5fc5bab54445034cc4cb87a7ed2128399588b8c08046602c71bf728075",
   "dependency_findings": [
-    "START_HERE.R requires officer/flextable; neither exists in supplied lock."
+    "PM v1.2 approved additive lock: existing 79 records preserved, 27 added, no removals. Current-runtime acceptance tracked separately."
   ],
-  "secret_handling": "Archive .env was not extracted, read, executed or copied to deliverables."
+  "secret_handling": "Archive .env was not extracted, read, executed or copied to deliverables.",
+  "previous_scientific_commit": "e7b98da4cfd01abbfccc86205f670209eba6ae12",
+  "approved_lock_sha256": "21dd72d3b6a2da0541c2f20fd1632052fba67ef152f949b6386d261e19d2a599"
 }
