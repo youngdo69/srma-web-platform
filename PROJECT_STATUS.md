@@ -1,3 +1,18 @@
+# Current B1 recovery checkpoint — 2026-09-27
+
+Status: INCOMPLETE. No B2 authorization.
+Last completed recovery work: strict request-field policy and authenticated human-review UI; six final local regression tests PASS.
+Outputs: web/docs/B1_RECOVERY_REPORT.md, B1_RECOVERY_CHECKPOINT.md, web/evidence/recovery, two new tests.
+Verification: development R 4.3.3/SQLite only; 98 frozen hashes unchanged, 27-group suite and independent-worker vertical path PASS. Clean Web restore remains incomplete after isolated R repair and 120-second timeout. No actual PostgreSQL PASS.
+Blockers: root-only PostgreSQL environment; missing canonical R 4.6.1/runtime and provider credential. Search concept preparation and generated-output/version handoff remain implementation gaps.
+Next: establish runtime/PostgreSQL prerequisites, finish WEB-008 upstream integration, prove actual QC/PubMed/end-to-end. Search/retrieval remain disabled; scientific lock proposal unapplied.
+Human review records explicit decisions only. New versions do not inherit approvals.
+Deferred: WEB-009+, production OIDC, push/merge/tag/deployment.
+Original old workspace preserved; reconstructed history explicitly identifies source-snapshot imports.
+Last updated: 2026-09-27.
+
+Historical delivery status follows; it is not current-session verification.
+
 # Active B1 status — 2026-09-27
 
 Phase: Autonomous Block B1, stopped before WEB-009.

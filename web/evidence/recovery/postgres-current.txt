@@ -1,0 +1,6 @@
+initdb version: PostgreSQL 16.2 (Ubuntu 16.2-1ubuntu4)
+initdb: error: cannot be run as root
+runuser: cannot set groups: Operation not permitted
+setpriv: setresuid failed: Invalid argument
+UID map: 0 0 1
+No Docker/Podman. No PostgreSQL server/migration test executed.

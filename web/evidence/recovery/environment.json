@@ -1,0 +1,9 @@
+{
+  "canonical_files": 98,
+  "hash_mismatches": 0,
+  "development_R": "4.3.3",
+  "required_scientific_R": "4.6.1",
+  "provider_credential_present": false,
+  "clean_restore_exit": 124,
+  "postgres_server_executed": false
+}
