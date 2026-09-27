@@ -1,3 +1,7 @@
+# PM C3 authorization — 2026-09-27
+
+Approved C2 153b8fb. Implement WEB-013 only in isolated web/block-c3. Scientific release requires actual canonical runtime and PostgreSQL acceptance. Preserve prior checkouts; stop before WEB-014.
+
 # PM C2-001 authorization — 2026-09-27
 
 Approved C1 045ce28. Implement WEB-012 only in isolated web/block-c2; preserve canonical science, upstream approvals and prior checkouts. Stop before WEB-013. Deliver C2-001 incremental bundle and PM report.
