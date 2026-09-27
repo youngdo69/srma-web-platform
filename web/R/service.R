@@ -69,6 +69,7 @@ web_submit <- function(con, settings, actor, project_id, version_id, operation =
   reg <- web_registry()[[operation]]
   web_b2_guard(con,settings,actor,project_id,version_id,operation)
   web_c1_guard(con,settings,actor,project_id,version_id,operation)
+  web_c2_guard(con,settings,actor,project_id,version_id,operation)
   web_pipeline_prerequisites(settings, operation)
   web_require_activated(con,project_id,version_id,operation)
   web_assert(!is.null(reg) && length(payload) == 0L, "This operation is not enabled in this release.")
@@ -118,6 +119,12 @@ web_decide_gate <- function(con, actor, project_id, gate_id, decision, rationale
     web_assert(nrow(a)==1L&&nzchar(trimws(rationale)),"Explicit analysis review rationale is required.")
     web_c1_current(con,project_id,a$evidence_version_id)
     web_assert(a$stage==if(gate$gate_type=="analysis_plan")"PLAN" else "RESULT","This gate does not match the analysis stage.")
+  }
+  if(nrow(gate)&&gate$gate_type %in% c("manuscript_plan","manuscript_review")) {
+    m<-web_query(con,"SELECT m.* FROM manuscript_versions m JOIN gates g ON g.version_id=m.version_id WHERE g.id=?g AND m.project_id=?p",g=gate_id,p=project_id)
+    web_assert(nrow(m)==1&&nzchar(trimws(rationale)),"Explicit manuscript review rationale required.")
+    # Full source guards run in prepare/approve; direct gate action never creates APPROVED manuscripts.
+    web_c1_current(con,project_id,m$evidence_version_id)
   }
   web_tx(con, function() {
     count <- web_exec(con, "UPDATE gates SET status=?d,decision=?d,reviewer_id=?u,decided_at=?now,rationale=?r WHERE id=?g AND project_id=?p AND status='PENDING'",

@@ -1,0 +1,97 @@
+{
+  "runtime": "R 4.3.3 development / SQLite; test-process-only runtime seam; production gate unchanged",
+  "environment": {
+    "SRMA_RSCRIPT": "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+    "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/b2-runtime/root/usr/lib/R/site-library",
+    "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library",
+    "C2_FIXTURE_STATE": "/workspace/scratch/284d178eb86f/c2-evidence/run1/c1-result.rds",
+    "C2_FIXTURE_DB": "/workspace/scratch/284d178eb86f/c2-evidence/final-c2.sqlite"
+  },
+  "final_c2": {
+    "command": "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript --vanilla web/tests/c2_resume.R",
+    "exit_code": 0,
+    "reason": "Replay new C2 workflow against actually executed and persisted B2/C1 approvals, without recalculating statistics"
+  },
+  "regressions": [
+    {
+      "test": "b1_pipeline",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline.R"
+      ],
+      "exit_code": 0,
+      "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+    },
+    {
+      "test": "b1_pipeline_inputs",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline_inputs.R"
+      ],
+      "exit_code": 0,
+      "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+    },
+    {
+      "test": "b1_pipeline_ui",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline_ui.R"
+      ],
+      "exit_code": 0,
+      "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+    },
+    {
+      "test": "b1_request_policy",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_request_policy.R"
+      ],
+      "exit_code": 0,
+      "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+    },
+    {
+      "test": "b1_security",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_security.R"
+      ],
+      "exit_code": 0,
+      "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+    },
+    {
+      "test": "state",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/state.R"
+      ],
+      "exit_code": 0,
+      "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+    },
+    {
+      "test": "contract",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/contract.R"
+      ],
+      "exit_code": 0,
+      "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+    }
+  ],
+  "integrity": {
+    "command": "python3 web/tests/c2_integrity.py",
+    "result": "PASS: 98 canonical hashes, both dependency locks unchanged, no deletion, git diff --check"
+  },
+  "syntax": {
+    "command": "Rscript --vanilla -e 'f <- list.files(\"web\",pattern=\"[.]R$\",recursive=TRUE,full.names=TRUE); invisible(lapply(f,parse)); cat(\"PASS: parsed\",length(f),\"Web R files\\n\")' ",
+    "result": "PASS: 76 files"
+  },
+  "attempts": "Initial c2_fixture.R executed B2/C1 prerequisites successfully, then failed in C2 NULL-field formatting. First resumed DOCX attempt failed on missing Title style. Both fixed; resume3 and final-c2 passed. Failed attempts are not reported as successful complete runs.",
+  "fresh_reproduction": "Use web/tests/c2_fixture.R with C1_TEST_ROOT set to a fresh private directory and the development library variables, or exact operator environment. c2_resume.R requires its persisted fixture; temporary databases are deliberately not delivered."
+}

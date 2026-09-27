@@ -68,6 +68,7 @@ web_registry <- function() {
     registry[[op]]<-list(enabled=TRUE,replay_safe=FALSE,label=label,progress=paste0(label,"…"))
   }
   if(exists("web_c1_operations",mode="function"))for(op in names(web_c1_operations()))registry[[op]]<-list(enabled=TRUE,replay_safe=FALSE,label="Run approved analysis and generate figures/tables",progress="Running the approved canonical analysis…")
+  if(exists("web_c2_operations",mode="function"))for(op in names(web_c2_operations()))registry[[op]]<-list(enabled=TRUE,replay_safe=FALSE,label=gsub("_"," ",op),progress="Preparing author-review manuscript output…")
   registry
 }
 web_result <- function(operation, project_id, job_id, status, message, engine_version,

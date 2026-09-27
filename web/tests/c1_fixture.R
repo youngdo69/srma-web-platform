@@ -4,7 +4,7 @@ reject<-function(expr){e<-tryCatch({force(expr);NULL},error=identity);stopifnot(
 s<-web_settings(data_root=Sys.getenv("C1_TEST_ROOT",tempfile("c1-e2e-")));s$timeout<-120L;con<-web_db(s);web_migrate(con,s);web_local_identity(con)
 for(u in c("second","adjudicator")){web_exec(con,"INSERT INTO app_users VALUES(?u,?u)",u=u);web_exec(con,"INSERT INTO workspace_members VALUES('local-workspace',?u)",u=u)}
 actor<-"local-researcher";f<-web_fixture(tempfile("b2-source-"),"b2-synthetic")
-cfg<-yaml::read_yaml(file.path(f,"config/project_config.yml"));cfg$search$databases<-list(central=TRUE);cfg$research_question$outcomes<-list(primary=list("Synthetic endpoint"),secondary=list());yaml::write_yaml(cfg,file.path(f,"config/project_config.yml"))
+cfg<-yaml::read_yaml(file.path(f,"config/project_config.yml"));if(identical(Sys.getenv("C2_TEST"),"1"))cfg$analysis<-list(manuscript=list(minimum_unique_references=1,minimum_intro_references=1,minimum_discussion_references=1));cfg$search$databases<-list(central=TRUE);cfg$research_question$outcomes<-list(primary=list("Synthetic endpoint"),secondary=list());yaml::write_yaml(cfg,file.path(f,"config/project_config.yml"))
 file.copy(file.path(f,"search_strategies/pubmed_search.txt"),file.path(f,"search_strategies/central_search.txt"))
 v<-web_import_project(con,s,actor,"local-workspace",f)
 upload_root<-tempfile();dir.create(upload_root);ris<-file.path(upload_root,"export.ris")

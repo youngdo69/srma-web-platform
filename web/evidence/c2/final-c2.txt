@@ -1,0 +1,28 @@
+/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/bin/R: line 249: /workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/ldpaths: No such file or directory
+During startup - Warning message:
+In file(file, "rt") :
+  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory
+C2 reconciliation starting
+PASS: immutable primary and sensitivity numbers exactly equal approved C1 registry, no recomputation
+PASS: auth/project/version/CSRF/actor/reviewer/paths/secrets/reference-artifact substitution and immutable schema
+$status
+[1] "PASS"
+
+$label
+[1] "WEB-012 Manuscript Pre-check — not Final QC"
+
+$issues
+list()
+
+PASS: numeric conflict/unresolved fact/invalid citation/unverified metadata blocked; deterministic numbering and genuine DOI/PMID dedup
+PASS: DOCX DEVELOPMENT SMOKE — actual worker, editable paragraphs/tables, headings, references, image artifacts, checksum and authorized download
+Loading required package: shiny
+
+Attaching package: ‘shiny’
+
+The following object is masked _by_ ‘.GlobalEnv’:
+
+    req
+
+PASS: authenticated Shiny manuscript preview/status/precheck; approved manuscript edit rejected
+PASS: Human manuscript approval; plan non-inheritance; analysis revision invalidates current use while preserving historical bytes

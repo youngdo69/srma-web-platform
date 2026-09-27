@@ -92,6 +92,7 @@ cat("PASS: Shiny canonical result/forest display and explicit-method plan save t
 # Production guard remains hard; only this test process has a local seam.
 web_science_settings<-original_science
 if(!isTRUE(canonical_acceptance)){reject(web_science_settings(s));web_science_settings<-function(settings,verify=TRUE)settings}else web_science_settings(s)
+if(identical(Sys.getenv("C2_TEST"),"1"))source("web/tests/c2_reconciliation.R")
 # Upstream revision invalidates current use of every old analysis; historical approvals unchanged.
 up<-web_b2_context(con,s,actor,ready$project_id,ready$version_id)$packet
 revised<-web_b2_edit(con,s,actor,ready$project_id,ready$version_id,"Target_Outcome_Verification",up$tables$Target_Outcome_Verification[[1]]$.row_id,list(intervention_events="1"))

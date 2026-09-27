@@ -1,0 +1,72 @@
+[
+  {
+    "test": "b1_pipeline",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_pipeline.R"
+    ],
+    "exit_code": 0,
+    "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+  },
+  {
+    "test": "b1_pipeline_inputs",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_pipeline_inputs.R"
+    ],
+    "exit_code": 0,
+    "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+  },
+  {
+    "test": "b1_pipeline_ui",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_pipeline_ui.R"
+    ],
+    "exit_code": 0,
+    "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+  },
+  {
+    "test": "b1_request_policy",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_request_policy.R"
+    ],
+    "exit_code": 0,
+    "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+  },
+  {
+    "test": "b1_security",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_security.R"
+    ],
+    "exit_code": 0,
+    "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+  },
+  {
+    "test": "state",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/state.R"
+    ],
+    "exit_code": 0,
+    "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+  },
+  {
+    "test": "contract",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+      "--vanilla",
+      "web/tests/contract.R"
+    ],
+    "exit_code": 0,
+    "reason": "Shared persistence/service/identity/worker/adapter/UI regression"
+  }
+]

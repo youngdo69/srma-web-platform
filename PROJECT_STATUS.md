@@ -1,3 +1,11 @@
+# C2 final implementation checkpoint — 2026-09-27
+
+Status: C2 / WEB-012 IMPLEMENTATION COMPLETE, ready for PM/Reviewer acceptance. Isolated web/block-c2 from approved C1 045ce28. Immutable ManuscriptVersion, source/reference/artifact binding, explicit plan and author-review gates, manual sections and credential-gated AI boundary, protected canonical numerical insertion, citation/pre-check, editable canonical Word generation and authenticated UI/downloads implemented. Actual development E2E, stale-job/edit/version rejection, Human approval/non-inheritance, upstream evidence/analysis invalidation, security, syntax, source protection and seven affected regressions PASS. PROJECT_STATUS updated; canonical source and both dependency locks unchanged.
+
+Last completed: final targeted C2 replay and four-page DOCX visual inspection. Outputs: web/docs/C2_*.md, web/evidence/c2, C2-001 incremental delivery and separate PM report. Next: PM review and external acceptance before WEB-013; no WEB-013/014 or release packaging started. No known remaining local C2 implementation defect. Limitations: deterministic checks do not replace semantic Human review; development canonical figures carry upstream rendering warnings; automatic canonical prose remains English. No private fixture/database/runtime tree delivered.
+
+POSTGRESQL_EXTERNAL_ACCEPTANCE_PENDING; CREDENTIALED_ACCEPTANCE_PENDING; CANONICAL_RUNTIME_ACCEPTANCE_PENDING; CREDENTIALED_AI_ACCEPTANCE_PENDING; CREDENTIALED_MANUSCRIPT_ACCEPTANCE_PENDING. Local R4.3.3/SQLite/cached real reference tests are not exact R4.6.1/provider acceptance. None for WEB-012 implementation completion (Human decisions). No push/merge/tag/deployment.
+
 # C2 starting checkpoint — 2026-09-27
 
 In progress: WEB-012 Manuscript Builder. Isolated srma-c2/web/block-c2 starts clean at approved C1 045ce28. Canonical audit completed; implementation next. Prior C1 is unchanged. PostgreSQL, credentials, canonical runtime and AI/manuscript provider acceptance remain external pending. WEB-013/014 and deployment deferred.

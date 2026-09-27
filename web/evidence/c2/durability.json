@@ -1,0 +1,27 @@
+{
+  "integrity": "ok",
+  "manuscript_stages": [
+    [
+      "APPROVED",
+      1
+    ],
+    [
+      "DRAFT",
+      2
+    ],
+    [
+      "HUMAN_EDITED",
+      21
+    ],
+    [
+      "PLAN",
+      3
+    ],
+    [
+      "REVIEW_REQUIRED",
+      1
+    ]
+  ],
+  "invalidation_events": 2,
+  "sha256": "6a9a8feaf91cfe3776cb86cd45587b03460475e4de4b5b150d3dde6660a5d5c2"
+}

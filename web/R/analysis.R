@@ -7,7 +7,7 @@ web_c1_write <- function(root,x) jsonlite::write_json(x,file.path(root,"config/g
 web_c1_csv <- function(path) readr::read_csv(path,col_types=readr::cols(.default=readr::col_character()),show_col_types=FALSE,na=character())
 web_c1_current <- function(con,project_id,evidence_version) {
  # A newer evidence revision invalidates active use, but never changes old approvals.
- n<-web_query(con,"SELECT v.id FROM project_versions v LEFT JOIN analysis_versions a ON a.version_id=v.id WHERE v.project_id=?p AND a.version_id IS NULL AND v.version>(SELECT version FROM project_versions WHERE id=?v AND project_id=?p)",p=project_id,v=evidence_version)
+ n<-web_query(con,"SELECT v.id FROM project_versions v LEFT JOIN analysis_versions a ON a.version_id=v.id LEFT JOIN manuscript_versions m ON m.version_id=v.id WHERE v.project_id=?p AND a.version_id IS NULL AND m.version_id IS NULL AND v.version>(SELECT version FROM project_versions WHERE id=?v AND project_id=?p)",p=project_id,v=evidence_version)
  web_assert(nrow(n)==0L,"Evidence has changed. Finish and approve the new evidence, then create a new analysis plan.","USER_ACTION_REQUIRED")
 }
 web_c1_evidence <- function(con,settings,actor,project_id,version_id,current=TRUE) {
@@ -51,6 +51,7 @@ web_c1_save <- function(con,settings,actor,project_id,parent_version,root,x,job_
    op<-if(x$stage=="PLAN")"run_meta_analysis" else "finalize_analysis_results"
    web_exec(con,"INSERT INTO gates(id,project_id,workspace_id,version_id,gate_type,required_operation,status,created_at) VALUES(?g,?p,?w,?v,?k,?op,'PENDING',?now)",g=web_id(),p=project_id,w=p$workspace_id,v=v$version_id,k=kind,op=op,now=web_now())
   }
+  web_c2_invalidate_audit(con,p,actor,v$version_id,"New analysis version; historical manuscripts retained")
   web_audit(con,p,paste0("ANALYSIS_",x$stage,"_SAVED"),v$version_id,actor,list(analysis_id=x$analysis_id,evidence=x$evidence_version,plan_sha256=web_c1_hash(x$plan),job=job_id))
   v
  })
@@ -154,6 +155,7 @@ web_c1_view <- function(con,settings,actor,project_id,version_id) {
 }
 
 web_c1_invalidate_audit <- function(con,project,actor,new_version) {
+ web_c2_invalidate_audit(con,project,actor,new_version,"New upstream evidence version")
  a<-web_query(con,"SELECT version_id,evidence_version_id FROM analysis_versions WHERE project_id=?p AND stage='APPROVED'",p=project$id)
  if(nrow(a))web_audit(con,project,"DOWNSTREAM_ANALYSIS_INVALIDATED",new_version,actor,list(historical_approved_versions=as.list(a$version_id),reason="New upstream evidence revision; historical records preserved"))
 }

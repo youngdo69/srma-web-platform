@@ -59,6 +59,11 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
   # Only named public request fields may cross into service functions.
   # Upload size limits and other operator policy remain server-owned.
   fields <- list(
+    manuscript_catalog=c("project_id","version_id"),manuscript_view=c("project_id","version_id"),
+    manuscript_plan=c("project_id","version_id","spec"),manuscript_begin=c("project_id","version_id"),
+    manuscript_edit=c("project_id","version_id","section","text","decision","rationale"),
+    manuscript_prepare_ai=c("project_id","version_id","section"),manuscript_accept=c("project_id","version_id","job_id"),
+    manuscript_approve=c("project_id","version_id","confirmed","rationale"),
     analysis_catalog=c("project_id","version_id"),analysis_view=c("project_id","version_id"),
     analysis_plan=c("project_id","version_id","spec"),analysis_accept=c("project_id","version_id","job_id"),
     analysis_approve=c("project_id","version_id","confirmed","rationale"),
@@ -90,12 +95,21 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     "The request contains unsupported fields.")
   web_assert(is.list(args) && !any(c("actor", "user_id", "identity", "con", "settings", "upload_root", "private") %in% names(args)),
     "The request contains an unsupported identity field.")
-  reads <- c("analysis_catalog","analysis_view","evidence_view", "initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
+  reads <- c("manuscript_catalog","manuscript_view","analysis_catalog","analysis_view","evidence_view", "initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
   if (!action %in% reads)
     web_assert(is.character(csrf) && length(csrf) == 1L && !is.null(expected_csrf) && identical(csrf, expected_csrf),
       "Refresh this page before trying again.")
   actor <- identity$user_id
   switch(action,
+    manuscript_catalog=do.call(web_c2_catalog,c(list(con=con,settings=settings,actor=actor),args)),
+    manuscript_view=do.call(web_c2_view,c(list(con=con,settings=settings,actor=actor),args)),
+    manuscript_plan=do.call(web_c2_plan,c(list(con=con,settings=settings,actor=actor),args)),
+    manuscript_begin=do.call(web_c2_begin,c(list(con=con,settings=settings,actor=actor),args)),
+    manuscript_edit=do.call(web_c2_edit,c(list(con=con,settings=settings,actor=actor),args)),
+    manuscript_prepare_ai=do.call(web_c2_prepare_ai,c(list(con=con,settings=settings,actor=actor),args)),
+    manuscript_accept=do.call(web_c2_accept,c(list(con=con,settings=settings,actor=actor),args)),
+    manuscript_approve=do.call(web_c2_approve,c(list(con=con,settings=settings,actor=actor),args)),
+
     analysis_catalog=do.call(web_c1_catalog,c(list(con=con,settings=settings,actor=actor),args)),
     analysis_view=do.call(web_c1_view,c(list(con=con,settings=settings,actor=actor),args)),
     analysis_plan=do.call(web_c1_plan,c(list(con=con,settings=settings,actor=actor),args)),
