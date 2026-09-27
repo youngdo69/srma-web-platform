@@ -50,6 +50,10 @@ web_app <- function(settings) {
           shiny::tabPanel("Results / Artifacts", shiny::selectInput("artifact", "Available output", character()),
             shiny::downloadButton("download", "Download selected output")),
           shiny::tabPanel("Human Review Required", shiny::tableOutput("gates"),
+            shiny::selectInput("review_gate", "Pending review for selected version", character()),
+            shiny::selectInput("review_decision", "Your decision", c("Choose a decision" = "", "Approve" = "APPROVED", "Reject" = "REJECTED")),
+            shiny::textAreaInput("review_rationale", "Reason and supporting protocol registration reference, where applicable"),
+            shiny::actionButton("record_review", "Record human review decision"),
             shiny::p("A saved draft or completed automated check does not approve scientific decisions. Review decisions remain required.")),
           shiny::tabPanel("Download", shiny::p("Individual verified outputs are available under Results / Artifacts. Final review packaging will be available after final quality control."))))
     })
@@ -86,6 +90,34 @@ web_app <- function(settings) {
       labels <- c(protocol_registration = "Protocol registration confirmation", configuration_human_review = "Review configuration approval")
       label <- unname(labels[gates$gate_type]); label[is.na(label)] <- "Human review requirement"
       data.frame(Review = label, Status = gates$status)
+    })
+    shiny::observe({
+      x <- state(); shiny::req(x, input$version)
+      pending <- x$gates[x$gates$version_id == input$version & x$gates$status == "PENDING", , drop = FALSE]
+      labels <- c(protocol_registration = "Protocol registration", configuration_human_review = "Review configuration")
+      operations <- c(generate_search = "search generation", retrieve_pubmed = "PubMed retrieval")
+      label <- unname(labels[pending$gate_type]); label[is.na(label)] <- "Human review"
+      step <- unname(operations[pending$required_operation]); step[is.na(step)] <- "the next workflow step"
+      shiny::updateSelectInput(session, "review_gate", choices = setNames(pending$id, paste(label, "before", step)),
+        selected = shiny::isolate(input$review_gate))
+    })
+    shiny::observeEvent(input$record_review, {
+      shiny::req(input$project, input$version, input$review_gate)
+      x <- state(); shiny::req(x)
+      if (!input$review_gate %in% x$gates$id[x$gates$version_id == input$version & x$gates$status == "PENDING"] ||
+          !input$review_decision %in% c("APPROVED", "REJECTED") ||
+          is.null(input$review_rationale) || !nzchar(trimws(input$review_rationale))) {
+        notice("Select a pending review, choose your decision, and provide its reason or registration reference.")
+        return()
+      }
+      done <- safe({request("decide_gate", list(project_id = input$project, gate_id = input$review_gate,
+        decision = input$review_decision, rationale = input$review_rationale)); TRUE})
+      if (isTRUE(done)) {
+        refresh(refresh() + 1L)
+        shiny::updateSelectInput(session, "review_decision", selected = "")
+        shiny::updateTextAreaInput(session, "review_rationale", value = "")
+        notice("Human decision recorded for this saved version. It cannot be changed or carried to a new version automatically. Scientific runtime and search quality checks still apply.")
+      }
     })
     shiny::observeEvent(input$run, {
       shiny::req(input$project, input$version)

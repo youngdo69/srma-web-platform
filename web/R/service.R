@@ -139,7 +139,7 @@ web_cancel <- function(con, actor, project_id, job_id) {
 web_view <- function(con, actor, project_id) {
   p <- web_authorize(con, actor, project_id)
   list(project = p[, c("id", "title"), drop = FALSE],
-    gates = web_query(con, "SELECT gate_type,status,version_id FROM gates WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
+    gates = web_query(con, "SELECT id,gate_type,required_operation,status,version_id FROM gates WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
     versions = web_query(con, "SELECT id,version,created_at FROM project_versions WHERE project_id=?p ORDER BY version DESC", p = project_id),
     jobs = web_query(con, "SELECT id,operation,state,message,progress,created_at FROM jobs WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
     artifacts = web_query(con, "SELECT id,logical_name,version,approval_state,created_at FROM artifacts WHERE project_id=?p AND status='AVAILABLE' ORDER BY created_at DESC", p = project_id))
