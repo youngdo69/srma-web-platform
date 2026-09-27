@@ -1,3 +1,9 @@
+# B1 isolated candidate re-verification — 2026-09-27
+
+Candidate checkout: /workspace/scratch/284d178eb86f/srma-b1-canonical-candidate; branch web/b1-acceptance. Restored recovery bundle baseline, verified all 64 before-hashes, applied complete delta and verified all 64 after-hashes. Full tree matched 636e730; restored preserved B1 candidate 2bbe205, with identical tested implementation. This documentation-only checkpoint records fresh syntax/diff and five targeted B1 regressions, all PASS. Scientific manifest 98/98; 97 non-lock files unchanged; 79 existing lock records plus 27 additions. Both protected Block A and existing checkout with B2 work remain byte-for-byte unchanged. No B2 implementation performed in this mission. Evidence: web/evidence/reacceptance.
+
+Current phase: B1 CANONICAL CANDIDATE, PM acceptance pending. Last completed: isolated reconstruction/re-verification. Next: PM/Reviewer acceptance and external gates only. POSTGRESQL_EXTERNAL_ACCEPTANCE_PENDING; CREDENTIALED_ACCEPTANCE_PENDING; CANONICAL_RUNTIME_ACCEPTANCE_PENDING. No known local implementation defect found; no source changes or broad test rerun.
+
 # B1 canonical reconstruction candidate — 2026-09-27
 
 Status: B1 CANONICAL CANDIDATE; PM acceptance pending.

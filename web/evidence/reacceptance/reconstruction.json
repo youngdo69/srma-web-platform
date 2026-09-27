@@ -1,0 +1,8 @@
+{
+  "source_hashes": 271,
+  "baseline_conditions": 64,
+  "after_hashes": 64,
+  "mismatches": 0,
+  "payload_tree": "38b013e10a39e2fd9e407e03a233bb465c4e698b",
+  "candidate_head": "2bbe2059a514c1c5f4b56377e02954893e7bb1f8"
+}

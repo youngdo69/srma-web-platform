@@ -1,0 +1,16 @@
+/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/bin/R: line 249: /workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/ldpaths: No such file or directory
+During startup - Warning message:
+In file(file, "rt") :
+  cannot open file '/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/etc/repositories': No such file or directory
+[1] 1
+PASS: canonical manual concepts and activation; idempotence, explicit approval, pending protocol and immutable lineage
+PASS: unresolved canonical decisions block activation; actual selected patch applied and verified
+PASS: missing credential fails closed with actionable state; synthetic secret rejected and redacted
+[1] 1
+[1] 1
+[1] 1
+PASS: synthetic raw artifact binding, real store/checksum verification and cross-version/path rejection (not scientific retrieval evidence)
+[1] "04fb97b9a57c2280cae8ad4d5fea7dd1"
+PASS: contract fixtures prove exact-version and pinned-source binding; stale retrieval cannot join newer search; REVIEW_REQUIRED blocks retrieval
+PASS: explicitly selected search/raw contract outputs and two uploads form new immutable input versions with provenance and pending gates; approved source snapshot unchanged
+PASS: synthetic status contract preserves PASS, REVIEW_REQUIRED and structured failure; no scientific QC claim
