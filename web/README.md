@@ -1,6 +1,6 @@
-# SR-MA Web Platform — Autonomous Block A
+# SR-MA Web Platform — Autonomous Block B1
 
-Local Shiny + bslib application around the unchanged, PM-authorized canonical R engine. Only **Check search strategies** is enabled. It checks structural syntax; it does not validate clinical search quality, search databases, or approve any scientific Human Gate.
+Local Shiny + bslib application around the unchanged, PM-authorized canonical R engine. **Check search strategies** and **Check database inputs** are enabled. Database preflight requires the separately verified scientific runtime. Neither operation approves any scientific Human Gate. Search generation and PubMed retrieval remain disabled.
 
 ## Run with an existing R installation
 
@@ -20,11 +20,11 @@ Rscript --vanilla web/bin/worker.R
 Rscript --vanilla web/bin/app.R
 ```
 
-Open http://127.0.0.1:3838. Select a project and saved version, click **Check search strategies**, then choose an available result and download it. The worker continues if the browser/app closes. Reopening the app loads persistent state.
+Open http://127.0.0.1:3838 and use the automated-test session setup below. Select a project and saved version, click **Check search strategies**, then choose an available result and download it. The worker continues if the browser/app closes. Reopening the app loads persistent state.
 
-`SRMA_WEB_DATA` optionally sets the same persistent data directory for all processes; the default is `tools::R_user_dir("srma-web", "data")`. `SRMA_RSCRIPT` optionally selects the Rscript executable. `SRMA_ENGINE_ROOT` optionally selects the repository root. `SRMA_WEB_PORT` defaults to 3838. No scientific API key is needed. Do not expose this development server beyond loopback: authentication is outside Block A.
+`SRMA_WEB_DATA` optionally sets the same persistent data directory for all processes; the default is `tools::R_user_dir("srma-web", "data")`. `SRMA_RSCRIPT` optionally selects the Rscript executable. `SRMA_ENGINE_ROOT` optionally selects the repository root. `SRMA_WEB_PORT` defaults to 3838. No scientific API key is needed for the two enabled validation operations. Do not expose this development server beyond loopback; production OIDC is not configured.
 
-The setup script restores a Web-only lock generated from the tested package versions. It was not itself clean-room restored here. A working C/C++ toolchain and system libraries may be needed when CRAN must install archived source packages. The actual isolated Linux test runtime and package versions are recorded in docs/development-runtime.json and docs/BASELINE.md. Canonical R 4.6.1 lock restoration is not claimed.
+The Web R 4.3.3 lock has now been restored into a fresh isolated library, with all 56 package versions and paths verified. The original scientific lock has separately been restored under R 4.6.1, with all 79 locked packages verified. See evidence/b1/ for current evidence; docs/development-runtime.json describes the earlier Block A environment. A C/C++ toolchain and system development libraries are required for source builds.
 
 ## Isolated synthetic demonstration
 
@@ -38,7 +38,7 @@ Rscript --vanilla web/tests/run.R
 python3 web/tests/vertical.py
 ```
 
-`vertical.py` creates a fresh local database, starts the real Shiny app, checks HTTP and JS/CSS resources, submits a persistent job through the application service, closes the application/submitter, runs two separate workers, and downloads real engine outputs through the authorization service. It writes reproducible evidence under web/evidence. UI interaction is also covered by Shiny testServer in run.R; the process-level vertical slice uses the service boundary rather than claiming a browser-click automation.
+`vertical.py` creates a fresh local database, starts the real Shiny app, checks HTTP and JS/CSS resources, submits a persistent job through the application service, closes the application/submitter, runs two separate workers, and downloads real engine outputs through the authorization service. It writes reproducible evidence under web/evidence/b1. UI interaction is also covered by Shiny testServer in run.R; the process-level vertical slice uses the service boundary rather than claiming a browser-click automation.
 
 ## Operator recovery and Human Gates
 
@@ -57,3 +57,32 @@ Object storage is a put/get/checksum port with a local immutable implementation.
 The engine source manifest covers 98 original files. The full-source ZIP preserves their exact bytes. A checkout that changes line endings may need a documented baseline refresh; never silently waive a source-hash mismatch. The ZIP excludes original .git and secrets, while the report records original and development commits. The separate change patch can be applied to the exact original source. No remote push or main merge was performed.
 
 See docs/ADR-001-architecture.md, docs/ADAPTER-CONTRACT.md and evidence/ for implementation and validation limits.
+
+## Block B1 development update
+
+The application now requires a server-verified session. There is no fixed browser actor. OIDC is a provider-neutral interface, not a configured production login. Run test identity provisioning only for automated development tests:
+
+```sh
+export SRMA_WEB_TEST_IDP=1
+Rscript --vanilla web/bin/test_session.R
+Rscript --vanilla web/bin/app.R
+```
+
+Keep the issued session credential private; enter it in the local sign-in form. It expires after one hour, is stored only as a hash in the database, and becomes unusable after logout. Leave `SRMA_WEB_TEST_IDP` unset outside tests. The app binds loopback and does not provide a production OIDC deployment.
+
+Use the Web R version declared in `web/renv.lock` (4.3.3), separately from the scientific R version declared in the root lock (4.6.1). `web/bin/setup.R` isolates its package library and refuses a different R version. `SRMA_WEB_LIBRARY` can select a fresh library; `SRMA_RENV_BOOTSTRAP` can identify a separately installed renv bootstrap library. The verified bootstrap version is recorded with the runtime evidence. Source builds need a C/C++ toolchain and PostgreSQL client development headers (`libpq-dev` / `pg_config`); these are system dependencies, not R packages borrowed from another environment.
+
+The dashboard contains a canonical-configuration wizard, immutable edit/resume, version-specific human-review requirements, saved search strategy viewing/downloading and safe manual export upload. Upload acceptance is distinct from canonical preflight validation. An uploaded extension alone never means valid scientific input.
+
+Search generation, retrieval and preflight readiness are governed by the semantic registry and scientific-runtime checks. Consult the B1 report for actually enabled/executed operations. No merge/deduplication or screening is started automatically. Canonical scientific files and root `renv.lock` remain frozen; any DOCX dependency update is a separate PM-review proposal.
+
+See `docs/B1_ARCHITECTURE.md`, `tests/b1*.R` and `evidence/b1/`. PostgreSQL must be exercised on an actual disposable server using `tests/postgres.R`; do not interpret SQLite evidence as PostgreSQL approval.
+
+Configure canonical preflight on the operator side, for both app and worker processes:
+
+```sh
+export SRMA_SCIENTIFIC_RSCRIPT=/path/to/R-4.6.1/bin/Rscript
+export SRMA_SCIENTIFIC_LIBRARY=/path/to/restored/scientific/library
+```
+
+The runtime probe must match the unchanged root lock before a preflight job can run. The DOCX proposal is not automatically applied. Read `docs/B1_PM_REPORT.md` and `evidence/b1/engine-dependency-proposal/README.md` before considering any scientific lock update.

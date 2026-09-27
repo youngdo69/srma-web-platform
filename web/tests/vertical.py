@@ -19,7 +19,7 @@ with (data/"app.log").open("w") as log:
             try:
                 response = urllib.request.urlopen(f"http://127.0.0.1:{port}",timeout=1)
                 html = response.read()
-                assert response.status == 200 and b"Research workspace" in html
+                assert response.status == 200 and b"Systematic Review Workspace" in html
                 break
             except OSError: time.sleep(.1)
         else: raise RuntimeError("Shiny did not start")
@@ -45,8 +45,8 @@ finally:
 run("verify")
 evidence=json.loads((data/"vertical-evidence.json").read_text())
 evidence.update(application_http_status=200,application_exited_before_execution=True,parallel_workers=2)
-(repo/"web/evidence/vertical-slice.json").write_text(json.dumps(evidence,indent=2)+"\n")
+(repo/"web/evidence/b1/vertical-slice.json").write_text(json.dumps(evidence,indent=2)+"\n")
 # Only synthetic engine outputs, no private execution paths or logs in deliverables.
 for path in (data/"downloads").iterdir():
-    (repo/"web/evidence"/path.name).write_bytes(path.read_bytes())
+    (repo/"web/evidence/b1"/path.name).write_bytes(path.read_bytes())
 print("PASS: process-level vertical slice evidence recorded",flush=True)

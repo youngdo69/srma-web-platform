@@ -1,3 +1,25 @@
+# Active B1 status — 2026-09-27
+
+Phase: Autonomous Block B1, stopped before WEB-009.
+Status: In progress — partial implementation delivered for PM review; full B1 acceptance NOT achieved.
+Current task: B1 evidence and PM handoff; acceptance blocked/partial as detailed below.
+Last completed tasks: WEB-006 dashboard; WEB-007 canonical wizard; manual-import and canonical scientific preflight path.
+Completed outputs: authenticated identity/service boundary; dashboard; immutable canonical configuration save/edit/resume; safe manual uploads; actual TASK-018 preflight; guarded runtime validation; test evidence.
+PostgreSQL: BLOCKED. Actual 16.2 binaries installed, but initdb rejects root and ordinary non-root identity changes are unavailable. No PostgreSQL execution PASS claimed.
+Web clean restore: PASS under R 4.3.3; all 56 locked packages verified in a fresh library, no Block A package borrowing; clean suite and independent-worker vertical test PASS.
+Scientific runtime: Original R 4.6.1 lock restored; all 79 exact packages load. DOCX maintenance UPDATE_READY: conservative proposal preserves all 79 original package records and adds 27 (106 total); namespace, DOCX/table and START_HERE environment-only validation PASS. Raw utility snapshot removed 12 original packages and is not recommended. Canonical root lock remains unchanged.
+WEB-005: IMPLEMENTED — VALIDATION PENDING (real PostgreSQL evidence required).
+WEB-006: PASS. WEB-007: PASS.
+WEB-008: FAIL / partial. Saved strategy display, safe manual import and actual canonical preflight work. Credential-free R/11 returns review required and R/16 blocks before EFetch. Successful credentialed QC/retrieval and complete upstream Web integration are not demonstrated.
+Block B1 end-to-end: FAIL. No claim of complete new-project-to-PubMed-to-preflight workflow.
+Enabled operations: validate_search and validate_database_inputs only. Preflight requires verified separate scientific runtime at submission and worker execution.
+Human gates: preserved; automated artifacts UNREVIEWED; no downstream merge/dedup/screening starts.
+Next: PM review; real PostgreSQL test environment; controlled dependency proposal decision; secure provider credential configuration; finish search/upstream integration and revalidate B1 before B2.
+Deferred: WEB-009 and later, production OIDC selection/deployment, public hosting, paid infrastructure.
+Last updated: 2026-09-27.
+
+Prior Block A record follows.
+
 # Active platform status — 2026-09-27
 
 Phase: Autonomous Block A — completed under PM Revised Mission v1.1.

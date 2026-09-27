@@ -1,0 +1,35 @@
+{
+  "test_inputs": "Explicitly synthetic RIS parser fixtures; no real studies or clinical observations",
+  "databases": ["embase", "central"],
+  "first_state": "USER_ACTION_REQUIRED",
+  "complete_state": "COMPLETE",
+  "attempts": 1,
+  "artifacts": [
+    {
+      "logical_name": "task018_database_input_gate.csv",
+      "checksum": "adc440d3c8d15aa3e4f5cab98a96e3f3307930b28a5b8bba2e2c362629c5cd26",
+      "approval_state": "UNREVIEWED"
+    },
+    {
+      "logical_name": "task018_database_input_gate.txt",
+      "checksum": "1ad66d4e39935e36f89863c410419c1cfebb8af8bb9f208d7fc1a66d57b42d16",
+      "approval_state": "UNREVIEWED"
+    }
+  ],
+  "provenance": {
+    "input_hashes": {
+      "config/project_config.yml": "4956f3580863f6ae4801e60c5027c2df6bc93a9ad7439b2d6e9b26c1f9093cee",
+      "config/search_terms.yml": "323243f24ac297a56301bd90df2f047c5706b3061d1bfdf8b5cc28d54dafe959",
+      "data/raw/central/central.ris": "39ac78ddcba6131a48c445aba113f88a9e58f163688c0e891217bfc0549f8c33",
+      "data/raw/embase/embase.ris": "39ac78ddcba6131a48c445aba113f88a9e58f163688c0e891217bfc0549f8c33",
+      "search_strategies/central_search.txt": "4043179674b494a851b6d79c2ef99af2cc26f5b9ab9bc3bdcdfc7c4821a9a551",
+      "search_strategies/embase_search.txt": "4043179674b494a851b6d79c2ef99af2cc26f5b9ab9bc3bdcdfc7c4821a9a551"
+    },
+    "engine_script_sha256": "16c255b85bf7f4076c90d01bd52ea6469dce2ea8d705d8dc1035acd46c6f7329",
+    "R": "R version 4.6.1 (2026-06-24)",
+    "project_version_id": "7ea1670d246b77d0341359a8eeaa4312",
+    "attempt": 1
+  },
+  "no_downstream_operation": true,
+  "human_approvals_unchanged": true
+}

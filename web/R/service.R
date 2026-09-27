@@ -21,10 +21,11 @@ web_local_identity <- function(con) {
       DBI::dbExecute(con, "INSERT INTO workspace_members VALUES('local-workspace','local-researcher')")
   })
 }
-web_import_project <- function(con, settings, actor, workspace_id, source_root) {
+web_import_project <- function(con, settings, actor, workspace_id, source_root, configuration_only = FALSE, draft_gates = FALSE) {
   web_assert(nrow(web_query(con, "SELECT user_id FROM workspace_members WHERE workspace_id=?w AND user_id=?u", w = workspace_id, u = actor)) == 1L,
     "This workspace is not accessible.")
-  info <- web_engine_inspect(settings, source_root)
+  engine <- web_register_engine(con, settings)
+  info <- web_engine_inspect(settings, source_root, configuration_only)
   version_id <- web_id()
   relative <- file.path("snapshots", version_id)
   target <- file.path(settings$data_root, relative)
@@ -45,21 +46,30 @@ web_import_project <- function(con, settings, actor, workspace_id, source_root) 
         w = workspace_id, c = info$project_id, t = info$title, now = web_now())
     } else project_id <- existing$id
     # Serialize version allocation on PostgreSQL as well as SQLite BEGIN IMMEDIATE.
-    web_exec(con, "UPDATE projects SET title=title WHERE id=?p", p = project_id)
+    web_exec(con, "UPDATE projects SET title=?t WHERE id=?p", t = info$title, p = project_id)
     n <- web_query(con, "SELECT COALESCE(MAX(version),0)+1 AS n FROM project_versions WHERE project_id=?p", p = project_id)$n
     web_exec(con, "INSERT INTO project_versions VALUES(?id,?p,?n,?hash,?locator,?manifest,?now)",
       id = version_id, p = project_id, n = n, hash = info$manifest[["config/project_config.yml"]],
       locator = relative, manifest = as.character(web_json(info$manifest)), now = web_now())
     project <- web_authorize(con, actor, project_id)
-    web_audit(con, project, "PROJECT_VERSION_IMPORTED", version_id, actor, list(version = n))
+    web_audit(con, project, "PROJECT_VERSION_IMPORTED", version_id, actor, list(version = n, engine_release = engine))
+    if (draft_gates) for (op in c("generate_search", "retrieve_pubmed"))
+      for (kind in c("protocol_registration", "configuration_human_review")) {
+        gate <- web_id()
+        web_exec(con, "INSERT INTO gates(id,project_id,workspace_id,version_id,gate_type,required_operation,status,created_at) VALUES(?id,?p,?w,?v,?k,?o,'PENDING',?now)",
+          id = gate, p = project_id, w = workspace_id, v = version_id, k = kind, o = op, now = web_now())
+        web_audit(con, project, "GATE_REQUIRED", gate, actor)
+      }
     list(project_id = project_id, version_id = version_id)
   })
 }
 web_submit <- function(con, settings, actor, project_id, version_id, operation = "validate_search", idempotency_key = web_id(), payload = list()) {
   project <- web_authorize(con, actor, project_id)
   reg <- web_registry()[[operation]]
-  web_assert(!is.null(reg) && isTRUE(reg$enabled) && length(payload) == 0L, "This operation is not enabled in this release.")
+  web_assert(!is.null(reg) && length(payload) == 0L, "This operation is not enabled in this release.")
+  web_assert(isTRUE(reg$enabled), if (!is.null(reg$blocked_reason)) reg$blocked_reason else "This operation is not enabled in this release.")
   web_assert(is.character(idempotency_key) && length(idempotency_key) == 1L && nzchar(idempotency_key) && nchar(idempotency_key) <= 128L, "Invalid request identifier.")
+  if (operation == "validate_database_inputs") web_science_settings(settings)
   engine <- web_register_engine(con, settings)
   web_tx(con, function() {
     web_exec(con, "UPDATE projects SET title=title WHERE id=?p", p = project_id)
@@ -73,7 +83,7 @@ web_submit <- function(con, settings, actor, project_id, version_id, operation =
     id <- web_id()
     web_exec(con, "INSERT INTO jobs(id,project_id,version_id,engine_id,operation,idempotency_key,state,message,progress,created_at,updated_at) VALUES(?id,?p,?v,?e,?o,?k,?s,?m,0,?now,?now)",
       id = id, p = project_id, v = version_id, e = engine, o = operation, k = idempotency_key, s = state,
-      m = if (blocked) "Human review is required before this step can continue." else "Waiting to check search strategies…", now = web_now())
+      m = if (blocked) "Human review is required before this step can continue." else paste0("Waiting: ", reg$label, "…"), now = web_now())
     web_audit(con, project, paste0("JOB_", state), id, actor)
     id
   })
@@ -129,7 +139,8 @@ web_cancel <- function(con, actor, project_id, job_id) {
 web_view <- function(con, actor, project_id) {
   p <- web_authorize(con, actor, project_id)
   list(project = p[, c("id", "title"), drop = FALSE],
+    gates = web_query(con, "SELECT gate_type,status,version_id FROM gates WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
     versions = web_query(con, "SELECT id,version,created_at FROM project_versions WHERE project_id=?p ORDER BY version DESC", p = project_id),
-    jobs = web_query(con, "SELECT id,state,message,progress,created_at FROM jobs WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
+    jobs = web_query(con, "SELECT id,operation,state,message,progress,created_at FROM jobs WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
     artifacts = web_query(con, "SELECT id,logical_name,version,approval_state,created_at FROM artifacts WHERE project_id=?p AND status='AVAILABLE' ORDER BY created_at DESC", p = project_id))
 }

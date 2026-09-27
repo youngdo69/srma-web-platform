@@ -22,11 +22,11 @@ web_tx <- function(con, f) {
   DBI::dbCommit(con); done <- TRUE
   value
 }
-web_migrate <- function(con, settings) {
+web_migrate_core <- function(con, settings) {
   path <- file.path(settings$engine_root, "web/db/001_core.sql")
   hash <- web_sha(path)
   if (DBI::dbExistsTable(con, "schema_migrations")) {
-    versions <- DBI::dbGetQuery(con, "SELECT * FROM schema_migrations")
+    versions <- DBI::dbGetQuery(con, "SELECT * FROM schema_migrations WHERE version=1")
     web_assert(nrow(versions) == 1L && versions$version == 1L && versions$checksum == hash,
       "Database migration history needs operator review.", "SYSTEM_FAILED")
     return(invisible(TRUE))
@@ -66,4 +66,32 @@ web_audit <- function(con, project, event, object, actor = NA_character_, detail
 web_gate_open <- function(con, project_id, version_id, operation) {
   nrow(web_query(con, "SELECT id FROM gates WHERE project_id=?p AND version_id=?v AND required_operation=?o AND status<>'APPROVED'",
     p = project_id, v = version_id, o = operation)) > 0L
+}
+
+web_migrate <- function(con, settings) {
+  web_migrate_core(con, settings)
+  dir <- file.path(settings$engine_root, "web/db")
+  migrations <- list(
+    list(version = 2L, files = "002_identity.sql", delimiter = ";"),
+    list(version = 3L, files = c("003_immutability.sqlite.sql", "003_immutability.postgres.sql"), delimiter = "-- NEXT"))
+  history <- DBI::dbGetQuery(con, "SELECT * FROM schema_migrations WHERE version<>1")
+  web_assert(all(history$version %in% c(2L, 3L)), "Database migration history needs operator review.", "SYSTEM_FAILED")
+  for (migration in migrations) {
+    paths <- file.path(dir, migration$files)
+    hashes <- vapply(paths, web_sha, character(1))
+    hash <- if (length(hashes) == 1L) unname(hashes) else digest::digest(paste(hashes, collapse = ":"), algo = "sha256", serialize = FALSE)
+    entry <- history[history$version == migration$version, , drop = FALSE]
+    if (nrow(entry)) {
+      web_assert(nrow(entry) == 1L && entry$checksum == hash,
+        "Database migration history needs operator review.", "SYSTEM_FAILED")
+      next
+    }
+    path <- if (length(paths) == 1L) paths else paths[if (inherits(con, "SQLiteConnection")) 1L else 2L]
+    web_tx(con, function() {
+      for (sql in strsplit(paste(readLines(path), collapse = "\n"), migration$delimiter, fixed = TRUE)[[1]])
+        if (nzchar(trimws(sql))) DBI::dbExecute(con, sql)
+      web_exec(con, "INSERT INTO schema_migrations VALUES(?v,?h,?n)", v = migration$version, h = hash, n = web_now())
+    })
+  }
+  invisible(TRUE)
 }

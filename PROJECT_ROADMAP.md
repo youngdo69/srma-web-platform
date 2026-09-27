@@ -1,3 +1,7 @@
+# PM-authorized B1 strategy update — 2026-09-27
+
+Block A at 50f1e3b is PM APPROVED. Continue through B0 hardening and WEB-005–008 under Autonomous Block B1 Master Mission v1.0. Stop before WEB-009. Preserve the architecture and scientific baseline; dependency baseline changes require PM review. This supersedes the earlier WEB-005 deferral only within the approved B1 scope.
+
 # PM-authorized strategy update — 2026-09-26
 
 The current explicit PM charter authorizes Autonomous Block A (WEB-000 through WEB-004) on the supplied canonical snapshot. This supersedes the historical frontend deferral below for this block only. Preserve the scientific engine and all Human Gates. WEB-005 and production deployment remain out of scope. Historical research-review completion is not asserted by this update.

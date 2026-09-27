@@ -1,0 +1,22 @@
+{
+  "R": "R version 4.6.1 (2026-06-24)",
+  "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+  "original_locked_packages_verified": 79,
+  "R41_required_packages": [
+    "yaml",
+    "readr",
+    "dplyr",
+    "tibble",
+    "stringr",
+    "digest",
+    "officer",
+    "flextable",
+    "openxlsx"
+  ],
+  "proposed_locked_packages_verified": 106,
+  "officer_version": "0.7.6",
+  "flextable_version": "0.10.1",
+  "editable_word_table": true,
+  "synthetic_dependency_smoke_only": true,
+  "canonical_R41_workflow_executed": false
+}

@@ -1,0 +1,22 @@
+{
+  "web_test_R": "R version 4.3.3 (2024-02-29)",
+  "scientific_runtime": "R version 4.6.1 (2026-06-24)",
+  "synthetic_terms": true,
+  "provider": "openai",
+  "credential_available_in_operator_environment": false,
+  "test_credential_deliberately_absent": true,
+  "generation_status": "USER_ACTION_REQUIRED",
+  "canonical_quality": "REVIEW_REQUIRED",
+  "pubmed_retrieval_status": "FAILED",
+  "blocked_before_EFetch": true,
+  "downloaded_records": 0,
+  "generation_provenance": {
+    "input_hashes": {
+      "config/project_config.yml": "4dcdf67b60a89eb2c4c464852fac4484eab468db25b5525e707d0f8e564f241c",
+      "config/search_terms.yml": "c6444d383823b7d394903bf85627775c7bd9f735c6b7945c0822d4296dae985c",
+      "search_strategies/pubmed_search.txt": "4043179674b494a851b6d79c2ef99af2cc26f5b9ab9bc3bdcdfc7c4821a9a551"
+    },
+    "engine_script_sha256": "4b21e496311d7a82aa151403753472c2cdacf68387651a9fcf4bd4d6a56d3d20",
+    "R": "R version 4.6.1 (2026-06-24)"
+  }
+}

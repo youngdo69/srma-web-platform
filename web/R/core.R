@@ -11,6 +11,7 @@ web_assert <- function(ok, message = "The requested action is not available.", c
 }
 web_inside <- function(path, root, exists = TRUE) {
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
+  if (!grepl("^(/|[A-Za-z]:|\\\\)", path)) path <- file.path(getwd(), path)
   path <- normalizePath(path, winslash = "/", mustWork = exists)
   # Resolve existing ancestors as well, preventing escapes via symlinked parents.
   parent <- path
@@ -20,9 +21,10 @@ web_inside <- function(path, root, exists = TRUE) {
     parent <- next_parent
   }
   parent <- normalizePath(parent, winslash = "/", mustWork = TRUE)
-  web_assert((identical(path, root) || startsWith(path, paste0(root, "/"))) &&
-             (identical(parent, root) || startsWith(parent, paste0(root, "/"))),
-             "A project path is outside its permitted location.")
+  if (!isTRUE((identical(path, root) || startsWith(path, paste0(root, "/"))) &&
+             (identical(parent, root) || startsWith(parent, paste0(root, "/")))))
+    web_error("VALIDATION_FAILED", "A project path is outside its permitted location.",
+      paste("Path:", path, "Root:", root, "Resolved parent:", parent))
   path
 }
 web_sha <- function(path) digest::digest(file = path, algo = "sha256")
@@ -42,10 +44,18 @@ web_registry <- function() {
     "finalize_included_studies", "extract_data", "assess_risk_of_bias", "run_meta_analysis",
     "generate_figures", "generate_tables", "generate_manuscript", "run_final_qc", "build_release_package",
     "validate_search")
-  setNames(lapply(names, function(n) list(enabled = identical(n, "validate_search"),
-     replay_safe = identical(n, "validate_search"),
+  registry <- setNames(lapply(names, function(n) list(enabled = n %in% c("validate_search", "validate_database_inputs"),
+     replay_safe = n %in% c("validate_search", "validate_database_inputs"),
      label = if (n == "validate_search") "Check search strategies" else "Not enabled in this release",
      progress = "Checking search strategies…")), names)
+  labels <- c(initialize_project = "Prepare review configuration", generate_search = "Generate database searches",
+    retrieve_pubmed = "Retrieve PubMed records", validate_database_inputs = "Check database inputs")
+  for (name in names(labels)) {
+    registry[[name]]$label <- labels[[name]]
+    registry[[name]]$blocked_reason <- "This step needs validated scientific runtime and canonical workflow integration before it can be enabled. Your saved inputs are retained."
+  }
+  registry$validate_database_inputs$progress <- "Checking database inputs…"
+  registry
 }
 web_result <- function(operation, project_id, job_id, status, message, engine_version,
                        code = NULL, diagnostic = NULL, artifacts = list(), started = web_now(), provenance = list()) {

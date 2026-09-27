@@ -1,0 +1,645 @@
+{
+  "status": "COMPLETE",
+  "error_code": null,
+  "user_message": "Canonical scientific runtime verified.",
+  "R": "R version 4.6.1 (2026-06-24)",
+  "packages": [
+    {
+      "package": "CompQuadForm",
+      "expected": "1.4.4",
+      "actual": "1.4.4",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "MASS",
+      "expected": "7.3-65",
+      "actual": "7.3-65",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/r461/opt/R/4.6.1/lib/R/library",
+      "matches": true
+    },
+    {
+      "package": "Matrix",
+      "expected": "1.7-5",
+      "actual": "1.7-5",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/r461/opt/R/4.6.1/lib/R/library",
+      "matches": true
+    },
+    {
+      "package": "R6",
+      "expected": "2.6.1",
+      "actual": "2.6.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "RColorBrewer",
+      "expected": "1.1-3",
+      "actual": "1.1-3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "Rcpp",
+      "expected": "1.1.2",
+      "actual": "1.1.2",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "RcppEigen",
+      "expected": "0.3.4.0.2",
+      "actual": "0.3.4.0.2",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "Rdpack",
+      "expected": "2.6.6",
+      "actual": "2.6.6",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "S7",
+      "expected": "0.2.2",
+      "actual": "0.2.2",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "XML",
+      "expected": "3.99-0.23",
+      "actual": "3.99-0.23",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "askpass",
+      "expected": "1.2.1",
+      "actual": "1.2.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "base64enc",
+      "expected": "0.1-6",
+      "actual": "0.1-6",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "bit",
+      "expected": "4.6.0",
+      "actual": "4.6.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "bit64",
+      "expected": "4.8.2",
+      "actual": "4.8.2",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "boot",
+      "expected": "1.3-32",
+      "actual": "1.3-32",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/r461/opt/R/4.6.1/lib/R/library",
+      "matches": true
+    },
+    {
+      "package": "cli",
+      "expected": "3.6.6",
+      "actual": "3.6.6",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "clipr",
+      "expected": "0.8.1",
+      "actual": "0.8.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "cpp11",
+      "expected": "0.5.5",
+      "actual": "0.5.5",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "crayon",
+      "expected": "1.5.3",
+      "actual": "1.5.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "curl",
+      "expected": "7.1.0",
+      "actual": "7.1.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "digest",
+      "expected": "0.6.39",
+      "actual": "0.6.39",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "dotenv",
+      "expected": "1.0.3",
+      "actual": "1.0.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "dplyr",
+      "expected": "1.2.1",
+      "actual": "1.2.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "farver",
+      "expected": "2.1.2",
+      "actual": "2.1.2",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "generics",
+      "expected": "0.1.4",
+      "actual": "0.1.4",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "ggplot2",
+      "expected": "4.0.3",
+      "actual": "4.0.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "glue",
+      "expected": "1.8.1",
+      "actual": "1.8.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "gtable",
+      "expected": "0.3.6",
+      "actual": "0.3.6",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "hms",
+      "expected": "1.1.4",
+      "actual": "1.1.4",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "httr",
+      "expected": "1.4.8",
+      "actual": "1.4.8",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "httr2",
+      "expected": "1.3.0",
+      "actual": "1.3.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "isoband",
+      "expected": "0.3.0",
+      "actual": "0.3.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "jsonlite",
+      "expected": "2.0.0",
+      "actual": "2.0.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "labeling",
+      "expected": "0.4.3",
+      "actual": "0.4.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "lattice",
+      "expected": "0.22-9",
+      "actual": "0.22-9",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/r461/opt/R/4.6.1/lib/R/library",
+      "matches": true
+    },
+    {
+      "package": "lifecycle",
+      "expected": "1.0.5",
+      "actual": "1.0.5",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "lme4",
+      "expected": "2.0-6",
+      "actual": "2.0-6",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "magrittr",
+      "expected": "2.0.5",
+      "actual": "2.0.5",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "mathjaxr",
+      "expected": "2.0-0",
+      "actual": "2.0-0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "meta",
+      "expected": "8.5-0",
+      "actual": "8.5-0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "metabook",
+      "expected": "0.2-0",
+      "actual": "0.2-0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "metadat",
+      "expected": "1.6-0",
+      "actual": "1.6-0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "metafor",
+      "expected": "5.0-1",
+      "actual": "5.0-1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "mime",
+      "expected": "0.13",
+      "actual": "0.13",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "minqa",
+      "expected": "1.2.8",
+      "actual": "1.2.8",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "nlme",
+      "expected": "3.1-169",
+      "actual": "3.1-169",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/r461/opt/R/4.6.1/lib/R/library",
+      "matches": true
+    },
+    {
+      "package": "nloptr",
+      "expected": "2.2.1",
+      "actual": "2.2.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "numDeriv",
+      "expected": "2016.8-1.1",
+      "actual": "2016.8-1.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "openssl",
+      "expected": "2.4.2",
+      "actual": "2.4.2",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "openxlsx",
+      "expected": "4.2.8.1",
+      "actual": "4.2.8.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "patchwork",
+      "expected": "1.3.2",
+      "actual": "1.3.2",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "pbapply",
+      "expected": "1.7-4",
+      "actual": "1.7-4",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "pillar",
+      "expected": "1.11.1",
+      "actual": "1.11.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "pkgconfig",
+      "expected": "2.0.3",
+      "actual": "2.0.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "prettyunits",
+      "expected": "1.2.0",
+      "actual": "1.2.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "progress",
+      "expected": "1.2.3",
+      "actual": "1.2.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "purrr",
+      "expected": "1.2.2",
+      "actual": "1.2.2",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "rbibutils",
+      "expected": "2.4.1",
+      "actual": "2.4.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "readr",
+      "expected": "2.2.0",
+      "actual": "2.2.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "reformulas",
+      "expected": "0.4.4",
+      "actual": "0.4.4",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "rentrez",
+      "expected": "1.2.4",
+      "actual": "1.2.4",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "renv",
+      "expected": "1.2.3",
+      "actual": "1.2.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "rlang",
+      "expected": "1.3.0",
+      "actual": "1.3.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "scales",
+      "expected": "1.4.0",
+      "actual": "1.4.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "stringi",
+      "expected": "1.8.9",
+      "actual": "1.8.9",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "stringr",
+      "expected": "1.6.0",
+      "actual": "1.6.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "sys",
+      "expected": "3.4.3",
+      "actual": "3.4.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "tibble",
+      "expected": "3.3.1",
+      "actual": "3.3.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "tidyr",
+      "expected": "1.3.2",
+      "actual": "1.3.2",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "tidyselect",
+      "expected": "1.2.1",
+      "actual": "1.2.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "tzdb",
+      "expected": "0.5.0",
+      "actual": "0.5.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "utf8",
+      "expected": "1.2.6",
+      "actual": "1.2.6",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "vctrs",
+      "expected": "0.7.3",
+      "actual": "0.7.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "viridisLite",
+      "expected": "0.4.3",
+      "actual": "0.4.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "vroom",
+      "expected": "1.7.1",
+      "actual": "1.7.1",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "withr",
+      "expected": "3.0.3",
+      "actual": "3.0.3",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "xml2",
+      "expected": "1.6.0",
+      "actual": "1.6.0",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "yaml",
+      "expected": "2.3.12",
+      "actual": "2.3.12",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    },
+    {
+      "package": "zip",
+      "expected": "3.0.2",
+      "actual": "3.0.2",
+      "loaded": true,
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/scientific-b1/renv/library/linux-ubuntu-noble/R-4.6/x86_64-pc-linux-gnu",
+      "matches": true
+    }
+  ],
+  "canonical_lock_sha256": "17223d5fc5bab54445034cc4cb87a7ed2128399588b8c08046602c71bf728075",
+  "docx_dependencies": {
+    "officer": false,
+    "flextable": false
+  }
+}

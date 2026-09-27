@@ -1,0 +1,347 @@
+{
+  "R": "R version 4.3.3 (2024-02-29)",
+  "library_paths": [
+    "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433",
+    "/workspace/scratch/f22ae3d8c5eb/runtime/clean-empty433",
+    "/workspace/scratch/f22ae3d8c5eb/runtime/root/usr/lib/R/library"
+  ],
+  "packages": [
+    {
+      "package": "shiny",
+      "expected": "1.8.0",
+      "actual": "1.8.0",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "bslib",
+      "expected": "0.6.1",
+      "actual": "0.6.1",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "DBI",
+      "expected": "1.2.2",
+      "actual": "1.2.2",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "RSQLite",
+      "expected": "2.3.4",
+      "actual": "2.3.4",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "RPostgreSQL",
+      "expected": "0.7-6",
+      "actual": "0.7-6",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "jsonlite",
+      "expected": "1.8.8",
+      "actual": "1.8.8",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "digest",
+      "expected": "0.6.34",
+      "actual": "0.6.34",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "yaml",
+      "expected": "2.3.8",
+      "actual": "2.3.8",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "dplyr",
+      "expected": "1.1.4",
+      "actual": "1.1.4",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "readr",
+      "expected": "2.1.5",
+      "actual": "2.1.5",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "httpuv",
+      "expected": "1.6.14",
+      "actual": "1.6.14",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "mime",
+      "expected": "0.12",
+      "actual": "0.12",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "xtable",
+      "expected": "1.8-4",
+      "actual": "1.8-4",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "fontawesome",
+      "expected": "0.5.2",
+      "actual": "0.5.2",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "htmltools",
+      "expected": "0.5.7",
+      "actual": "0.5.7",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "R6",
+      "expected": "2.5.1",
+      "actual": "2.5.1",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "sourcetools",
+      "expected": "0.1.7-1",
+      "actual": "0.1.7-1",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "later",
+      "expected": "1.3.2",
+      "actual": "1.3.2",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "promises",
+      "expected": "1.2.1",
+      "actual": "1.2.1",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "crayon",
+      "expected": "1.5.2",
+      "actual": "1.5.2",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "rlang",
+      "expected": "1.1.3",
+      "actual": "1.1.3",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "fastmap",
+      "expected": "1.1.1",
+      "actual": "1.1.1",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "withr",
+      "expected": "2.5.0",
+      "actual": "2.5.0",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "commonmark",
+      "expected": "1.9.1",
+      "actual": "1.9.1",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "glue",
+      "expected": "1.7.0",
+      "actual": "1.7.0",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "cachem",
+      "expected": "1.0.8",
+      "actual": "1.0.8",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "ellipsis",
+      "expected": "0.3.2",
+      "actual": "0.3.2",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "lifecycle",
+      "expected": "1.0.4",
+      "actual": "1.0.4",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "base64enc",
+      "expected": "0.1-3",
+      "actual": "0.1-3",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "jquerylib",
+      "expected": "0.1.4",
+      "actual": "0.1.4",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "memoise",
+      "expected": "2.0.1",
+      "actual": "2.0.1",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "sass",
+      "expected": "0.4.8",
+      "actual": "0.4.8",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "Rcpp",
+      "expected": "1.0.12",
+      "actual": "1.0.12",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "cli",
+      "expected": "3.6.2",
+      "actual": "3.6.2",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "magrittr",
+      "expected": "2.0.3",
+      "actual": "2.0.3",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "fs",
+      "expected": "1.6.3",
+      "actual": "1.6.3",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "rappdirs",
+      "expected": "0.3.3",
+      "actual": "0.3.3",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "bit64",
+      "expected": "4.0.5",
+      "actual": "4.0.5",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "blob",
+      "expected": "1.2.4",
+      "actual": "1.2.4",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "pkgconfig",
+      "expected": "2.0.3",
+      "actual": "2.0.3",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "plogr",
+      "expected": "0.2.0",
+      "actual": "0.2.0",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "cpp11",
+      "expected": "0.4.7",
+      "actual": "0.4.7",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "bit",
+      "expected": "4.0.5",
+      "actual": "4.0.5",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "vctrs",
+      "expected": "0.6.5",
+      "actual": "0.6.5",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "generics",
+      "expected": "0.1.3",
+      "actual": "0.1.3",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "pillar",
+      "expected": "1.9.0",
+      "actual": "1.9.0",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "tibble",
+      "expected": "3.2.1",
+      "actual": "3.2.1",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "tidyselect",
+      "expected": "1.2.0",
+      "actual": "1.2.0",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "fansi",
+      "expected": "1.0.5",
+      "actual": "1.0.5",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "utf8",
+      "expected": "1.2.4",
+      "actual": "1.2.4",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "clipr",
+      "expected": "0.8.0",
+      "actual": "0.8.0",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "hms",
+      "expected": "1.1.3",
+      "actual": "1.1.3",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "vroom",
+      "expected": "1.6.5",
+      "actual": "1.6.5",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "tzdb",
+      "expected": "0.4.0",
+      "actual": "0.4.0",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "progress",
+      "expected": "1.2.3",
+      "actual": "1.2.3",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    },
+    {
+      "package": "prettyunits",
+      "expected": "1.2.0",
+      "actual": "1.2.0",
+      "library": "/workspace/scratch/f22ae3d8c5eb/runtime/web-clean433"
+    }
+  ],
+  "old_Block_A_packages_used": false
+}

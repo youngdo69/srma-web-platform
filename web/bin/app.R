@@ -1,7 +1,6 @@
 source("web/load.R")
 source("web/ui/app.R")
 settings <- web_settings()
-# Local-only identity boundary. Bind loopback; no remote/shared deployment in Block A.
-actor <- Sys.getenv("SRMA_LOCAL_ACTOR", "local-researcher")
-options(shiny.sanitize.errors = TRUE)
-shiny::runApp(web_app(settings, actor), host = "127.0.0.1", port = as.integer(Sys.getenv("SRMA_WEB_PORT", "3838")), launch.browser = FALSE)
+con <- web_db(settings); web_migrate(con, settings); DBI::dbDisconnect(con)
+options(shiny.sanitize.errors = TRUE, shiny.maxRequestSize = 20 * 1024^2)
+shiny::runApp(web_app(settings), host = "127.0.0.1", port = as.integer(Sys.getenv("SRMA_WEB_PORT", "3838")), launch.browser = FALSE)

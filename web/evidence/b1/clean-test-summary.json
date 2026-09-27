@@ -1,0 +1,112 @@
+[
+  {
+    "test": "clean_runtime",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/clean_runtime.R"
+    ],
+    "exit_code": 0,
+    "seconds": 1.22
+  },
+  {
+    "test": "baseline",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/baseline.R"
+    ],
+    "exit_code": 0,
+    "seconds": 1.02
+  },
+  {
+    "test": "foundation",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/foundation.R"
+    ],
+    "exit_code": 0,
+    "seconds": 0.67
+  },
+  {
+    "test": "contract",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/contract.R"
+    ],
+    "exit_code": 0,
+    "seconds": 2.47
+  },
+  {
+    "test": "state",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/state.R"
+    ],
+    "exit_code": 0,
+    "seconds": 1.47
+  },
+  {
+    "test": "run",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/run.R"
+    ],
+    "exit_code": 0,
+    "seconds": 15.12
+  },
+  {
+    "test": "b1",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/b1.R"
+    ],
+    "exit_code": 0,
+    "seconds": 4.98
+  },
+  {
+    "test": "b1_import",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/b1_import.R"
+    ],
+    "exit_code": 0,
+    "seconds": 6.28
+  },
+  {
+    "test": "b1_security",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/b1_security.R"
+    ],
+    "exit_code": 0,
+    "seconds": 4.58
+  },
+  {
+    "test": "b1_ui",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/b1_ui.R"
+    ],
+    "exit_code": 0,
+    "seconds": 5.43
+  },
+  {
+    "test": "b1_preflight",
+    "command": [
+      "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript-clean433",
+      "--vanilla",
+      "web/tests/b1_preflight.R"
+    ],
+    "exit_code": 0,
+    "seconds": 19.47
+  }
+]

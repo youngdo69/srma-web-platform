@@ -2,6 +2,7 @@
 args <- commandArgs(trailingOnly = TRUE)
 # Library path is inherited explicitly from the parent operational process.
 request <- jsonlite::fromJSON(args[[1L]], simplifyVector = FALSE)
+if (!is.null(request$engine_library)) .libPaths(c(request$engine_library, .Library), include.site = FALSE)
 source(file.path(request$engine_root, "web/R/core.R"))
 started <- web_now()
 result <- tryCatch({
@@ -12,6 +13,11 @@ result <- tryCatch({
   e <- new.env(parent = globalenv())
   sys.source(file.path(request$engine_root, "R/utils/config_utils.R"), envir = e)
   sys.source(file.path(request$engine_root, "R/utils/path_utils.R"), envir = e)
+  if (identical(request$action, "write_configuration")) {
+    source(file.path(request$engine_root, "web/adapter/wizard.R"))
+    previous <- if (file.exists("config/project_config.yml")) yaml::read_yaml("config/project_config.yml") else NULL
+    web_write_configuration(request$engine_root, root, request$values, previous)
+  }
   config <- e$load_project_config("config/project_config.yml", validate = FALSE, quiet = TRUE)
   # Security boundary only: scientific parsing, validation and path mapping stay canonical.
   for (path in unlist(config$paths, use.names = FALSE)) {
@@ -21,15 +27,49 @@ result <- tryCatch({
   }
   config <- e$load_project_config("config/project_config.yml", validate = TRUE, quiet = TRUE)
   paths <- e$build_project_paths(config, create_directories = TRUE, validate = TRUE)
-  inputs <- c("config/project_config.yml", paths$search_terms_file,
-     unlist(paths[paste0(e$get_enabled_databases(config, validate = FALSE), "_search")], use.names = FALSE))
+  configuration_only <- request$action %in% c("inspect_configuration", "write_configuration", "database_context", "validate_database_inputs", "generate_search", "retrieve_pubmed")
+  inputs <- c("config/project_config.yml", paths$search_terms_file)
+  if (!configuration_only) inputs <- c(inputs,
+    unlist(paths[paste0(e$get_enabled_databases(config, validate = FALSE), "_search")], use.names = FALSE))
+  if (configuration_only) {
+    # Preserve verified uploaded/generated inputs when editing a saved version.
+    extra <- list.files(root, recursive = TRUE, full.names = TRUE)
+    extra <- extra[!dir.exists(extra)]
+    inputs <- unique(c(inputs, extra))
+  }
   for (p in inputs) {
     if (!file.exists(p)) web_error("USER_ACTION_REQUIRED", "Add the configured search inputs before continuing.", p)
     web_inside(p, root)
   }
   inputs <- unique(vapply(inputs, function(p) substring(normalizePath(p, winslash = "/", mustWork = TRUE), nchar(root) + 2L), character(1)))
   manifest <- setNames(lapply(inputs, web_sha), inputs)
-  if (identical(request$action, "inspect")) {
+  if (request$action %in% c("generate_search", "retrieve_pubmed")) {
+    source(file.path(request$engine_root, "web/adapter/search.R"))
+    produced <- web_canonical_search(request$action, e, paths, root, request$engine_root)
+    web_result(request$action, request$project_id, request$job_id,
+      if (isTRUE(produced$ready)) "COMPLETE" else "USER_ACTION_REQUIRED",
+      if (isTRUE(produced$ready)) "Canonical processing finished. Review the outputs before continuing."
+      else "Search quality still requires upstream review. Retrieval remains blocked.", request$engine_version,
+      code = if (!isTRUE(produced$ready)) "USER_ACTION_REQUIRED" else NULL,
+      artifacts = produced$outputs, provenance = list(input_hashes = manifest,
+        engine_script_sha256 = produced$script_hash, R = R.version.string))
+  } else if (request$action %in% c("database_context", "validate_database_inputs")) {
+    source(file.path(request$engine_root, "web/adapter/database.R"))
+    databases <- web_database_context(e, config, paths, root, request$engine_root)
+    if (request$action == "database_context") list(status = "COMPLETE", databases = databases)
+    else {
+      checked <- e$task018_run_database_input_gate(config = config, paths = paths,
+        verbose = FALSE, write_evidence = TRUE, write_provenance = TRUE, task019c_prompt = FALSE)
+      outputs <- c(checked$evidence_csv, checked$evidence_report)
+      web_result(request$action, request$project_id, request$job_id,
+        if (isTRUE(checked$ready)) "COMPLETE" else "USER_ACTION_REQUIRED",
+        if (isTRUE(checked$ready)) "Database inputs passed preflight. Human review remains required; no merge or screening has started."
+        else "Database inputs still need attention. Review the database instructions and upload the required exports.",
+        request$engine_version, code = if (!isTRUE(checked$ready)) "USER_ACTION_REQUIRED" else NULL,
+        artifacts = lapply(outputs, function(p) list(path = web_inside(p, root), logical_name = basename(p), type = "database_preflight")),
+        provenance = list(input_hashes = manifest, engine_script_sha256 = web_sha(file.path(request$engine_root, "R/TASK018_database_input_gate_hardening.R")), R = R.version.string))
+    }
+  } else if (request$action %in% c("inspect", "inspect_configuration", "write_configuration")) {
     list(status = "COMPLETE", project_id = e$get_project_id(config), title = e$get_project_title(config),
          inputs = as.list(inputs), manifest = manifest)
   } else {

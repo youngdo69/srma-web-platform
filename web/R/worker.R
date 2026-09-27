@@ -39,8 +39,8 @@ web_worker_once <- function(con, settings) {
       dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
       web_assert(file.copy(source, dest), "Could not prepare project inputs.", "SYSTEM_FAILED")
     }
-    web_exec(con, "UPDATE jobs SET progress=30,message='Checking search strategies…',heartbeat=?time,updated_at=?now WHERE id=?id AND state='RUNNING' AND worker_token=?token",
-      time = as.numeric(Sys.time()), now = web_now(), id = j$id, token = j$worker_token)
+    web_exec(con, "UPDATE jobs SET progress=30,message=?message,heartbeat=?time,updated_at=?now WHERE id=?id AND state='RUNNING' AND worker_token=?token",
+      message = web_registry()[[j$operation]]$progress, time = as.numeric(Sys.time()), now = web_now(), id = j$id, token = j$worker_token)
     web_audit(con, p, "JOB_PROGRESS", j$id, detail = list(progress = 30))
     srma_run(settings, p$canonical_id, j$operation, list(), j$id, work, j$engine_id, file.path(attempt, "engine"))
   }, error = function(e) web_result(j$operation, p$canonical_id, j$id, "FAILED",
@@ -48,7 +48,7 @@ web_worker_once <- function(con, settings) {
        j$engine_id, if (inherits(e, "srma_web_error")) e$code else "SYSTEM_FAILED", conditionMessage(e)))
   # Storage writes may leave unreferenced immutable objects after interruption; never publish partial registry rows.
   stored <- tryCatch({
-    if (identical(result$status, "COMPLETE")) lapply(result$artifacts, function(a) {
+    if (result$status %in% c("COMPLETE", "USER_ACTION_REQUIRED")) lapply(result$artifacts, function(a) {
       web_inside(a$path, work)
       id <- web_id()
       obj <- web_store(settings)$put(a$path, paste0(j$project_id, "/", id))

@@ -14,7 +14,7 @@ reject <- function(expr, pattern = NULL) {
 }
 settings <- web_settings(data_root = tempfile("srma-tests-"))
 con <- web_db(settings)
-check("schema creation and migration idempotence", {web_migrate(con, settings); web_migrate(con, settings); stopifnot(length(DBI::dbListTables(con)) == 11L)})
+check("schema creation and migration idempotence", {web_migrate(con, settings); web_migrate(con, settings); stopifnot(length(DBI::dbListTables(con)) == 13L)})
 web_local_identity(con)
 actor <- "local-researcher"
 fixture <- web_fixture(tempfile("input-"))
@@ -145,11 +145,18 @@ check("audit update and deletion rejected", {
   reject(DBI::dbExecute(con,"DELETE FROM audit_events"))
 })
 check("Shiny bslib application can construct", {
-  source("web/ui/app.R");app <- web_app(settings,actor);stopifnot(inherits(app,"shiny.appobj"))
+  source("web/ui/app.R");app <- web_app(settings);stopifnot(inherits(app,"shiny.appobj"))
 })
 check("Shiny server queues through the authorized service", {
   ui_v <- web_import_project(con,settings,actor,"local-workspace",web_fixture(tempfile("ui-")))
-  shiny::testServer(web_app(settings,actor), {
+  Sys.setenv(SRMA_WEB_TEST_IDP="1")
+  DBI::dbExecute(con,"INSERT INTO external_identities VALUES('local-test','ui-test','local-researcher')")
+  provider <- web_test_provider("ui-test")
+  ui_token <- web_sign_in(con,provider$provider,provider$credential)
+  shiny::testServer(web_app(settings), {
+    session$setInputs(credential=ui_token,login=1)
+    session$flushReact()
+    session$setInputs(csrf=csrf)
     session$setInputs(project=ui_v$project_id,version=ui_v$version_id)
     session$flushReact()
     session$setInputs(run=1)
@@ -179,10 +186,10 @@ check("actual second-workspace actor cannot access the first project", {
   reject(web_decide_gate(con,"second-actor",v$project_id,gate,"APPROVED"))
 })
 check("migration checksum mismatch fails closed", {
-  hash <- DBI::dbGetQuery(con,"SELECT checksum FROM schema_migrations")$checksum
-  DBI::dbExecute(con,"UPDATE schema_migrations SET checksum='changed'")
+  hash <- DBI::dbGetQuery(con,"SELECT checksum FROM schema_migrations WHERE version=1")$checksum
+  DBI::dbExecute(con,"UPDATE schema_migrations SET checksum='changed' WHERE version=1")
   reject(web_migrate(con,settings))
-  web_exec(con,"UPDATE schema_migrations SET checksum=?hash",hash=hash)
+  web_exec(con,"UPDATE schema_migrations SET checksum=?hash WHERE version=1",hash=hash)
 })
 DBI::dbDisconnect(con)
 cat("RESULT:", passed, "test groups passed; 0 failed\n")
