@@ -23,6 +23,7 @@ web_b2_save_snapshot <- function(con,settings,actor,project_id,parent_version,ro
   web_exec(con,"INSERT INTO evidence_versions VALUES(?v,?p,?parent,?stage,?j,?actor,?now)",v=saved$version_id,p=project_id,parent=parent_version,stage=stage,j=if(is.null(job_id))NA_character_ else job_id,actor=actor,now=web_now())
   ops<-names(web_b2_operations())[web_b2_operations()==stage];kinds<-web_b2_gates()
   for(op in intersect(ops,names(kinds)))web_exec(con,"INSERT INTO gates(id,project_id,workspace_id,version_id,gate_type,required_operation,status,created_at) VALUES(?g,?p,?w,?v,?k,?op,'PENDING',?now)",g=web_id(),p=project_id,w=project$workspace_id,v=saved$version_id,k=kinds[[op]],op=op,now=web_now())
+  if(exists("web_c1_invalidate_audit",mode="function"))web_c1_invalidate_audit(con,project,actor,saved$version_id)
   web_audit(con,project,"EVIDENCE_VERSION_SAVED",saved$version_id,actor,list(parent_version=parent_version,stage=stage,source_job=job_id))
   saved
  })

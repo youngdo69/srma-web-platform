@@ -1,4 +1,5 @@
 source(file.path(web_root,"web/ui/evidence.R"))
+source(file.path(web_root,"web/ui/analysis.R"))
 web_app <- function(settings) {
   ui <- shiny::fluidPage(theme = bslib::bs_theme(version = 5),
     shiny::titlePanel("Systematic Review Workspace"),
@@ -49,7 +50,7 @@ web_app <- function(settings) {
           shiny::tabPanel("Current Action", shiny::textOutput("next_action"),
             shiny::actionButton("run", "Check existing search strategies"), shiny::tableOutput("jobs")),
           shiny::tabPanel("Search / Study Import", shiny::uiOutput("search_import")),
-          web_b2_ui(),
+          web_b2_ui(), web_c1_ui(),
           shiny::tabPanel("Results / Artifacts", shiny::selectInput("artifact", "Available output", character()),
             shiny::downloadButton("download", "Download selected output")),
           shiny::tabPanel("Human Review Required",
@@ -79,11 +80,12 @@ web_app <- function(settings) {
       shiny::updateSelectInput(session, "version", choices = if(nrow(x$versions))setNames(x$versions$id, paste("Version", x$versions$version)) else character(), selected=shiny::isolate(input$version))
     })
     web_b2_server(input,output,session,request,safe,notice,refresh)
+    web_c1_server(input,output,session,request,safe,notice,refresh)
     output$overview <- shiny::renderText({x <- state(); shiny::req(x); x$project$title})
     output$workflow <- shiny::renderTable({
       x <- state(); shiny::req(x)
       data.frame(Step = c("Project Setup", "Protocol", "Search", "Study Import", "Screening", "Full-text Review", "Data Extraction", "Risk of Bias", "Meta-analysis", "Manuscript", "Final QC", "Download"),
-        Status = c("Draft saved", "Human review required", "Search validation available", "See Search / Study Import", c(rep("See Screening / Evidence",4),rep("Not enabled in this release",3)), "Individual artifacts available"))
+        Status = c("Draft saved", "Human review required", "Search validation available", "See Search / Study Import", c(rep("See Screening / Evidence",4),"See Meta-analysis",rep("Not enabled in this release",2)), "Individual artifacts available"))
     })
     output$next_action <- shiny::renderText({
       x <- state(); shiny::req(x)

@@ -68,6 +68,7 @@ web_submit <- function(con, settings, actor, project_id, version_id, operation =
   project <- web_authorize(con, actor, project_id)
   reg <- web_registry()[[operation]]
   web_b2_guard(con,settings,actor,project_id,version_id,operation)
+  web_c1_guard(con,settings,actor,project_id,version_id,operation)
   web_pipeline_prerequisites(settings, operation)
   web_require_activated(con,project_id,version_id,operation)
   web_assert(!is.null(reg) && length(payload) == 0L, "This operation is not enabled in this release.")
@@ -112,6 +113,12 @@ web_decide_gate <- function(con, actor, project_id, gate_id, decision, rationale
   web_assert(decision %in% c("APPROVED", "REJECTED"), "A human review decision is required.")
   gate<-web_query(con,"SELECT gate_type FROM gates WHERE id=?g AND project_id=?p",g=gate_id,p=project_id)
   if(nrow(gate)&&startsWith(gate$gate_type,"b2_"))web_assert(is.character(rationale)&&length(rationale)==1L&&!is.na(rationale)&&nzchar(trimws(rationale)),"Provide a rationale for this explicit evidence approval.")
+  if(nrow(gate)&&gate$gate_type %in% c("analysis_plan","analysis_results")) {
+    a<-web_query(con,"SELECT a.* FROM analysis_versions a JOIN gates g ON g.version_id=a.version_id WHERE g.id=?g AND a.project_id=?p",g=gate_id,p=project_id)
+    web_assert(nrow(a)==1L&&nzchar(trimws(rationale)),"Explicit analysis review rationale is required.")
+    web_c1_current(con,project_id,a$evidence_version_id)
+    web_assert(a$stage==if(gate$gate_type=="analysis_plan")"PLAN" else "RESULT","This gate does not match the analysis stage.")
+  }
   web_tx(con, function() {
     count <- web_exec(con, "UPDATE gates SET status=?d,decision=?d,reviewer_id=?u,decided_at=?now,rationale=?r WHERE id=?g AND project_id=?p AND status='PENDING'",
       d = decision, u = actor, now = web_now(), r = rationale, g = gate_id, p = project_id)

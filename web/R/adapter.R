@@ -43,6 +43,7 @@ srma_run <- function(settings, project_id, operation, payload, job_id, project_d
     if(operation %in% names(web_b2_ai_operations()) && !nzchar(Sys.getenv(web_b2_credential_name(settings$engine_root,operation),"")))return(web_result(operation,project_id,job_id,"USER_ACTION_REQUIRED","AI assistance requires operator credentials; use manual Human review.",engine_version,"USER_ACTION_REQUIRED"))
     settings<-web_science_settings(settings)
   }
+  if(operation %in% names(web_c1_operations()))settings<-web_science_settings(settings)
   web_engine_call(settings, list(action = operation, project_id = project_id, job_id = job_id,
     project_dir = project_dir, engine_version = engine_version, version_id=version_id), diagnostic_dir)
 }

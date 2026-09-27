@@ -1,3 +1,9 @@
+# C1 integration checkpoint — 2026-09-27
+
+WEB-011 integration and targeted tests PASS in development R4.3.3/SQLite. Implemented immutable AnalysisVersion, explicit analysis_plan/analysis_results gates, canonical R27/R28/R28B/R33 orchestration, canonical numeric registry, PDF/CSV/XLSX consistency, authenticated UI/downloads, primary/linked sensitivity, stale-evidence rejection and audit. Source/locks unchanged. Final fresh E2E, security/UI, source/syntax checks and seven affected B1/common regressions PASS; B2 extended regression PASS. Sealed closed SQLite state independently reopened with integrity OK and persisted invalidation event. Existing scratch WAL sidecars made reused test paths unreliable; no production workaround or database dump is delivered.
+
+Last completed: final integration/self-review. Next: local commits and C1-001 incremental package/PM report. No known remaining local implementation defect. Four external gates remain pending, including exact R4.6.1/metafor5.0-1 scientific acceptance. WEB-012 and deployment remain out of scope.
+
 # C1 starting checkpoint — 2026-09-27
 
 In progress: WEB-011. Clean isolated srma-c1/web/block-c1 verified at approved B2 17edbfd; all 40 B2 after-hashes PASS. Last completed: approved B2. Next: analysis lineage, explicit plan/result gates, canonical statistics/figures/tables, targeted regression. Exact R4.6.1 unavailable in bounded probe; development R4.3.3 only. All four external gates remain pending. No canonical scientific source/lock changes planned; WEB-012 deferred.

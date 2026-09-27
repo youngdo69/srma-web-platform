@@ -59,6 +59,9 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
   # Only named public request fields may cross into service functions.
   # Upload size limits and other operator policy remain server-owned.
   fields <- list(
+    analysis_catalog=c("project_id","version_id"),analysis_view=c("project_id","version_id"),
+    analysis_plan=c("project_id","version_id","spec"),analysis_accept=c("project_id","version_id","job_id"),
+    analysis_approve=c("project_id","version_id","confirmed","rationale"),
     evidence_review_proposal=c("project_id","version_id","table","row_id","decision","rationale"),
     evidence_add_row=c("project_id","version_id","row_id"),
     evidence_start=c("project_id","version_id"), evidence_view=c("project_id","version_id"),
@@ -87,12 +90,17 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     "The request contains unsupported fields.")
   web_assert(is.list(args) && !any(c("actor", "user_id", "identity", "con", "settings", "upload_root", "private") %in% names(args)),
     "The request contains an unsupported identity field.")
-  reads <- c("evidence_view", "initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
+  reads <- c("analysis_catalog","analysis_view","evidence_view", "initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
   if (!action %in% reads)
     web_assert(is.character(csrf) && length(csrf) == 1L && !is.null(expected_csrf) && identical(csrf, expected_csrf),
       "Refresh this page before trying again.")
   actor <- identity$user_id
   switch(action,
+    analysis_catalog=do.call(web_c1_catalog,c(list(con=con,settings=settings,actor=actor),args)),
+    analysis_view=do.call(web_c1_view,c(list(con=con,settings=settings,actor=actor),args)),
+    analysis_plan=do.call(web_c1_plan,c(list(con=con,settings=settings,actor=actor),args)),
+    analysis_accept=do.call(web_c1_accept,c(list(con=con,settings=settings,actor=actor),args)),
+    analysis_approve=do.call(web_c1_approve,c(list(con=con,settings=settings,actor=actor),args)),
     evidence_review_proposal=do.call(web_b2_review_proposal,c(list(con=con,settings=settings,actor=actor),args)),
     evidence_add_row=do.call(web_b2_add_row,c(list(con=con,settings=settings,actor=actor),args)),
     evidence_start=do.call(web_b2_start,c(list(con=con,settings=settings,actor=actor),args)),
