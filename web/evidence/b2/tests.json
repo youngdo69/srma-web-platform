@@ -1,0 +1,124 @@
+{
+  "cwd": "/workspace/scratch/284d178eb86f/srma-b2-v11",
+  "environment": {
+    "SRMA_RSCRIPT": "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+    "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/b2-runtime/root/usr/lib/R/site-library",
+    "B2_EXTENDED": "1"
+  },
+  "results": [
+    {
+      "test": "b2_e2e",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b2_e2e.R"
+      ],
+      "exit_code": 0,
+      "seconds": "final targeted rerun; bounded at 600 seconds",
+      "initial_result": "FAIL: test used a final-decision label in a reviewer-decision field; corrected fixture to canonical Unclear",
+      "final_log": "b2-final.txt",
+      "retest_command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b2_e2e.R"
+      ]
+    },
+    {
+      "test": "b1_pipeline",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline.R"
+      ],
+      "exit_code": 0,
+      "seconds": 14.9
+    },
+    {
+      "test": "b1_pipeline_inputs",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline_inputs.R"
+      ],
+      "exit_code": 0,
+      "seconds": 10.0
+    },
+    {
+      "test": "b1_pipeline_ui",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline_ui.R"
+      ],
+      "exit_code": 0,
+      "seconds": 14.1
+    },
+    {
+      "test": "b1_request_policy",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_request_policy.R"
+      ],
+      "exit_code": 0,
+      "seconds": 0.7
+    },
+    {
+      "test": "b1_security",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_security.R"
+      ],
+      "exit_code": 0,
+      "seconds": 4.9
+    },
+    {
+      "test": "state",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/state.R"
+      ],
+      "exit_code": 0,
+      "seconds": 1.5
+    },
+    {
+      "test": "contract",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/contract.R"
+      ],
+      "exit_code": 0,
+      "seconds": 2.3
+    },
+    {
+      "test": "syntax",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "-e",
+        "source(\"web/load.R\");f<-list.files(\"web\",pattern=\"[.]R$\",recursive=TRUE,full.names=TRUE);invisible(lapply(f,parse));cat(\"PASS\",length(f),\"R files parsed\\n\")"
+      ],
+      "exit_code": 0
+    },
+    {
+      "test": "integrity",
+      "command": [
+        "python3",
+        "web/tests/b2_integrity.py"
+      ],
+      "exit_code": 0
+    },
+    {
+      "test": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0
+    }
+  ]
+}

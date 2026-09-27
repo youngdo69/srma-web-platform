@@ -80,7 +80,8 @@ web_result <- function(operation, project_id, job_id, status, message, engine_ve
 # Operator credentials never enter requests, snapshots, published results or logs.
 web_operator_secrets <- function(engine_root) {
   cfg <- yaml::read_yaml(file.path(engine_root,"config/initialization_agent.yml"))
-  keys <- unique(c(cfg$initialization_agent$provider$api_key_env,"NCBI_API_KEY"))
+  screening <- yaml::read_yaml(file.path(engine_root,"config/agent_screening.yml"))
+  keys <- unique(c(cfg$initialization_agent$provider$api_key_env,screening$agent_screening$provider$api_key_env,"OPENAI_API_KEY","NCBI_API_KEY"))
   values <- Sys.getenv(keys,unset="")
   unname(values[nzchar(values)])
 }

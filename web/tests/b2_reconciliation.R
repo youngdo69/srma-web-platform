@@ -97,3 +97,43 @@ shiny::testServer(function(input,output,session){
  stopifnot(z$tables$Reviewer_1[[1]]$notes=="Human UI decision",z$tables$Reviewer_1[[1]]$.actor==actor)
 })
 cat("PASS: Shiny screening display and authenticated Human decision/new version\n")
+# Uncertain screening must not disappear from the finalized evidence base.
+rv<-web_b2_edit(con,s,actor,full$project_id,full$version_id,"Reviewer_1",fx$tables$Reviewer_1[[1]]$.row_id,list(decision="Unclear"))
+rv<-web_b2_edit(con,s,"second",rv$project_id,rv$version_id,"Reviewer_2",fx$tables$Reviewer_2[[1]]$.row_id,list(decision="Unclear"))
+g<-web_query(con,"SELECT id FROM gates WHERE version_id=?v AND gate_type='b2_screening'",v=rv$version_id)$id
+web_decide_gate(con,actor,rv$project_id,g,"APPROVED","Check uncertainty boundary")
+j<-web_submit(con,s,actor,rv$project_id,rv$version_id,"finalize_screening");web_worker_once(con,s)
+jr<-web_query(con,"SELECT state,result_json FROM jobs WHERE id=?j",j=j);stopifnot(jr$state %in% c("USER_ACTION_REQUIRED","FAILED"));err<-web_parse(jr$result_json);if(!grepl("uncertain|unresolved|adjudicat",paste(err$user_message,err$technical$diagnostic),ignore.case=TRUE))print(err);stopifnot(grepl("uncertain|unresolved|adjudicat",paste(err$user_message,err$technical$diagnostic),ignore.case=TRUE))
+reject(web_b2_accept(con,s,actor,rv$project_id,rv$version_id,j))
+cat("PASS: canonical uncertain screening blocks finalization instead of silently dropping a report\n")
+# Only synthetic proposal CONTENT is supplied; persistence/UI/approval stay real.
+r<-tempfile("proposal-content-",s$data_root);dir.create(r);web_copy_version(con,s,actor,revision$project_id,revision$version_id,r)
+z<-web_b2_packet(r);z$tables$AI_outcome_data<-list(list(.row_id=web_id(),screening_id=row$screening_id,intervention_events="9",source_location="Synthetic table",.source="AI RECOMMENDATION",.verification="UNVERIFIED",.provider="synthetic-content-fixture",.model="none"));web_b2_write(r,z)
+pv<-web_b2_save_snapshot(con,s,actor,revision$project_id,revision$version_id,r,"EXTRACTION");unlink(r,recursive=TRUE)
+shiny::testServer(function(input,output,session){
+ notice<-shiny::reactiveVal("");refresh<-shiny::reactiveVal(0L)
+ safe<-function(expr)tryCatch(expr,error=function(e){notice(conditionMessage(e));NULL})
+ request<-function(action,args=list())req(action,args)
+ web_b2_server(input,output,session,request,safe,notice,refresh);output$notice<-shiny::renderText(notice())
+},{
+ session$setInputs(project=pv$project_id,version=pv$version_id);session$flushReact();session$setInputs(evidence_refresh=1);session$flushReact()
+ session$setInputs(evidence_table="AI_outcome_data",evidence_row=z$tables$AI_outcome_data[[1]]$.row_id);session$flushReact()
+ stopifnot(grepl("AI RECOMMENDATION",output$evidence_context$html),grepl("UNVERIFIED",output$evidence_context$html))
+ session$setInputs(proposal_decision="REJECT",proposal_rationale="Human compared the synthetic source",proposal_review=1);session$flushReact();stopifnot(grepl("Saved a new evidence version",output$notice))
+ latest<-web_query(con,"SELECT id FROM project_versions WHERE project_id=?p ORDER BY version DESC LIMIT 1",p=pv$project_id)$id
+ pp<-web_b2_context(con,s,actor,pv$project_id,latest)$packet
+ stopifnot(pp$tables$AI_outcome_data[[1]]$.human_review$decision=="REJECT",pp$tables$AI_outcome_data[[1]]$.verification=="UNVERIFIED",identical(z$tables$Target_Outcome_Verification,pp$tables$Target_Outcome_Verification))
+ session$setInputs(version=ready$version_id);session$flushReact();session$setInputs(evidence_refresh=2);session$flushReact()
+ session$setInputs(evidence_table="Domain_Review",evidence_row=rob$.row_id);session$flushReact()
+ stopifnot(grepl("Bias instrument",output$evidence_context$html),grepl("FINAL / APPROVED",output$evidence_stage))
+ session$setInputs(evf_1="Low",evf_2="Revised synthetic human rationale",evf_3="",evidence_save=1);session$flushReact()
+ latest<-web_query(con,"SELECT id FROM project_versions WHERE project_id=?p ORDER BY version DESC LIMIT 1",p=pv$project_id)$id
+ pp<-web_b2_context(con,s,actor,pv$project_id,latest)$packet
+ stopifnot(pp$stage=="ROB",any(vapply(pp$tables$Overall_Review,function(a)is.null(a$.actor),logical(1))))
+})
+cat("PASS: Shiny proposal review remains UNVERIFIED; Human values unchanged; RoB edits require renewed overall approval\n")
+a<-web_query(con,"SELECT * FROM artifacts WHERE job_id=?j AND logical_name='analysis_ready_evidence.json'",j=job)
+pkg<-jsonlite::read_json(web_store(s)$get(a$storage_locator,a$checksum))
+stopifnot(identical(pkg$project_version,a$version_id),length(pkg$input_sha256)>0,length(pkg$unresolved_blocking)==0,identical(pkg$status,"human_verified_dataset"))
+stopifnot(web_sha(file.path(ready_root,"config/generated/web_evidence.json"))==ready_hash)
+cat("PASS: final canonical evidence package binds source version, engine, job, report-study map and hashed inputs\n")

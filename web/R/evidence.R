@@ -42,7 +42,7 @@ web_b2_guard <- function(con,settings,actor,project_id,version_id,operation) {
  if(!operation %in% names(web_b2_operations()))return(invisible(TRUE))
  c<-web_b2_context(con,settings,actor,project_id,version_id)
  if(operation %in% names(web_b2_ai_operations())) {
-  web_assert(nzchar(Sys.getenv("OPENAI_API_KEY","")),"AI assistance requires an operator credential. Manual Human review remains available.","USER_ACTION_REQUIRED")
+  web_assert(nzchar(Sys.getenv(web_b2_credential_name(settings$engine_root,operation),"")),"AI assistance requires an operator credential. Manual Human review remains available.","USER_ACTION_REQUIRED")
  }
  web_science_settings(settings)
  web_assert(identical(c$row$stage,unname(web_b2_operations()[[operation]])),"This operation does not match the selected evidence stage.")
@@ -93,6 +93,11 @@ web_b2_edit <- function(con,settings,actor,project_id,version_id,table,row_id,va
   first<-x$tables$Reviewer_1[[i]];second<-x$tables$Reviewer_2[[i]]
   web_assert(!is.null(first$.actor)&&!is.null(second$.actor)&&!actor %in% c(first$.actor,second$.actor),"Complete both independent reviews before a separate adjudicator resolves conflicts.")
  }
+ if(table=="Author_Final_Review"&&!is.null(values$retrieval_status)&&values$retrieval_status=="Available") {
+  web_assert(!is.null(row$.pdf_sha256),"Upload and register the PDF before marking it available.")
+  f<-web_inside(file.path(c$version$root,row$.pdf_relative),c$version$root)
+  web_assert(identical(web_sha(f),row$.pdf_sha256),"The registered PDF failed checksum verification.")
+ }
  before<-row
  for(n in names(values))row[[n]]<-values[[n]]
  if(table %in% c("Target_Study_Verification","Target_Outcome_Verification")) {
@@ -100,7 +105,7 @@ web_b2_edit <- function(con,settings,actor,project_id,version_id,table,row_id,va
   for(n in setdiff(names(values),c("source_location","source_evidence","raw_value","transformation_rule","value_status"))) {
    old<-before$.values[[n]]
    row$.values[[n]]<-list(source_report=row$screening_id,source_pdf_sha256=row$.pdf_sha256,
-    reported_value=if(!is.null(old$reported_value))old$reported_value else values[[n]],
+    reported_value=if(!is.null(old$reported_value))old$reported_value else if((row$value_status %||b2% "REPORTED") %in% c("DERIVED","CALCULATED","IMPUTED"))row$raw_value else values[[n]],
     prior_value=before[[n]],human_value=values[[n]],status=row$value_status %||b2% "REPORTED",
     location=row$source_location,evidence=row$source_evidence,raw_value=row$raw_value,transformation=row$transformation_rule,
     actor=actor,at=web_now(),source_version=version_id,verification="UNVERIFIED")
@@ -154,7 +159,7 @@ web_b2_upload <- function(con,settings,actor,project_id,version_id,row_id,upload
  f<-file(source,"rb");sig<-readBin(f,"raw",5);close(f);web_assert(identical(sig,charToRaw("%PDF-")),"The file does not have a valid PDF signature.")
  root<-tempfile("pdf-version-",settings$data_root);dir.create(root);on.exit(unlink(root,recursive=TRUE));web_copy_version(con,settings,actor,project_id,version_id,root)
  row<-x$tables$Author_Final_Review[[i]];dest<-web_inside(file.path(root,row$.pdf_relative),root,exists=FALSE);dir.create(dirname(dest),recursive=TRUE,showWarnings=FALSE);web_assert(file.copy(source,dest,overwrite=TRUE),"PDF upload failed.")
- row$pdf_status<-"Available";row$retrieval_status<-"Available";row$pdf_path<-row$.pdf_relative;row$.pdf_sha256<-web_sha(dest);row$author_final_decision<-"";row$author_final_exclusion_reason<-"";row$.actor<-NULL
+ row$pdf_status<-"Available";row$retrieval_status<-"Available";row$pdf_path<-row$.pdf_relative;row$.pdf_sha256<-web_sha(dest);row$author_final_decision<-"";row$author_final_exclusion_reason<-"";row$.actor<-NULL;row$.source<-"SYSTEM OUTPUT";row$.uploaded_by<-actor;row$.uploaded_at<-web_now()
  x$tables$Author_Final_Review[[i]]<-row;x$tables$AI_Eligibility<-NULL;x<-web_b2_invalidate_packet(x);web_b2_invalidate(root,"FULLTEXT");web_b2_write(root,x)
  saved<-web_b2_save_snapshot(con,settings,actor,project_id,version_id,root,"FULLTEXT")
  web_audit(con,web_authorize(con,actor,project_id),"FULLTEXT_UPLOADED",saved$version_id,actor,list(report=row$screening_id,sha256=row$.pdf_sha256,source_version=version_id))
@@ -196,4 +201,22 @@ web_b2_add_row <- function(con,settings,actor,project_id,version_id,row_id) {
  x$tables$Target_Outcome_Verification<-c(rows,list(row))
  root<-tempfile("outcome-revision-",settings$data_root);dir.create(root);on.exit(unlink(root,recursive=TRUE));web_copy_version(con,settings,actor,project_id,version_id,root);web_b2_invalidate(root,"EXTRACTION");web_b2_write(root,x)
  web_b2_save_snapshot(con,settings,actor,project_id,version_id,root,"EXTRACTION")
+}
+
+# Reviewing a proposal never changes a scientific Human decision or verifies a value.
+web_b2_review_proposal <- function(con,settings,actor,project_id,version_id,table,row_id,decision,rationale) {
+ c<-web_b2_context(con,settings,actor,project_id,version_id);x<-c$packet
+ web_assert(startsWith(table,"AI_")&&table %in% names(x$tables),"Select an AI recommendation from this version.")
+ stage<-if(table=="AI_Screening")"SCREENING" else if(table=="AI_Eligibility")"FULLTEXT" else if(table=="AI_Risk_of_Bias")"ROB" else "EXTRACTION"
+ web_assert(x$stage==stage,"Review proposals in their draft stage; create an evidence revision before revisiting finalized proposals.")
+ web_assert(decision %in% c("ACCEPT_FOR_MANUAL_ENTRY","REJECT","UNCERTAIN")&&is.character(rationale)&&length(rationale)==1L&&!is.na(rationale)&&nzchar(trimws(rationale))&&nchar(rationale)<=20000,"Choose a proposal review and give a rationale.")
+ i<-which(vapply(x$tables[[table]],function(a)identical(a$.row_id,row_id),logical(1)));web_assert(length(i)==1L,"This proposal is not in the selected version.")
+ x$tables[[table]][[i]]$.human_review<-list(decision=decision,rationale=rationale,actor=actor,at=web_now(),version=version_id)
+ root<-tempfile("proposal-review-",settings$data_root);dir.create(root);on.exit(unlink(root,recursive=TRUE))
+ web_copy_version(con,settings,actor,project_id,version_id,root);web_b2_write(root,x)
+ web_b2_save_snapshot(con,settings,actor,project_id,version_id,root,x$stage)
+}
+web_b2_credential_name <- function(engine_root,operation) {
+ if(operation=="recommend_risk_of_bias")return("OPENAI_API_KEY")
+ yaml::read_yaml(file.path(engine_root,"config/agent_screening.yml"))$agent_screening$provider$api_key_env %||b2% "OPENAI_API_KEY"
 }

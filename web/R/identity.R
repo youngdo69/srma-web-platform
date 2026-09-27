@@ -59,6 +59,7 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
   # Only named public request fields may cross into service functions.
   # Upload size limits and other operator policy remain server-owned.
   fields <- list(
+    evidence_review_proposal=c("project_id","version_id","table","row_id","decision","rationale"),
     evidence_add_row=c("project_id","version_id","row_id"),
     evidence_start=c("project_id","version_id"), evidence_view=c("project_id","version_id"),
     evidence_accept=c("project_id","version_id","job_id"),
@@ -92,6 +93,7 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
       "Refresh this page before trying again.")
   actor <- identity$user_id
   switch(action,
+    evidence_review_proposal=do.call(web_b2_review_proposal,c(list(con=con,settings=settings,actor=actor),args)),
     evidence_add_row=do.call(web_b2_add_row,c(list(con=con,settings=settings,actor=actor),args)),
     evidence_start=do.call(web_b2_start,c(list(con=con,settings=settings,actor=actor),args)),
     evidence_view=do.call(web_b2_view,c(list(con=con,settings=settings,actor=actor),args)),

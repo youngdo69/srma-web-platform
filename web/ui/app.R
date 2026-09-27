@@ -76,7 +76,7 @@ web_app <- function(settings) {
     shiny::observeEvent(list(input$project, refresh()), {
       shiny::req(token(), input$project)
       x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
-      shiny::updateSelectInput(session, "version", choices = if(nrow(x$versions))setNames(x$versions$id, paste("Version", x$versions$version)) else character())
+      shiny::updateSelectInput(session, "version", choices = if(nrow(x$versions))setNames(x$versions$id, paste("Version", x$versions$version)) else character(), selected=shiny::isolate(input$version))
     })
     web_b2_server(input,output,session,request,safe,notice,refresh)
     output$overview <- shiny::renderText({x <- state(); shiny::req(x); x$project$title})

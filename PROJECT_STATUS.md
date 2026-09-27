@@ -1,3 +1,9 @@
+# B2 v1.1 final implementation checkpoint — 2026-09-27
+
+Status: B2 IMPLEMENTATION COMPLETE; ready for PM review before WEB-011. Baseline fb303704, new isolated srma-b2-v11 / web/block-b2; selectively reviewed salvage, all previous checkouts unchanged. WEB-009 screening/fulltext/explicit immutable inclusion and WEB-010 schema-driven extraction/independent verification/canonical RoB/analysis-ready evidence implemented. Final canonical manual E2E, B2 security/revision/AI-negative/Shiny tests and seven affected B1/state/contract regressions PASS. All scientific source and both locks unchanged; 98 manifest hashes PASS. No known remaining local implementation defect.
+
+Last completed: B2 UI/security/canonical integration and self-review. Evidence: web/evidence/b2; contracts/user guide/operator acceptance: web/docs/B2_*.md. Next: PM/Reviewer review; no WEB-011 work authorized in this mission. Deferred gates: POSTGRESQL_EXTERNAL_ACCEPTANCE_PENDING; CREDENTIALED_ACCEPTANCE_PENDING; CANONICAL_RUNTIME_ACCEPTANCE_PENDING; CREDENTIALED_AI_ACCEPTANCE_PENDING. Real provider and R4.6.1/PostgreSQL tests not executed. No models/figures/manuscript, push/merge/tag/deployment. No Human decision required for B2 implementation completion.
+
 # B2 v1.1 review/security checkpoint — 2026-09-27
 
 PASS: canonical manual E2E including PDF registry, independent extraction verification and both RoB instruments; targeted access/upload/version/revision/credential-negative tests; actual Shiny Human decision save. Added field provenance and downstream invalidation, retained production scientific-runtime gate. Source unchanged. Remaining: AI review UX/operator script, uncertainty guard, affected B1 regression and final self-review.

@@ -1,7 +1,7 @@
 # Real provider boundary; all returned content remains an AI RECOMMENDATION.
 # Called only in a worker with operator credential and validated scientific runtime.
 web_b2_ai <- function(op,engine,root,paths,x,run) {
- web_assert(nzchar(Sys.getenv("OPENAI_API_KEY","")),"AI assistance needs an operator credential. Continue with manual Human review.","USER_ACTION_REQUIRED")
+ web_assert(nzchar(Sys.getenv(web_b2_credential_name(engine,op),"")),"AI assistance needs an operator credential. Continue with manual Human review.","USER_ACTION_REQUIRED")
  for(p in list.files(file.path(engine,"prompts"),full.names=TRUE)){dir.create("prompts",showWarnings=FALSE);file.copy(p,file.path("prompts",basename(p)),overwrite=TRUE)}
  before_tables<-x$tables
  if(op=="recommend_extraction") {
