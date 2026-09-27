@@ -1,3 +1,7 @@
+# PM C1 v1.0 authorization — 2026-09-27
+
+Approved B2 17edbfd. Implement WEB-011 only in isolated web/block-c1. Preserve earlier checkouts and canonical scientific methodology. Stop before WEB-012.
+
 # PM B2 v1.1 authorization — 2026-09-27
 
 Approved B1 fb303704. Implement WEB-009/010 only in a new isolated checkout. Selective salvage allowed; protect all prior checkouts. Stop before WEB-011, preserve scientific source and explicit Human Gates.

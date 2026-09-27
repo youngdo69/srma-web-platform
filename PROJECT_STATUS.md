@@ -1,3 +1,7 @@
+# C1 starting checkpoint — 2026-09-27
+
+In progress: WEB-011. Clean isolated srma-c1/web/block-c1 verified at approved B2 17edbfd; all 40 B2 after-hashes PASS. Last completed: approved B2. Next: analysis lineage, explicit plan/result gates, canonical statistics/figures/tables, targeted regression. Exact R4.6.1 unavailable in bounded probe; development R4.3.3 only. All four external gates remain pending. No canonical scientific source/lock changes planned; WEB-012 deferred.
+
 # B2 v1.1 final implementation checkpoint — 2026-09-27
 
 Status: B2 IMPLEMENTATION COMPLETE; ready for PM review before WEB-011. Baseline fb303704, new isolated srma-b2-v11 / web/block-b2; selectively reviewed salvage, all previous checkouts unchanged. WEB-009 screening/fulltext/explicit immutable inclusion and WEB-010 schema-driven extraction/independent verification/canonical RoB/analysis-ready evidence implemented. Final canonical manual E2E, B2 security/revision/AI-negative/Shiny tests and seven affected B1/state/contract regressions PASS. All scientific source and both locks unchanged; 98 manifest hashes PASS. No known remaining local implementation defect.
