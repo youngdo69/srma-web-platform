@@ -4,7 +4,7 @@ web_migrate(con, s); web_local_identity(con)
 Sys.setenv(SRMA_WEB_TEST_IDP="1")
 DBI::dbExecute(con,"INSERT INTO external_identities VALUES('local-test','reviewer','local-researcher')")
 p <- web_test_provider("reviewer"); login_token <- web_sign_in(con,p$provider,p$credential)
-v <- web_import_project(con,s,"local-researcher","local-workspace",web_fixture(tempfile("review-fixture-")),draft_gates=TRUE)
+v <- web_import_project(con,s,"local-researcher","local-workspace",web_fixture(tempfile("review-fixture-"), id="review-ui-fixture"),draft_gates=TRUE)
 gate <- web_view(con,"local-researcher",v$project_id)$gates$id[1]
 reject <- function(expr) {e<-tryCatch({force(expr);NULL},error=identity);stopifnot(inherits(e,"srma_web_error"))}
 reject(web_request(con,login_token,"decide_gate",list(project_id=v$project_id,gate_id=gate,decision="APPROVED",rationale="Synthetic review"),"wrong","expected",s))
@@ -21,7 +21,8 @@ reject(web_request(con,login_token,"decide_gate",list(project_id=v$project_id,ga
 stopifnot(web_query(con,"SELECT COUNT(*) AS n FROM audit_events WHERE event_type='GATE_DECIDED' AND object_id=?g",g=gate)$n==1L,
  nrow(DBI::dbGetQuery(con,"SELECT id FROM jobs"))==0L,
  !web_registry()$generate_search$enabled, !web_registry()$retrieve_pubmed$enabled)
-v2 <- web_import_project(con,s,"local-researcher","local-workspace",web_fixture(tempfile("new-review-fixture-")),draft_gates=TRUE)
-stopifnot(all(web_query(con,"SELECT status FROM gates WHERE version_id=?v",v=v2$version_id)$status=="PENDING"))
+v2 <- web_import_project(con,s,"local-researcher","local-workspace",web_fixture(tempfile("new-review-fixture-"), id="review-ui-fixture"),draft_gates=TRUE)
+stopifnot(v2$project_id == v$project_id, v2$version_id != v$version_id,
+ all(web_query(con,"SELECT status FROM gates WHERE version_id=?v",v=v2$version_id)$status=="PENDING"))
 DBI::dbDisconnect(con)
 cat("PASS: authenticated UI records explicit version review with rationale; CSRF, immutable decision and audit verified; new gates pending; no scientific job enabled\n")

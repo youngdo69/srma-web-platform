@@ -1,0 +1,42 @@
+Universal SR-MA Agent Toolkit
+Search Strategy Validation Report
+Generated: 2026-09-27 00:46:25.179507
+
+SUMMARY
+--------------------------------------------------
+# A tibble: 1 × 5
+  database total_checks passed_checks failed_checks overall_pass
+  <chr>           <int>         <int>         <int> <lgl>       
+1 PubMed             12            12             0 TRUE        
+
+DETAILED RESULTS
+--------------------------------------------------
+ database          category                check passed
+   PubMed           general       file_not_empty   TRUE
+   PubMed           general       minimum_length   TRUE
+   PubMed           general          parentheses   TRUE
+   PubMed           general    boolean_placement   TRUE
+   PubMed           general     boolean_presence   TRUE
+   PubMed           general      duplicate_lines   TRUE
+   PubMed database_specific        double_quotes   TRUE
+   PubMed database_specific field_title_abstract   TRUE
+   PubMed database_specific             mesh_tag   TRUE
+   PubMed database_specific      no_central_tags   TRUE
+   PubMed database_specific       no_embase_tags   TRUE
+   PubMed database_specific      bracket_balance   TRUE
+                                                                               message
+                                           The search-strategy file must not be empty.
+                                                         Search length: 48 characters.
+                                        Opening parentheses: 1; closing parentheses: 1
+                                                      Boolean placement appears valid.
+                                                             AND count: 1; OR count: 1
+               No duplicated search lines were detected within logical concept blocks.
+                                                                 Double-quote count: 4
+                                  At least one [Title/Abstract] field tag is required.
+ No MeSH field tag was detected. This may be acceptable only if intentionally omitted.
+                                CENTRAL-style :ti,ab,kw syntax was detected in PubMed.
+                                         Embase-style syntax may be present in PubMed.
+                                Opening square brackets: 2; closing square brackets: 2
+
+IMPORTANT
+This report performs local structural checks only. It does not guarantee acceptance by PubMed, Embase, or the Cochrane Library search interface.

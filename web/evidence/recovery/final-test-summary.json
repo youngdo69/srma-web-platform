@@ -1,0 +1,26 @@
+[
+  {
+    "test": "b1_request_policy",
+    "exit": 0
+  },
+  {
+    "test": "b1_review_ui",
+    "exit": 0
+  },
+  {
+    "test": "b1",
+    "exit": 0
+  },
+  {
+    "test": "b1_security",
+    "exit": 0
+  },
+  {
+    "test": "b1_ui",
+    "exit": 0
+  },
+  {
+    "test": "b1_import",
+    "exit": 0
+  }
+]
