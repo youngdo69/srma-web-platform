@@ -1,0 +1,23 @@
+{
+  "integrity": [
+    [
+      "ok"
+    ]
+  ],
+  "analysis_stages": [
+    [
+      "APPROVED",
+      2
+    ],
+    [
+      "PLAN",
+      6
+    ],
+    [
+      "RESULT",
+      3
+    ]
+  ],
+  "invalidation_events": 1,
+  "sha256": "d5601ed2e1485ed3e775a682095c28354fddbc15106f627bb3b3eff0f70c288f"
+}

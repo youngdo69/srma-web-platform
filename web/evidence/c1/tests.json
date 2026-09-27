@@ -1,0 +1,100 @@
+{
+  "environment": {
+    "SRMA_RSCRIPT": "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+    "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/b2-runtime/root/usr/lib/R/site-library",
+    "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library"
+  },
+  "working_directory": "/workspace/scratch/284d178eb86f/srma-c1",
+  "tests": [
+    {
+      "command": "C1_TEST_ROOT=/workspace/scratch/284d178eb86f/c1-evidence/accepted-state Rscript --vanilla web/tests/c1_fixture.R",
+      "result": "PASS (exit 0)",
+      "reason": "Complete changed WEB-011 state/engine/numeric/UI/security flow, using explicit test-only development seam",
+      "log": "c1-accepted.log"
+    },
+    {
+      "command": "B2_EXTENDED=1 Rscript --vanilla web/tests/b2_e2e.R",
+      "result": "PASS (exit 0)",
+      "reason": "Shared service, request, worker and engine dispatcher integration; preserve B2 workflows",
+      "log": "b2-regression.log"
+    },
+    {
+      "test": "b1_pipeline",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline.R"
+      ],
+      "exit_code": 0
+    },
+    {
+      "test": "b1_pipeline_inputs",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline_inputs.R"
+      ],
+      "exit_code": 0
+    },
+    {
+      "test": "b1_pipeline_ui",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline_ui.R"
+      ],
+      "exit_code": 0
+    },
+    {
+      "test": "b1_request_policy",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_request_policy.R"
+      ],
+      "exit_code": 0
+    },
+    {
+      "test": "b1_security",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_security.R"
+      ],
+      "exit_code": 0
+    },
+    {
+      "test": "state",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/state.R"
+      ],
+      "exit_code": 0
+    },
+    {
+      "test": "contract",
+      "command": [
+        "/workspace/scratch/f22ae3d8c5eb/runtime/Rscript",
+        "--vanilla",
+        "web/tests/contract.R"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": "Rscript --vanilla -e 'f<-list.files(\"web\",pattern=\"[.]R$\",recursive=TRUE,full.names=TRUE);invisible(lapply(f,parse));cat(\"PASS syntax\",length(f),\"files\\n\")'",
+      "result": "PASS 67 R files",
+      "reason": "All changed source/test syntax"
+    },
+    {
+      "command": "python3 web/tests/c1_integrity.py",
+      "result": "PASS",
+      "reason": "98 canonical hashes, root/Web locks, no deletions or scientific-source edits; git diff --check"
+    },
+    {
+      "command": "Python sqlite3: PRAGMA integrity_check; SELECT stage,count(*) FROM analysis_versions GROUP BY stage; SELECT count(*) FROM audit_events WHERE event_type='DOWNSTREAM_ANALYSIS_INVALIDATED'",
+      "result": "PASS in separately reopened sealed closed database, 2 APPROVED/6 PLAN/3 RESULT, 1 invalidation",
+      "reason": "Resolve reused scratch WAL-sidecar interference; verify actual durable records, no production change"
+    }
+  ]
+}

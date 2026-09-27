@@ -1,3 +1,9 @@
+# C1 final checkpoint — 2026-09-27
+
+Status: C1 / WEB-011 IMPLEMENTATION COMPLETE; ready for PM/Reviewer acceptance before WEB-012. Baseline approved B2 17edbfd. Final code/test checkpoints 0a53db5 / 1240f3f. Source and locks unchanged; previous checkouts protected. Final E2E/security/UI/numeric consistency/durability and affected regressions PASS. No known remaining local implementation defect. Next: PM review and operator acceptance only; do not begin WEB-012. Outputs: web/docs/C1_*.md, web/evidence/c1, C1-001 incremental delivery and separate PM report.
+
+CANONICAL SCIENTIFIC ACCEPTANCE PENDING: exact R4.6.1 and locked packages unavailable locally. POSTGRESQL_EXTERNAL_ACCEPTANCE_PENDING; CREDENTIALED_ACCEPTANCE_PENDING; CANONICAL_RUNTIME_ACCEPTANCE_PENDING; CREDENTIALED_AI_ACCEPTANCE_PENDING. No push/merge/tag/deployment. No Human methodological decision needed for implementation completion.
+
 # C1 integration checkpoint — 2026-09-27
 
 WEB-011 integration and targeted tests PASS in development R4.3.3/SQLite. Implemented immutable AnalysisVersion, explicit analysis_plan/analysis_results gates, canonical R27/R28/R28B/R33 orchestration, canonical numeric registry, PDF/CSV/XLSX consistency, authenticated UI/downloads, primary/linked sensitivity, stale-evidence rejection and audit. Source/locks unchanged. Final fresh E2E, security/UI, source/syntax checks and seven affected B1/common regressions PASS; B2 extended regression PASS. Sealed closed SQLite state independently reopened with integrity OK and persisted invalidation event. Existing scratch WAL sidecars made reused test paths unreliable; no production workaround or database dump is delivered.
