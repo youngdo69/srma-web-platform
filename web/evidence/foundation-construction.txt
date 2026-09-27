@@ -1,0 +1,1 @@
+PASS: Shiny+bslib construction; semantic registry shape; isolated settings

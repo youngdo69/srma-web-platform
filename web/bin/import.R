@@ -1,0 +1,7 @@
+source("web/load.R")
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) != 1L) stop("Usage: Rscript --vanilla web/bin/import.R <existing-project-folder>", call. = FALSE)
+settings <- web_settings()
+con <- web_db(settings); web_migrate(con, settings); web_local_identity(con)
+print(web_import_project(con, settings, "local-researcher", "local-workspace", normalizePath(args[[1L]], mustWork = TRUE)))
+DBI::dbDisconnect(con)

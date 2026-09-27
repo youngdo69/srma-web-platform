@@ -29,7 +29,7 @@ web_app <- function(settings, actor) {
     })
     shiny::observeEvent(input$project, {
       x <- safe(web_view(con, actor, input$project))
-      if (!is.null(x)) shiny::updateSelectInput(session, "version", choices = setNames(x$versions$id, paste("Version", x$versions$version)))
+      if (!is.null(x)) shiny::updateSelectInput(session, "version", choices = if (nrow(x$versions)) setNames(x$versions$id, paste("Version", x$versions$version)) else character())
     })
     shiny::observeEvent(input$run, {
       shiny::req(input$project, input$version)
@@ -43,7 +43,7 @@ web_app <- function(settings, actor) {
     })
     shiny::observe({
       x <- state(); shiny::req(x)
-      shiny::updateSelectInput(session, "artifact", choices = setNames(x$artifacts$id, paste(x$artifacts$logical_name, "— version", x$artifacts$version)), selected = shiny::isolate(input$artifact))
+      shiny::updateSelectInput(session, "artifact", choices = if (nrow(x$artifacts)) setNames(x$artifacts$id, paste(x$artifacts$logical_name, "— version", x$artifacts$version)) else character(), selected = shiny::isolate(input$artifact))
     })
     output$download <- shiny::downloadHandler(
       filename = function() {

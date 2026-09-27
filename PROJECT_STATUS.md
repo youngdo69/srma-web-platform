@@ -1,12 +1,16 @@
-# Active platform status — 2026-09-26
+# Active platform status — 2026-09-27
 
-Phase: Autonomous Block A.
-Current task: WEB-003 persistent state model.
-Status: In progress.
-Last completed platform task: WEB-002 — PASS; WEB-000–001 also PASS.
-Next: architecture, adapter, persistent state and worker vertical slice.
-Blockers: none for bounded Block A. Canonical full renv restore remains unverified; see web/docs/BASELINE.md.
-Deferred: WEB-005 and later; existing scientific Human Gates remain unchanged.
+Phase: Autonomous Block A — completed under PM Revised Mission v1.1.
+Current task: Complete; stopped before WEB-005.
+Status: PASS for Environment bootstrap, WEB-000–004 and the real vertical slice.
+Last completed platform task: WEB-004 background worker and real engine-backed vertical slice.
+Completed outputs: web/ application, adapter, schema, service, worker, storage port, tests and evidence.
+Validation: 27 integrated test groups; direct canonical smoke; 98-file source integrity; 78 R-file syntax; adapter/state tests; Shiny HTTP/assets and UI action; disconnected app with two concurrent workers and one engine attempt; two verified downloads.
+Next: PM review of Block A report; Block B only under a subsequent mission.
+Blockers: none for the revised bounded Block A mission.
+Limitations: SQLite exercised; PostgreSQL runtime untested. Canonical full renv restore unverified; supplied lock lacks officer/flextable. Local development only; no authentication or production readiness claim.
+Deferred: WEB-005 and later. Scientific operations other than diagnostic search validation remain disabled; canonical Human Gates unchanged.
+Last updated: 2026-09-27.
 
 Historical status retained below; it does not describe current platform progress.
 

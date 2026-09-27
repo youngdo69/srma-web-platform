@@ -1,3 +1,4 @@
+if (dir.exists("web/.library")) .libPaths(c(normalizePath("web/.library"), .libPaths()))
 library(digest)
 web_sha <- function(path) digest::digest(file = path, algo = "sha256")
 source("web/tests/fixture.R")

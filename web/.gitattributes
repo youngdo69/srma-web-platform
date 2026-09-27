@@ -1,0 +1,2 @@
+# Preserve exact engine output/checksum evidence across Windows and Unix checkouts.
+evidence/** -text

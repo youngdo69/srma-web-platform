@@ -1,3 +1,4 @@
+if (dir.exists("web/.library")) .libPaths(c(normalizePath("web/.library"), .libPaths()))
 source("web/R/core.R"); source("web/R/adapter.R"); source("web/tests/fixture.R")
 s <- web_settings(data_root = tempfile("contract-"));p <- web_fixture(tempfile("contract-input-"))
 i <- web_engine_inspect(s,p)

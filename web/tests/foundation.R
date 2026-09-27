@@ -1,3 +1,4 @@
+if (dir.exists("web/.library")) .libPaths(c(normalizePath("web/.library"), .libPaths()))
 source("web/R/core.R")
 source("web/ui/app.R")
 settings <- web_settings(data_root = tempfile("foundation-"))

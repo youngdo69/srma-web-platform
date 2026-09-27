@@ -1,0 +1,13 @@
+database,category,check,passed,message
+PubMed,general,file_not_empty,TRUE,The search-strategy file must not be empty.
+PubMed,general,minimum_length,TRUE,Search length: 48 characters.
+PubMed,general,parentheses,TRUE,Opening parentheses: 1; closing parentheses: 1
+PubMed,general,boolean_placement,TRUE,Boolean placement appears valid.
+PubMed,general,boolean_presence,TRUE,AND count: 1; OR count: 1
+PubMed,general,duplicate_lines,TRUE,No duplicated search lines were detected within logical concept blocks.
+PubMed,database_specific,double_quotes,TRUE,Double-quote count: 4
+PubMed,database_specific,field_title_abstract,TRUE,At least one [Title/Abstract] field tag is required.
+PubMed,database_specific,mesh_tag,TRUE,No MeSH field tag was detected. This may be acceptable only if intentionally omitted.
+PubMed,database_specific,no_central_tags,TRUE,"CENTRAL-style :ti,ab,kw syntax was detected in PubMed."
+PubMed,database_specific,no_embase_tags,TRUE,Embase-style syntax may be present in PubMed.
+PubMed,database_specific,bracket_balance,TRUE,Opening square brackets: 2; closing square brackets: 2

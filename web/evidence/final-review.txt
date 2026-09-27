@@ -1,0 +1,1 @@
+PASS: 98 frozen canonical files unchanged; no scientific diff; no topic/user-machine hardcoding in platform application code; UI contains no engine script numbers.

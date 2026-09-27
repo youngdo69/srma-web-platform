@@ -1,0 +1,5 @@
+[1] 1
+[1] 1
+[1] 1
+[1] 1
+PASS: schema/reopen; scoped project/version; gate decision/audit; invalid transition rejection

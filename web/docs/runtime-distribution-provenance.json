@@ -1,0 +1,698 @@
+{
+  "platform": "Ubuntu 24.04 amd64",
+  "installation": "Project-scoped dpkg-deb -x, no system package installation",
+  "distribution_packages": {
+    "r-base-core": {
+      "version": "4.3.3-2build2",
+      "sha256": "086f046230727fc896f70cfb459d693023a30a9f6877492554aa7041dac2e576",
+      "source": "pool/universe/r/r-base/r-base-core_4.3.3-2build2_amd64.deb"
+    },
+    "libtcl8.6": {
+      "version": "8.6.14+dfsg-1build1",
+      "sha256": "7534eb825f6317514d747ce53b4d6c23bf24df1dc1785f9599610ece5515e685",
+      "source": "pool/main/t/tcl8.6/libtcl8.6_8.6.14+dfsg-1build1_amd64.deb"
+    },
+    "libtk8.6": {
+      "version": "8.6.14-1build1",
+      "sha256": "c5edb6c79c91a9f4c25cf0ad68c3341467a6604cb97789b2ac36c6d3de352725",
+      "source": "pool/main/t/tk8.6/libtk8.6_8.6.14-1build1_amd64.deb"
+    },
+    "libxft2": {
+      "version": "2.3.6-1build1",
+      "sha256": "b4f4f3255c0b8773b260c61cbe20ee7c63799cfc0e4e389fa58375dd480b093a",
+      "source": "pool/main/x/xft/libxft2_2.3.6-1build1_amd64.deb"
+    },
+    "r-cran-yaml": {
+      "version": "2.3.8-1",
+      "sha256": "fb6cd75c86bdb3f877e7020113729313a327cc80e30cff629ca8cd3f50b90938",
+      "source": "pool/universe/r/r-cran-yaml/r-cran-yaml_2.3.8-1_amd64.deb"
+    },
+    "r-cran-jsonlite": {
+      "version": "1.8.8+dfsg-1",
+      "sha256": "65297c1b26baf29ded8d107923d42a495f0ff43ef59eac2eae7f530c52b223b8",
+      "source": "pool/universe/r/r-cran-jsonlite/r-cran-jsonlite_1.8.8+dfsg-1_amd64.deb"
+    },
+    "r-cran-dplyr": {
+      "version": "1.1.4-1",
+      "sha256": "abc6761f89cb753a160a94d7ee88c099be30063d11c72de29e3f127214d34e84",
+      "source": "pool/universe/r/r-cran-dplyr/r-cran-dplyr_1.1.4-1_amd64.deb"
+    },
+    "r-cran-cli": {
+      "version": "3.6.2-1",
+      "sha256": "cddd0c0206b8fc6b616451f82fc3de80184620ddb170c39c083de491e22c7751",
+      "source": "pool/universe/r/r-cran-cli/r-cran-cli_3.6.2-1_amd64.deb"
+    },
+    "r-cran-generics": {
+      "version": "0.1.3-1",
+      "sha256": "ccfefbb6c8796c3f67e9c73a9f025193055dcfb6a2f6568200f96baa727310b0",
+      "source": "pool/universe/r/r-cran-generics/r-cran-generics_0.1.3-1_all.deb"
+    },
+    "r-cran-glue": {
+      "version": "1.7.0-1",
+      "sha256": "03d912f4b8c3582de4f80e4404bab70dbf190dc4f1ea03f953eda1fda2882e66",
+      "source": "pool/universe/r/r-cran-glue/r-cran-glue_1.7.0-1_amd64.deb"
+    },
+    "r-cran-lifecycle": {
+      "version": "1.0.4+dfsg-1",
+      "sha256": "350c84b5ee11e5a063a0c2f52323e8ed084c9cbc503e99f876e0b2a602de4139",
+      "source": "pool/universe/r/r-cran-lifecycle/r-cran-lifecycle_1.0.4+dfsg-1_all.deb"
+    },
+    "r-cran-rlang": {
+      "version": "1.1.3-1",
+      "sha256": "104779f26a6a1b0173eea580ceb0b3f43637757ee2526870021d2379da7688e4",
+      "source": "pool/universe/r/r-cran-rlang/r-cran-rlang_1.1.3-1_amd64.deb"
+    },
+    "r-cran-magrittr": {
+      "version": "2.0.3-1",
+      "sha256": "c6c6141030823e20b03359e0b40cbb62c09d7846353a8ee1c2bafce32da97115",
+      "source": "pool/universe/r/r-cran-magrittr/r-cran-magrittr_2.0.3-1_amd64.deb"
+    },
+    "r-cran-pillar": {
+      "version": "1.9.0+dfsg-1",
+      "sha256": "56bbd321ba082fa3bd1160f92d7fe48f669de69ff982bc9e7a0af08e13686251",
+      "source": "pool/universe/r/r-cran-pillar/r-cran-pillar_1.9.0+dfsg-1_all.deb"
+    },
+    "r-cran-fansi": {
+      "version": "1.0.5-1",
+      "sha256": "a1d9183bd5e0234d09ecb8cedb01e18721fc96a5694843d6486c319c7ae8f590",
+      "source": "pool/universe/r/r-cran-fansi/r-cran-fansi_1.0.5-1_amd64.deb"
+    },
+    "r-cran-utf8": {
+      "version": "1.2.4-1",
+      "sha256": "630be9c3c646140ca7fb15735f93393731be84803b96f23377fe3ba00b647ca9",
+      "source": "pool/universe/r/r-cran-utf8/r-cran-utf8_1.2.4-1_amd64.deb"
+    },
+    "r-cran-vctrs": {
+      "version": "0.6.5-1",
+      "sha256": "395f564852d926a19483fe74ffaeb962c0c74eb0cf06da8ca52e821a4af7dab2",
+      "source": "pool/universe/r/r-cran-vctrs/r-cran-vctrs_0.6.5-1_amd64.deb"
+    },
+    "r-cran-r6": {
+      "version": "2.5.1-1",
+      "sha256": "ca6d82cd8475ccd9b48b3130d1c8d6b4832f6fdc991f0cc9b6ce99014702a29d",
+      "source": "pool/universe/r/r-cran-r6/r-cran-r6_2.5.1-1_all.deb"
+    },
+    "r-cran-tibble": {
+      "version": "3.2.1+dfsg-2",
+      "sha256": "8cc8b9345c1bc9743e2048a8ef1a896d62eca5b16c98dd02308f271b00acf79c",
+      "source": "pool/universe/r/r-cran-tibble/r-cran-tibble_3.2.1+dfsg-2_amd64.deb"
+    },
+    "r-cran-pkgconfig": {
+      "version": "2.0.3-2build1",
+      "sha256": "f788db2f2e1db3615f6d216ce3784a28f139344fd2999e0b28c1b45c4f6283c2",
+      "source": "pool/universe/r/r-cran-pkgconfig/r-cran-pkgconfig_2.0.3-2build1_all.deb"
+    },
+    "r-cran-tidyselect": {
+      "version": "1.2.0+dfsg-1",
+      "sha256": "46fc552ad7a3b23152002a9d2c8122a9a32c6aa27b54617545dd921e15d12f6f",
+      "source": "pool/universe/r/r-cran-tidyselect/r-cran-tidyselect_1.2.0+dfsg-1_amd64.deb"
+    },
+    "r-cran-withr": {
+      "version": "2.5.0-1",
+      "sha256": "5dab9781c52bfc2abdbdc56be35082e8a0efa741d12941f09c768ff6a2ce518d",
+      "source": "pool/universe/r/r-cran-withr/r-cran-withr_2.5.0-1_all.deb"
+    },
+    "r-cran-readr": {
+      "version": "2.1.5-1",
+      "sha256": "3d311ee5c9311fbd1364ee58a3c41df203b55f4bb3830aac2f031a1532d382f8",
+      "source": "pool/universe/r/r-cran-readr/r-cran-readr_2.1.5-1_amd64.deb"
+    },
+    "r-cran-clipr": {
+      "version": "0.8.0-1",
+      "sha256": "63696d76d72853707ed4c5ee0a2ad547f0413b5c3f01b2365a891bd9365ab16b",
+      "source": "pool/universe/r/r-cran-clipr/r-cran-clipr_0.8.0-1_all.deb"
+    },
+    "r-cran-crayon": {
+      "version": "1.5.2-1",
+      "sha256": "c313e4d7a3ddf8f771cc93d5a16d2f2be07facdd500dd684afb9e93d7e77bcca",
+      "source": "pool/universe/r/r-cran-crayon/r-cran-crayon_1.5.2-1_all.deb"
+    },
+    "r-cran-hms": {
+      "version": "1.1.3-1",
+      "sha256": "91e53b0a535ea824310ec7deb2239886a7c3b76929097ce531685dc8c15d2c03",
+      "source": "pool/universe/r/r-cran-hms/r-cran-hms_1.1.3-1_all.deb"
+    },
+    "r-cran-vroom": {
+      "version": "1.6.5-1",
+      "sha256": "55de4cddb265ce8fa715e992b61fbeff124fb6596fb578040265b1af503972e2",
+      "source": "pool/universe/r/r-cran-vroom/r-cran-vroom_1.6.5-1_amd64.deb"
+    },
+    "r-cran-bit64": {
+      "version": "4.0.5-1",
+      "sha256": "ed25d7718d9563353453032029ce24e7e22c26c4bf31254bd1fc6b4902eb3ce2",
+      "source": "pool/universe/r/r-cran-bit64/r-cran-bit64_4.0.5-1_amd64.deb"
+    },
+    "r-cran-bit": {
+      "version": "4.0.5-1",
+      "sha256": "04cc9ef646b141d3006619d16243e9d91c1c6f52ab09e0f9f09eae3a4e397a26",
+      "source": "pool/universe/r/r-cran-bit/r-cran-bit_4.0.5-1_amd64.deb"
+    },
+    "r-cran-tzdb": {
+      "version": "0.4.0-2",
+      "sha256": "a6fb6083dd29c6d81e54e657cfb9f82a8fc3e571423ca97f0c684a664999ea79",
+      "source": "pool/universe/r/r-cran-tzdb/r-cran-tzdb_0.4.0-2_amd64.deb"
+    },
+    "r-cran-cpp11": {
+      "version": "0.4.7-1",
+      "sha256": "15cb3396fc0ea8aad91c7c85d781e8ecf0042a7ff4b384b5b4d26de2774c725d",
+      "source": "pool/universe/r/r-cran-cpp11/r-cran-cpp11_0.4.7-1_all.deb"
+    },
+    "r-cran-progress": {
+      "version": "1.2.3-1",
+      "sha256": "6a7c1c77adbdd1c677ef7789080ef330fb32206b645c3e019f6ca403260a740d",
+      "source": "pool/universe/r/r-cran-progress/r-cran-progress_1.2.3-1_all.deb"
+    },
+    "r-cran-prettyunits": {
+      "version": "1.2.0-1",
+      "sha256": "4f58c6c316cf260d29264403591852701349c69097fd8b2d1f16041e1c8e6fe6",
+      "source": "pool/universe/r/r-cran-prettyunits/r-cran-prettyunits_1.2.0-1_all.deb"
+    },
+    "r-cran-rcpp": {
+      "version": "1.0.12-1",
+      "sha256": "8f10901160b2031e408c70d09b0f0c0960532ea4fbcc0760d1a2e6fe549d87a0",
+      "source": "pool/universe/r/rcpp/r-cran-rcpp_1.0.12-1_amd64.deb"
+    },
+    "littler": {
+      "version": "0.3.19-1",
+      "sha256": "9060d0387ac628f71c137a98deddc7cf30b62beb25c5839f43d4e4f80e4f6314",
+      "source": "pool/universe/l/littler/littler_0.3.19-1_all.deb"
+    },
+    "r-cran-littler": {
+      "version": "0.3.19-1",
+      "sha256": "c650b37d903da994f9de37d86986087a233ccd46f7821b2cf8077f6e4c1d72dd",
+      "source": "pool/universe/l/littler/r-cran-littler_0.3.19-1_amd64.deb"
+    },
+    "r-cran-pkgkitten": {
+      "version": "0.2.3-1",
+      "sha256": "bcf2aef9ab750eb023004d352a7081474a364055c63e79062640ffc5ab9ef0ed",
+      "source": "pool/universe/r/r-cran-pkgkitten/r-cran-pkgkitten_0.2.3-1_all.deb"
+    },
+    "r-cran-digest": {
+      "version": "0.6.34-1",
+      "sha256": "4c73c46121e6bbeaece4e9038e958866f4eb2b3291bbc87bead6efae10cf14ca",
+      "source": "pool/universe/r/r-cran-digest/r-cran-digest_0.6.34-1_amd64.deb"
+    },
+    "r-cran-shiny": {
+      "version": "1.8.0+dfsg-1",
+      "sha256": "b867044383563bea29ac63f79d0e2a819d44668b3d9332763d61b82f787a4246",
+      "source": "pool/universe/r/r-cran-shiny/r-cran-shiny_1.8.0+dfsg-1_all.deb"
+    },
+    "r-cran-httpuv": {
+      "version": "1.6.14+dfsg-1build2",
+      "sha256": "557ab3e3a81ca1e0139eb6af630f84ecc1c6c90fc036c31a700ee747dd47d3fb",
+      "source": "pool/universe/r/r-cran-httpuv/r-cran-httpuv_1.6.14+dfsg-1build2_amd64.deb"
+    },
+    "r-cran-later": {
+      "version": "1.3.2+dfsg-1",
+      "sha256": "6738a131ab12ac6467a019a6e1952b6dc2401a957c2d9399304c8d085101db36",
+      "source": "pool/universe/r/r-cran-later/r-cran-later_1.3.2+dfsg-1_amd64.deb"
+    },
+    "r-cran-promises": {
+      "version": "1.2.1+dfsg-1",
+      "sha256": "66129d4b5518f7b4c0216f44654bb3d545fc529f0430b458736d6f437a0a91a6",
+      "source": "pool/universe/r/r-cran-promises/r-cran-promises_1.2.1+dfsg-1_amd64.deb"
+    },
+    "r-cran-fastmap": {
+      "version": "1.1.1-1",
+      "sha256": "cb09e72a9a2815e4ffebce9426de5ac92b143467172382456a7aa918d8e8db76",
+      "source": "pool/universe/r/r-cran-fastmap/r-cran-fastmap_1.1.1-1_amd64.deb"
+    },
+    "libuv1t64": {
+      "version": "1.48.0-1.1build1",
+      "sha256": "72a1856b30af1e533494ab90742a2446f4491b15ddebcade6661a6e8d61b4359",
+      "source": "pool/main/libu/libuv1/libuv1t64_1.48.0-1.1build1_amd64.deb"
+    },
+    "r-cran-mime": {
+      "version": "0.12-1",
+      "sha256": "5110e57e67a5e5621d34b9317125e28195267b910ab5e0b92a70f8fc1a64962d",
+      "source": "pool/universe/r/r-cran-mime/r-cran-mime_0.12-1_amd64.deb"
+    },
+    "r-cran-xtable": {
+      "version": "1:1.8-4-2",
+      "sha256": "41721a16799c17a0812b5e9c86e13d04aca22db73ddc8b74b985d90cf845d246",
+      "source": "pool/universe/r/r-cran-xtable/r-cran-xtable_1.8-4-2_all.deb"
+    },
+    "r-cran-fontawesome": {
+      "version": "0.5.2-1",
+      "sha256": "c97df8e6b73746dda60cd324d9798366cd03ac148082ed7f2f13f8912867a16e",
+      "source": "pool/universe/r/r-cran-fontawesome/r-cran-fontawesome_0.5.2-1_all.deb"
+    },
+    "r-cran-htmltools": {
+      "version": "0.5.7-1",
+      "sha256": "ca83a3fbae470916c53882d6839426ff025462964c2b7aa4c4b082a2019fed1c",
+      "source": "pool/universe/r/r-cran-htmltools/r-cran-htmltools_0.5.7-1_amd64.deb"
+    },
+    "r-cran-base64enc": {
+      "version": "0.1-3-3",
+      "sha256": "b5d3ab93eb7423f15af9c75f1e1906c7c5312273eafd5222ff7f7a151e3d32bf",
+      "source": "pool/universe/r/r-cran-base64enc/r-cran-base64enc_0.1-3-3_amd64.deb"
+    },
+    "r-cran-ellipsis": {
+      "version": "0.3.2-2",
+      "sha256": "953f7d3a3d75bde7afc5a249c3dbbf979305d2ac132fed63b08f5a3d814d89e3",
+      "source": "pool/universe/r/r-cran-ellipsis/r-cran-ellipsis_0.3.2-2_amd64.deb"
+    },
+    "r-cran-sourcetools": {
+      "version": "0.1.7-1-1",
+      "sha256": "bcc238c7a0d16a23b45f4ae2cb9fa758d2cfbd52e6fb5a9125286b4334432912",
+      "source": "pool/universe/r/r-cran-sourcetools/r-cran-sourcetools_0.1.7-1-1_amd64.deb"
+    },
+    "r-cran-commonmark": {
+      "version": "1.9.1-1",
+      "sha256": "fb4fb4bc1d3e1f1e7bac76dd40f019f1eb6036f34eb43e2e2d65939dde0f7823",
+      "source": "pool/universe/r/r-cran-commonmark/r-cran-commonmark_1.9.1-1_amd64.deb"
+    },
+    "r-cran-bslib": {
+      "version": "0.6.1+dfsg-1",
+      "sha256": "b41c156a98befddc22e3ea06203172034ee0ac38eac34c87904babb36b89e5fb",
+      "source": "pool/universe/r/r-cran-bslib/r-cran-bslib_0.6.1+dfsg-1_all.deb"
+    },
+    "r-cran-cachem": {
+      "version": "1.0.8-1",
+      "sha256": "1b3880ebca7c81a4d885dfb6f75d80619a66d7ca8b64218a1745f137b845b5f0",
+      "source": "pool/universe/r/r-cran-cachem/r-cran-cachem_1.0.8-1_amd64.deb"
+    },
+    "r-cran-jquerylib": {
+      "version": "0.1.4+dfsg-4",
+      "sha256": "a1d2e9b1ad336bb52c8780a10977cdd46dc72c38c2c0f110bf4ac99899ce1e7d",
+      "source": "pool/universe/r/r-cran-jquerylib/r-cran-jquerylib_0.1.4+dfsg-4_all.deb"
+    },
+    "libjs-jquery": {
+      "version": "3.6.1+dfsg+~3.5.14-1",
+      "sha256": "8cd2eccd9c73c78c8dfdc5394861c63645f7e114553f29b4d9f15628625d191d",
+      "source": "pool/main/n/node-jquery/libjs-jquery_3.6.1+dfsg+~3.5.14-1_all.deb"
+    },
+    "r-cran-memoise": {
+      "version": "2.0.1-1",
+      "sha256": "2bf2ff26a3d55c2b1c8be768784e0049a35ed36b2d1d6c85c336cd9dbdd917bc",
+      "source": "pool/universe/r/r-cran-memoise/r-cran-memoise_2.0.1-1_all.deb"
+    },
+    "r-cran-sass": {
+      "version": "0.4.8+dfsg-1",
+      "sha256": "f0e85ceff60a4154f6268928ff743ba072bc25ce45930daede85456222a66abf",
+      "source": "pool/universe/r/r-cran-sass/r-cran-sass_0.4.8+dfsg-1_amd64.deb"
+    },
+    "r-cran-fs": {
+      "version": "1.6.3+dfsg-1build2",
+      "sha256": "553dcd166d2a8871eff3bad92cec35b2c8d079c43d2b5c60a7559216f5dfe72f",
+      "source": "pool/universe/r/r-cran-fs/r-cran-fs_1.6.3+dfsg-1build2_amd64.deb"
+    },
+    "r-cran-rappdirs": {
+      "version": "0.3.3-1",
+      "sha256": "89c0e58abc440539ff35a177c7ac3ee51ea4b44246085c2c5c98437b1578c031",
+      "source": "pool/universe/r/r-cran-rappdirs/r-cran-rappdirs_0.3.3-1_amd64.deb"
+    },
+    "node-bootstrap-sass": {
+      "version": "3.4.3-2",
+      "sha256": "bf59501fe42eb30a9f060cca3ca17ac84e2b475b418c2c9bd96047ca240b032c",
+      "source": "pool/universe/n/node-bootstrap-sass/node-bootstrap-sass_3.4.3-2_all.deb"
+    },
+    "libjs-bootstrap4": {
+      "version": "4.6.1+dfsg1-4",
+      "sha256": "5b3404cfaaac1df2a30b16598db6eabbf949700c12ba0c1023decb1fdab10b00",
+      "source": "pool/universe/t/twitter-bootstrap4/libjs-bootstrap4_4.6.1+dfsg1-4_all.deb"
+    },
+    "libjs-popper.js": {
+      "version": "1.16.1+ds-6",
+      "sha256": "09a9592bd83454dc7c39928bf7c645b01ee380bb059894ceab4ebfac2c1e6ef8",
+      "source": "pool/universe/p/popper.js/libjs-popper.js_1.16.1+ds-6_all.deb"
+    },
+    "javascript-common": {
+      "version": "11+nmu1",
+      "sha256": "5e0e49d84d2e6ef1204b0925576305c011d7c70f8d2e2122a1187bced33b36ef",
+      "source": "pool/main/j/javascript-common/javascript-common_11+nmu1_all.deb"
+    },
+    "libjs-bootstrap": {
+      "version": "3.4.1+dfsg-3",
+      "sha256": "d8ce4e3f3fd7a10bac5817228ce5637b8622c49351d18d7df6fb5ad02bf1ea96",
+      "source": "pool/universe/t/twitter-bootstrap3/libjs-bootstrap_3.4.1+dfsg-3_all.deb"
+    },
+    "fonts-glyphicons-halflings": {
+      "version": "1.009~3.4.1+dfsg-3",
+      "sha256": "b34b2491b96392261061ab210f4c62bf9f0c7924dd83dee7fb88b8eef9b6ea7c",
+      "source": "pool/universe/t/twitter-bootstrap3/fonts-glyphicons-halflings_1.009~3.4.1+dfsg-3_all.deb"
+    },
+    "libjs-json": {
+      "version": "0~20221030+~1.0.8-1",
+      "sha256": "1992e4c2330f594c3b05f415c8397eb1c37e38037ce53941c60d9eb8ad92f62c",
+      "source": "pool/universe/j/json-js/libjs-json_0~20221030+~1.0.8-1_all.deb"
+    },
+    "libjs-jquery-datatables": {
+      "version": "1.11.5+dfsg-2",
+      "sha256": "44bdeb04a07f2428c69958401a05807c9f19f05324fae34c53399539517aa16b",
+      "source": "pool/universe/d/datatables.js/libjs-jquery-datatables_1.11.5+dfsg-2_all.deb"
+    },
+    "libjs-es5-shim": {
+      "version": "4.6.7-2",
+      "sha256": "af55fd6774ef411748bc36a4687c79e390a9de8375143f025316796ba69123a1",
+      "source": "pool/universe/n/node-es5-shim/libjs-es5-shim_4.6.7-2_all.deb"
+    },
+    "libjs-jquery-ui": {
+      "version": "1.13.2+dfsg-1",
+      "sha256": "53c4ec6c6edf44eefb60dd6c51fd6a84a94e41ec366b3ff3b885f6eaf2a8515b",
+      "source": "pool/universe/j/jqueryui/libjs-jquery-ui_1.13.2+dfsg-1_all.deb"
+    },
+    "libjs-highlight.js": {
+      "version": "9.18.5+dfsg1-2",
+      "sha256": "a76484a96f0f72b21360137e03106fd8d5ea8793441681b51ea9c386ce92e409",
+      "source": "pool/universe/h/highlight.js/libjs-highlight.js_9.18.5+dfsg1-2_all.deb"
+    },
+    "libjs-twitter-bootstrap-datepicker": {
+      "version": "1.3.1+dfsg1-4.1",
+      "sha256": "818aa891a8682a6e31e46489687fa8a44e93894922071fa8182b2b5031858516",
+      "source": "pool/universe/libj/libjs-twitter-bootstrap-datepicker/libjs-twitter-bootstrap-datepicker_1.3.1+dfsg1-4.1_all.deb"
+    },
+    "libjs-jquery-selectize.js": {
+      "version": "0.12.6+dfsg-1.1",
+      "sha256": "1543e7a51a05512a88db8a0d3c117f38ac7ba8959a651724915f7e59fc10e29e",
+      "source": "pool/universe/libj/libjs-jquery-selectize.js/libjs-jquery-selectize.js_0.12.6+dfsg-1.1_all.deb"
+    },
+    "libjs-sifter.js": {
+      "version": "0.6.0+dfsg-3",
+      "sha256": "84e95cd5de97ca5cd5b0169e87303e178e1a9d470e58faa71cc4694206ca96ef",
+      "source": "pool/universe/libj/libjs-sifter.js/libjs-sifter.js_0.6.0+dfsg-3_all.deb"
+    },
+    "libjs-microplugin.js": {
+      "version": "0.0.3+dfsg-1.1",
+      "sha256": "badf0ad8d99db0cd70b9d74ab672fa7717bb72fdb2013b533947eb2f76e5a0f1",
+      "source": "pool/universe/libj/libjs-microplugin.js/libjs-microplugin.js_0.0.3+dfsg-1.1_all.deb"
+    },
+    "libjs-d3": {
+      "version": "3.5.17-4",
+      "sha256": "2759c783803871e3a87d57f4d10c8e50e70aad79fb82216ae33f882244875bb6",
+      "source": "pool/universe/d/d3/libjs-d3_3.5.17-4_all.deb"
+    },
+    "fonts-font-awesome": {
+      "version": "5.0.10+really4.7.0~dfsg-4.1",
+      "sha256": "4821463b1ff075717b89477cb67edaa25a6533b71f0bcaf5e7bdbd80b011b53c",
+      "source": "pool/main/f/fonts-font-awesome/fonts-font-awesome_5.0.10+really4.7.0~dfsg-4.1_all.deb"
+    },
+    "node-html5shiv": {
+      "version": "3.7.3+dfsg-5",
+      "sha256": "d4b12f4101f482abfef880d2699cdc5ff1a8bf10400703f441674d9815ad46cb",
+      "source": "pool/universe/n/node-html5shiv/node-html5shiv_3.7.3+dfsg-5_all.deb"
+    },
+    "r-cran-dbi": {
+      "version": "1.2.2-1",
+      "sha256": "6daa52631fb0e861533ccd24f48f0c19fdfa0b9de4ac55935ad4fd4e06154e34",
+      "source": "pool/universe/d/dbi/r-cran-dbi_1.2.2-1_all.deb"
+    },
+    "r-cran-rsqlite": {
+      "version": "2.3.4-1",
+      "sha256": "17de24e6b13b27883a86b83eaa423f3b7d813a26f48fd47610bcd90aba935968",
+      "source": "pool/universe/r/r-cran-rsqlite/r-cran-rsqlite_2.3.4-1_amd64.deb"
+    },
+    "r-cran-blob": {
+      "version": "1.2.4-1",
+      "sha256": "068a41313978219326e676eea8b8fdce000b9a3ba9045756556e4b37c7e9c8b3",
+      "source": "pool/universe/r/r-cran-blob/r-cran-blob_1.2.4-1_all.deb"
+    },
+    "r-cran-plogr": {
+      "version": "0.2.0-3build1",
+      "sha256": "7b8dcaaa065e1f77fc85ba66dad4cf47cb9b7038c37e9de3ca577b8721596fe2",
+      "source": "pool/universe/r/r-cran-plogr/r-cran-plogr_0.2.0-3build1_all.deb"
+    },
+    "r-cran-rpostgresql": {
+      "version": "0.7-6+dfsg-1",
+      "sha256": "32ed62f2ad406e8883a9598fde83f53f9cdf6713005934cc94b1dde3e242cfa0",
+      "source": "pool/universe/r/r-cran-rpostgresql/r-cran-rpostgresql_0.7-6+dfsg-1_amd64.deb"
+    },
+    "libpq5": {
+      "version": "16.2-1ubuntu4",
+      "sha256": "1e0fc42cdf4de9323e454a7bb3ccdf3efc087784b396a094da92d79ba3a707d5",
+      "source": "pool/main/p/postgresql-16/libpq5_16.2-1ubuntu4_amd64.deb"
+    },
+    "r-cran-processx": {
+      "version": "3.8.3-1",
+      "sha256": "f8691dbb4f4c626d6e4632ffeaa9b3283a2b6b48be090aeff9f5deb92275ed4a",
+      "source": "pool/universe/r/r-cran-processx/r-cran-processx_3.8.3-1_amd64.deb"
+    },
+    "r-cran-ps": {
+      "version": "1.7.6-1",
+      "sha256": "b89718a7cb6dc15606f48a1b596cfd99bd7fc0ba7de9f664bc0e901c18660d37",
+      "source": "pool/universe/r/r-cran-ps/r-cran-ps_1.7.6-1_amd64.deb"
+    },
+    "r-cran-testthat": {
+      "version": "3.2.1-1",
+      "sha256": "e8ca987daa54e55834f39cbde336ce85f96636f0c2f87889e65059cacb5e8718",
+      "source": "pool/universe/r/r-cran-testthat/r-cran-testthat_3.2.1-1_amd64.deb"
+    },
+    "r-cran-brio": {
+      "version": "1.1.4-1",
+      "sha256": "801244fd8ce3f24c3453483b1f7df981451c11973aad7ca53e1127d313cf87aa",
+      "source": "pool/universe/r/r-cran-brio/r-cran-brio_1.1.4-1_amd64.deb"
+    },
+    "r-cran-callr": {
+      "version": "3.7.5-1",
+      "sha256": "ecae6af221d875fec6e1bdd3db231d9bb940cf6ac99541f18f976ea9b8132cec",
+      "source": "pool/universe/r/r-cran-callr/r-cran-callr_3.7.5-1_all.deb"
+    },
+    "r-cran-desc": {
+      "version": "1.4.3-1",
+      "sha256": "9a6a9472fe905ef02ff7ea059c234364d68ad8c8d619bae82478c4391f56370f",
+      "source": "pool/universe/r/r-cran-desc/r-cran-desc_1.4.3-1_all.deb"
+    },
+    "r-cran-evaluate": {
+      "version": "0.23-1",
+      "sha256": "b705e2450a60999b6010c11ffc7be747e19980adbe661e9d9e45acb3e4d4da01",
+      "source": "pool/universe/r/r-cran-evaluate/r-cran-evaluate_0.23-1_all.deb"
+    },
+    "r-cran-pkgload": {
+      "version": "1.3.4-1",
+      "sha256": "75cf54fac92d2510c81f4f01e14c1a6da728543e3c1b860953c2575d2539b014",
+      "source": "pool/universe/r/r-cran-pkgload/r-cran-pkgload_1.3.4-1_all.deb"
+    },
+    "r-cran-pkgbuild": {
+      "version": "1.4.3-1",
+      "sha256": "ccbfacf3f2a51c8d984c694544de4e800b13742a9e0d77271c614ab51a51081b",
+      "source": "pool/universe/r/r-cran-pkgbuild/r-cran-pkgbuild_1.4.3-1_all.deb"
+    },
+    "r-cran-rprojroot": {
+      "version": "2.0.4-1",
+      "sha256": "ba47f67cd5d2d068995e3ce44b0d116a7b894edeb9485603dc530d7e7989d5be",
+      "source": "pool/universe/r/r-cran-rprojroot/r-cran-rprojroot_2.0.4-1_all.deb"
+    },
+    "r-cran-praise": {
+      "version": "1.0.0-4build1",
+      "sha256": "25fc0790913b754af663969f2d5bfcbfcc8f07efaa582224647011f8dbea2cbc",
+      "source": "pool/universe/r/r-cran-praise/r-cran-praise_1.0.0-4build1_all.deb"
+    },
+    "r-cran-waldo": {
+      "version": "0.5.2-1build1",
+      "sha256": "fdaf30ecab87d470f796eb0546bdb5608b78decf6b0782a2773db6776541b397",
+      "source": "pool/universe/r/r-cran-waldo/r-cran-waldo_0.5.2-1build1_all.deb"
+    },
+    "r-cran-diffobj": {
+      "version": "0.3.5-1",
+      "sha256": "bdc539fff01edaa11788a5057c3b1e17f8d6a8fac958496350e63aa005920e9b",
+      "source": "pool/universe/r/r-cran-diffobj/r-cran-diffobj_0.3.5-1_amd64.deb"
+    },
+    "r-cran-rematch2": {
+      "version": "2.1.2-2build1",
+      "sha256": "6adc88d93c2b8d8540d9548f4cd7095e7590457c1ef3e01db8a28987d935a12d",
+      "source": "pool/universe/r/r-cran-rematch2/r-cran-rematch2_2.1.2-2build1_all.deb"
+    },
+    "r-cran-officer": {
+      "version": "0.6.4+dfsg-1",
+      "sha256": "d4b378b14f8186c35207b0a637ac6f77fac38049827638a8322e11f51c15ca59",
+      "source": "pool/universe/r/r-cran-officer/r-cran-officer_0.6.4+dfsg-1_all.deb"
+    },
+    "r-cran-zip": {
+      "version": "2.3.1-1",
+      "sha256": "f50b7e6120b11968dfeb3ae7475ba1b21a092dbe10c30d58fb57c7c0a0f8fec2",
+      "source": "pool/universe/r/r-cran-zip/r-cran-zip_2.3.1-1_amd64.deb"
+    },
+    "r-cran-xml2": {
+      "version": "1.3.6-1",
+      "sha256": "6bed1613847cdd1797048a659d421c3cfbd550f78632d92e99b4e7d29ca792b7",
+      "source": "pool/universe/r/r-cran-xml2/r-cran-xml2_1.3.6-1_amd64.deb"
+    },
+    "r-cran-openssl": {
+      "version": "2.1.1+dfsg-2build2",
+      "sha256": "216a25ba09b588c71699d7391d3c61239838dd597039c74d7d49c85bea24a76a",
+      "source": "pool/universe/r/r-cran-openssl/r-cran-openssl_2.1.1+dfsg-2build2_amd64.deb"
+    },
+    "r-cran-askpass": {
+      "version": "1.2.0-1",
+      "sha256": "2d28d6c9e1f51136bb90c9336444525717a094d2b8d67f6e76486d0ad2c41d29",
+      "source": "pool/universe/r/r-cran-askpass/r-cran-askpass_1.2.0-1_amd64.deb"
+    },
+    "r-cran-sys": {
+      "version": "3.4.2-1",
+      "sha256": "a08d7358a3ea66625e7c109be0d59c7835a250da1d9266a1937a20f391ef121e",
+      "source": "pool/universe/r/r-cran-sys/r-cran-sys_3.4.2-1_amd64.deb"
+    },
+    "r-cran-uuid": {
+      "version": "1.2-0-1",
+      "sha256": "534f0bd3d6548041720b6e5d33e5e8c7b18c0df17e337378a8c8dcc60e280219",
+      "source": "pool/universe/r/r-cran-uuid/r-cran-uuid_1.2-0-1_amd64.deb"
+    },
+    "r-cran-ragg": {
+      "version": "1.2.7-1build2",
+      "sha256": "0e90a5bdb3eb4224ab72cdda0bc5e2c51484fc1c4085e1845d3c3ca2e922fe7d",
+      "source": "pool/universe/r/r-cran-ragg/r-cran-ragg_1.2.7-1build2_amd64.deb"
+    },
+    "r-cran-systemfonts": {
+      "version": "1.0.5-1",
+      "sha256": "9f69cee0179900308467ef498905e900ba9dac1639b0eca1668aa5344a711fb5",
+      "source": "pool/universe/r/r-cran-systemfonts/r-cran-systemfonts_1.0.5-1_amd64.deb"
+    },
+    "r-cran-textshaping": {
+      "version": "0.3.7-2",
+      "sha256": "6c609a451caf6947ac265431ddc617f77b2b6a79eee22f6f67b12d79ac4a8d06",
+      "source": "pool/universe/r/r-cran-textshaping/r-cran-textshaping_0.3.7-2_amd64.deb"
+    },
+    "r-cran-flextable": {
+      "version": "0.9.4-1",
+      "sha256": "7186c28064677811ac485b256cd369773d5875930a4a538e18266ba37012e588",
+      "source": "pool/universe/r/r-cran-flextable/r-cran-flextable_0.9.4-1_all.deb"
+    },
+    "r-cran-rmarkdown": {
+      "version": "2.25+dfsg-3",
+      "sha256": "6cfc19ab3245f62e1e5cd681652dc4dcde13daaed4b4d80f910922f245467fe0",
+      "source": "pool/universe/r/r-cran-rmarkdown/r-cran-rmarkdown_2.25+dfsg-3_all.deb"
+    },
+    "r-cran-knitr": {
+      "version": "1.45+dfsg-1",
+      "sha256": "ec744ee721d61e64ec3bb47f10748934f78f81efd011252d1db0c23be258281f",
+      "source": "pool/universe/r/r-cran-knitr/r-cran-knitr_1.45+dfsg-1_all.deb"
+    },
+    "r-cran-highr": {
+      "version": "0.10+dfsg-1",
+      "sha256": "f4efab1d92e7c61072e812f55262141b2553100bc328eea17d1b24f68fe61053",
+      "source": "pool/universe/r/r-cran-highr/r-cran-highr_0.10+dfsg-1_all.deb"
+    },
+    "r-cran-xfun": {
+      "version": "0.41+dfsg-1",
+      "sha256": "151ae9e4a201462d4b52f16a061cf309280e1172110b8b5de80c2be7d30e3dff",
+      "source": "pool/universe/r/r-cran-xfun/r-cran-xfun_0.41+dfsg-1_amd64.deb"
+    },
+    "libjs-mathjax": {
+      "version": "2.7.9+dfsg-1",
+      "sha256": "851be370569dd963357a3abe39e1752a91e5c4c2010104c5ba6a3e1c33f467ea",
+      "source": "pool/main/m/mathjax/libjs-mathjax_2.7.9+dfsg-1_all.deb"
+    },
+    "fonts-mathjax": {
+      "version": "2.7.9+dfsg-1",
+      "sha256": "47e00b5468e563cd2743e42ddb67943590e161e41b49272d59ee5e274e73e9e2",
+      "source": "pool/main/m/mathjax/fonts-mathjax_2.7.9+dfsg-1_all.deb"
+    },
+    "r-cran-stringr": {
+      "version": "1.5.1-1",
+      "sha256": "0a379e80c94c31e20af6efe1fb3b47e3581994e4e8f4553ddb971ce568ad50aa",
+      "source": "pool/universe/r/r-cran-stringr/r-cran-stringr_1.5.1-1_all.deb"
+    },
+    "r-cran-stringi": {
+      "version": "1.8.3-1",
+      "sha256": "ad48eb12f96aa5d4aae94c6e2e22cb475e0d53c79d0fed186af6344ee7662e15",
+      "source": "pool/universe/r/r-cran-stringi/r-cran-stringi_1.8.3-1_amd64.deb"
+    },
+    "r-cran-tinytex": {
+      "version": "0.49-1",
+      "sha256": "738b0a06d00bcb000f2805c2ce5a3546d3c0d17ac38d50339b210ce86b069deb",
+      "source": "pool/universe/r/r-cran-tinytex/r-cran-tinytex_0.49-1_all.deb"
+    },
+    "libjs-modernizr": {
+      "version": "2.6.2+ds1-5",
+      "sha256": "a022707a10815c0c369b6cbaebb1244dce3f9abeb1d5640391a61d154434aae5",
+      "source": "pool/universe/m/modernizr/libjs-modernizr_2.6.2+ds1-5_all.deb"
+    },
+    "libjs-prettify": {
+      "version": "2015.12.04+dfsg-1.1",
+      "sha256": "717335db2e7eee0ba810647cb8983c20ca10919bbd307f021a1d65782c402a43",
+      "source": "pool/universe/p/prettify.js/libjs-prettify_2015.12.04+dfsg-1.1_all.deb"
+    },
+    "r-cran-gdtools": {
+      "version": "0.3.5-1",
+      "sha256": "7afdd6d7ef50c9169dfc9eaa10a84c716c9e32125b526118984e090aedc2b198",
+      "source": "pool/universe/r/r-cran-gdtools/r-cran-gdtools_0.3.5-1_amd64.deb"
+    },
+    "r-cran-gfonts": {
+      "version": "0.2.0-3",
+      "sha256": "cd84edb1f6d096756d42b1192eb58638392f456cb598dab9dbbb5b6246979355",
+      "source": "pool/universe/r/r-cran-gfonts/r-cran-gfonts_0.2.0-3_all.deb"
+    },
+    "r-cran-crul": {
+      "version": "1.4.0+dfsg-1",
+      "sha256": "c1f2b492cf1ddadafafd1cbfb1d77c2a6229a554b03eac4b84794800468e04c0",
+      "source": "pool/universe/r/r-cran-crul/r-cran-crul_1.4.0+dfsg-1_all.deb"
+    },
+    "r-cran-curl": {
+      "version": "5.2.0+dfsg-1build2",
+      "sha256": "c39313abc6547174e8746084187e47463682956bc656727e8ec45d4ae564803b",
+      "source": "pool/universe/r/r-cran-curl/r-cran-curl_5.2.0+dfsg-1build2_amd64.deb"
+    },
+    "r-cran-urltools": {
+      "version": "1.7.3+dfsg-2",
+      "sha256": "48f1c4dfd35414f0a974ed6f37423ba1b93194e61f564cca9faeebb182f65b61",
+      "source": "pool/universe/r/r-cran-urltools/r-cran-urltools_1.7.3+dfsg-2_amd64.deb"
+    },
+    "r-cran-triebeard": {
+      "version": "0.4.1-1",
+      "sha256": "d89535148097d02a692e112480c616a49343c21d4eaa5cbe740729ca4e3583d3",
+      "source": "pool/universe/r/r-cran-triebeard/r-cran-triebeard_0.4.1-1_amd64.deb"
+    },
+    "r-cran-httpcode": {
+      "version": "0.3.0-2build1",
+      "sha256": "d1db1821f8969628d6f7faf5557b604513a0cbc9edbe091cddf506779b806c82",
+      "source": "pool/universe/r/r-cran-httpcode/r-cran-httpcode_0.3.0-2build1_all.deb"
+    },
+    "r-cran-fontquiver": {
+      "version": "0.2.1-4",
+      "sha256": "37881160703edf9b518ca9691609c47713b398dc37d6bf95dd048ec5fb0cab28",
+      "source": "pool/universe/r/r-cran-fontquiver/r-cran-fontquiver_0.2.1-4_all.deb"
+    },
+    "r-cran-fontbitstreamvera": {
+      "version": "0.1.1+dfsg-4build1",
+      "sha256": "49e7ae14648a4543439f868ae0b007049d6346a4aac08569db764155b7314a0a",
+      "source": "pool/universe/r/r-cran-fontbitstreamvera/r-cran-fontbitstreamvera_0.1.1+dfsg-4build1_all.deb"
+    },
+    "ttf-bitstream-vera": {
+      "version": "1.10-8.2",
+      "sha256": "ec7e7266da186ebc671ac8f04afb705c045ed78486b138bdc784ff0b1d2a2765",
+      "source": "pool/universe/t/ttf-bitstream-vera/ttf-bitstream-vera_1.10-8.2_all.deb"
+    },
+    "r-cran-fontliberation": {
+      "version": "0.1.0+dfsg-5",
+      "sha256": "dc74296b180baad2bda48a7b6c58fc301ea66f542657e2429305826fb66fb50c",
+      "source": "pool/universe/r/r-cran-fontliberation/r-cran-fontliberation_0.1.0+dfsg-5_all.deb"
+    },
+    "fonts-liberation": {
+      "version": "1:2.1.5-3",
+      "sha256": "065c2ab1abc9108b17d401016dc594b79750904390f095845c93bb06e1153acc",
+      "source": "pool/main/f/fonts-liberation/fonts-liberation_2.1.5-3_all.deb"
+    },
+    "r-cran-data.table": {
+      "version": "1.14.10+dfsg-1",
+      "sha256": "d327c81f2fba65329fce951b0201e46334f002eb0f8dc91c634caea13d5c2a9b",
+      "source": "pool/universe/r/r-cran-data.table/r-cran-data.table_1.14.10+dfsg-1_amd64.deb"
+    },
+    "postgresql-16": {
+      "version": "16.2-1ubuntu4",
+      "sha256": "7f25383e8f39ca99f4886b7b2cbb31c62534ac924e3a61da3f0e8e6456091e69",
+      "source": "pool/main/p/postgresql-16/postgresql-16_16.2-1ubuntu4_amd64.deb"
+    },
+    "postgresql-client-16": {
+      "version": "16.2-1ubuntu4",
+      "sha256": "d9f308ba17d9ac027d3a44fd07e5464e3d69407fb609a7d3ecd6e81937e5282d",
+      "source": "pool/main/p/postgresql-16/postgresql-client-16_16.2-1ubuntu4_amd64.deb"
+    },
+    "postgresql-client-common": {
+      "version": "257build1",
+      "sha256": "8e59fb6fa1073e99f5f1516c5daaa9451b6056af428d4755f558c2bbd4c9c0c7",
+      "source": "pool/main/p/postgresql-common/postgresql-client-common_257build1_all.deb"
+    },
+    "libllvm17t64": {
+      "version": "1:17.0.6-9ubuntu1",
+      "sha256": "1863b5459ca4a6691f5e039e76157f074ee08b48176267642ee4dfea065f5db4",
+      "source": "pool/main/l/llvm-toolchain-17/libllvm17t64_17.0.6-9ubuntu1_amd64.deb"
+    }
+  },
+  "upstream_replacement": {
+    "package": "jquerylib",
+    "version": "0.1.4",
+    "reason": "Distribution package queried system dpkg state; upstream package is relocatable.",
+    "url": "https://cloud.r-project.org/src/contrib/jquerylib_0.1.4.tar.gz",
+    "sha256": "f0bcc11dcde3a6ff180277e45c24642d3da3c8690900e38f44495efbc9064411"
+  }
+}
