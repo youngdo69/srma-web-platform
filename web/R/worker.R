@@ -46,6 +46,8 @@ web_worker_once <- function(con, settings) {
     web_b2_guard(con,settings,owner,j$project_id,j$version_id,j$operation)
     web_c1_guard(con,settings,owner,j$project_id,j$version_id,j$operation)
   web_c2_guard(con,settings,owner,j$project_id,j$version_id,j$operation)
+  web_c3_guard(con,settings,owner,j$project_id,j$version_id,j$operation)
+    if(j$operation=="run_final_qc") {proof<-web_c3_collect(con,settings,owner,j$project_id,j$version_id,work);jsonlite::write_json(proof,file.path(work,"config/generated/final_qc_input.json"),auto_unbox=TRUE,null="null",digits=NA)}
     web_require_activated(con,j$project_id,j$version_id,j$operation)
     web_exec(con, "UPDATE jobs SET progress=30,message=?message,heartbeat=?time,updated_at=?now WHERE id=?id AND state='RUNNING' AND worker_token=?token",
       message = web_registry()[[j$operation]]$progress, time = as.numeric(Sys.time()), now = web_now(), id = j$id, token = j$worker_token)

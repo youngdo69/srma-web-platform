@@ -70,6 +70,7 @@ web_submit <- function(con, settings, actor, project_id, version_id, operation =
   web_b2_guard(con,settings,actor,project_id,version_id,operation)
   web_c1_guard(con,settings,actor,project_id,version_id,operation)
   web_c2_guard(con,settings,actor,project_id,version_id,operation)
+  web_c3_guard(con,settings,actor,project_id,version_id,operation)
   web_pipeline_prerequisites(settings, operation)
   web_require_activated(con,project_id,version_id,operation)
   web_assert(!is.null(reg) && length(payload) == 0L, "This operation is not enabled in this release.")
@@ -126,6 +127,7 @@ web_decide_gate <- function(con, actor, project_id, gate_id, decision, rationale
     # Full source guards run in prepare/approve; direct gate action never creates APPROVED manuscripts.
     web_c1_current(con,project_id,m$evidence_version_id)
   }
+  web_assert(gate$gate_type!="final_qc","Use the Final QC review screen; generic gate approval cannot bypass checks.")
   web_tx(con, function() {
     count <- web_exec(con, "UPDATE gates SET status=?d,decision=?d,reviewer_id=?u,decided_at=?now,rationale=?r WHERE id=?g AND project_id=?p AND status='PENDING'",
       d = decision, u = actor, now = web_now(), r = rationale, g = gate_id, p = project_id)

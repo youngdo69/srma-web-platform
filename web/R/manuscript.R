@@ -70,6 +70,7 @@ web_c2_save <- function(con,settings,actor,project_id,parent,root,x,job=NULL,new
   web_assert(v$project_id==project_id,"Manuscript project changed.")
   web_exec(con,"INSERT INTO manuscript_versions VALUES(?v,?p,?m,?parent,?e,?stage,?source,?refs,?spec,?job,?engine,?actor,?now)",v=v$version_id,p=project_id,m=x$manuscript_id,parent=parent,e=x$evidence_version,stage=x$stage,source=x$source_sha256,refs=x$reference_sha256,spec=web_c2_hash(x$spec),job=job %||b2% NA_character_,engine=x$engine,actor=actor,now=web_now())
   if(x$stage %in% c("PLAN","REVIEW_REQUIRED"))web_exec(con,"INSERT INTO gates(id,project_id,workspace_id,version_id,gate_type,required_operation,status,created_at) VALUES(?g,?p,?w,?v,?k,?o,'PENDING',?now)",g=web_id(),p=project_id,w=p$workspace_id,v=v$version_id,k=if(x$stage=="PLAN")"manuscript_plan" else "manuscript_review",o=if(x$stage=="PLAN")"prepare_manuscript" else "approve_manuscript",now=web_now())
+  web_c3_invalidate_audit(con,p,actor,v$version_id)
   web_audit(con,p,paste0("MANUSCRIPT_",x$stage),v$version_id,actor,list(source=x$source_sha256,reference=x$reference_sha256,job=job))
   if(new_plan)web_audit(con,p,"MANUSCRIPT_SOURCE_REVISION",v$version_id,actor,list(reference=x$reference_sha256))
   v
@@ -185,6 +186,7 @@ web_c2_view <- function(con,settings,actor,project_id,version_id) {
 }
 
 web_c2_invalidate_audit <- function(con,project,actor,new_version,reason) {
+ web_c3_invalidate_audit(con,project,actor,new_version)
  a<-web_query(con,"SELECT version_id FROM manuscript_versions WHERE project_id=?p AND stage='APPROVED'",p=project$id)
  if(nrow(a))web_audit(con,project,"DOWNSTREAM_MANUSCRIPT_INVALIDATED",new_version,actor,list(historical_versions=as.list(a$version_id),reason=reason))
 }

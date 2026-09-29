@@ -38,6 +38,7 @@ texts$Discussion<-"Reporting should make evidence and uncertainty explicit. [[PM
 texts$Declarations<-"Author declarations have been reviewed for this demonstration. Publication is not authorized."
 texts$Keywords<-"Evidence synthesis; reproducibility; author review"
 texts$Results<-paste0("The primary pooled effect is {{FACT:A",primary$version_id,".pooled_effect}}. See {{ARTIFACT:",aids[1],"}}.")
+if(identical(Sys.getenv("C3_VALID_FIXTURE"),"1"))texts$Results<-paste(texts$Results,"The selected tables and figures substantiate these results and preserve their separate analysis roles.",paste0("{{ARTIFACT:",aids,"}}",collapse=" "))
 for(k in names(texts))mv<-web_c2_edit(con,s,actor,mv$project_id,mv$version_id,k,texts[[k]],"APPROVE","Human reviewed source grounding and wording")
 x<-web_c2_view(con,s,actor,mv$project_id,mv$version_id);print(x$precheck);stopifnot(x$precheck$status=="PASS")
 rr<-web_c2_render(x,s$engine_root);stopifnot(identical(rr$text,web_c2_render(x,s$engine_root)$text),grepl("PRISMA 2020",rr$text),grepl("PRIMARY",rr$text),grepl("SENSITIVITY",rr$text),nrow(rr$citations)==1)
@@ -73,6 +74,7 @@ approved_ms<-web_c2_approve(con,s,actor,mv$project_id,mv$version_id,TRUE,"Review
 x<-web_c2_view(con,s,actor,approved_ms$project_id,approved_ms$version_id);stopifnot(x$stage=="APPROVED",x$current)
 msroot<-web_c2_context(con,s,actor,approved_ms$project_id,approved_ms$version_id)$version$root;mshash<-web_sha(file.path(msroot,"config/generated/web_manuscript.json"))
 source("web/tests/c2_ui.R")
+if(identical(Sys.getenv("C3_TEST"),"1"))source("web/tests/c3_reconciliation.R")
 # New plan has no inherited gate, even for identical sources.
 mp2<-web_c2_plan(con,s,actor,ready$project_id,ready$version_id,mspec);reject(web_c2_begin(con,s,actor,mp2$project_id,mp2$version_id))
 revision<-web_c1_plan(con,s,actor,ready$project_id,ready$version_id,spec)

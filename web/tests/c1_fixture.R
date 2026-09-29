@@ -4,7 +4,7 @@ reject<-function(expr){e<-tryCatch({force(expr);NULL},error=identity);stopifnot(
 s<-web_settings(data_root=Sys.getenv("C1_TEST_ROOT",tempfile("c1-e2e-")));s$timeout<-120L;con<-web_db(s);web_migrate(con,s);web_local_identity(con)
 for(u in c("second","adjudicator")){web_exec(con,"INSERT INTO app_users VALUES(?u,?u)",u=u);web_exec(con,"INSERT INTO workspace_members VALUES('local-workspace',?u)",u=u)}
 actor<-"local-researcher";f<-web_fixture(tempfile("b2-source-"),"b2-synthetic")
-cfg<-yaml::read_yaml(file.path(f,"config/project_config.yml"));if(identical(Sys.getenv("C2_TEST"),"1"))cfg$analysis<-list(manuscript=list(minimum_unique_references=1,minimum_intro_references=1,minimum_discussion_references=1));cfg$search$databases<-list(central=TRUE);cfg$research_question$outcomes<-list(primary=list("Synthetic endpoint"),secondary=list());yaml::write_yaml(cfg,file.path(f,"config/project_config.yml"))
+cfg<-yaml::read_yaml(file.path(f,"config/project_config.yml"));if(identical(Sys.getenv("C2_TEST"),"1"))cfg$analysis<-list(manuscript=list(minimum_unique_references=1,minimum_intro_references=1,minimum_discussion_references=1));cfg$search$databases<-list(central=TRUE);cfg$research_question$outcomes<-list(primary=list(if(identical(Sys.getenv("C3_VALID_FIXTURE"),"1"))"Illustrative endpoint" else "Synthetic endpoint"),secondary=list());yaml::write_yaml(cfg,file.path(f,"config/project_config.yml"))
 file.copy(file.path(f,"search_strategies/pubmed_search.txt"),file.path(f,"search_strategies/central_search.txt"))
 v<-web_import_project(con,s,actor,"local-workspace",f)
 upload_root<-tempfile();dir.create(upload_root);ris<-file.path(upload_root,"export.ris")
@@ -37,6 +37,7 @@ for(i in 1:4){x<-context();v<-web_b2_upload(con,s,actor,v$project_id,v$version_i
  edit("Author_Final_Review",i,list(author_final_decision=if(i==4)"Exclude" else "Include",author_final_exclusion_reason=if(i==4)"Ineligible" else "",author_notes="Explicit synthetic full-text review",study_id=paste0("STUDY_",i)))}
 step("register_fulltext");step("finalize_included_studies");stopifnot(length(context()$included_reports)==3)
 step("prepare_extraction")
+if(identical(Sys.getenv("C3_VALID_FIXTURE"),"1"))source("web/tests/c3_fixture_labels.R")
 for(i in 1:3){
  edit("Target_Study_Verification",i,list(study_design="randomized trial",source_location="Page 1",source_evidence="Synthetic fixture, not clinical evidence"))
  x<-context();v<-web_b2_verify(con,s,"second",v$project_id,v$version_id,"Target_Study_Verification",x$tables$Target_Study_Verification[[i]]$.row_id,TRUE,"Independent synthetic verification")

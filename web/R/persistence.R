@@ -81,9 +81,11 @@ web_migrate <- function(con, settings) {
     list(version=8L,files="008_analysis.sql",delimiter=";"),
     list(version=9L,files=c("009_analysis_immutability.sqlite.sql","009_analysis_immutability.postgres.sql"),delimiter="-- NEXT"),
     list(version=10L,files="010_manuscript.sql",delimiter=";"),
-    list(version=11L,files=c("011_manuscript_immutability.sqlite.sql","011_manuscript_immutability.postgres.sql"),delimiter="-- NEXT"))
+    list(version=11L,files=c("011_manuscript_immutability.sqlite.sql","011_manuscript_immutability.postgres.sql"),delimiter="-- NEXT"),
+    list(version=12L,files="012_final_qc.sql",delimiter=";"),
+    list(version=13L,files=c("013_final_qc_immutability.sqlite.sql","013_final_qc_immutability.postgres.sql"),delimiter="-- NEXT"))
   history <- DBI::dbGetQuery(con, "SELECT * FROM schema_migrations WHERE version<>1")
-  web_assert(all(history$version %in% c(2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L)), "Database migration history needs operator review.", "SYSTEM_FAILED")
+  web_assert(all(history$version %in% c(2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L)), "Database migration history needs operator review.", "SYSTEM_FAILED")
   for (migration in migrations) {
     paths <- file.path(dir, migration$files)
     hashes <- vapply(paths, web_sha, character(1))

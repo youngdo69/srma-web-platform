@@ -59,6 +59,7 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
   # Only named public request fields may cross into service functions.
   # Upload size limits and other operator policy remain server-owned.
   fields <- list(
+    qc_start=c("project_id","version_id"),qc_list=c("project_id"),qc_view=c("project_id","qc_id"),qc_accept=c("project_id","qc_id"),qc_resolve=c("project_id","qc_id","finding_id","decision","rationale"),qc_approve=c("project_id","qc_id","confirmed","rationale"),
     manuscript_catalog=c("project_id","version_id"),manuscript_view=c("project_id","version_id"),
     manuscript_plan=c("project_id","version_id","spec"),manuscript_begin=c("project_id","version_id"),
     manuscript_edit=c("project_id","version_id","section","text","decision","rationale"),
@@ -95,12 +96,18 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     "The request contains unsupported fields.")
   web_assert(is.list(args) && !any(c("actor", "user_id", "identity", "con", "settings", "upload_root", "private") %in% names(args)),
     "The request contains an unsupported identity field.")
-  reads <- c("manuscript_catalog","manuscript_view","analysis_catalog","analysis_view","evidence_view", "initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
+  reads <- c("qc_list","qc_view","manuscript_catalog","manuscript_view","analysis_catalog","analysis_view","evidence_view", "initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
   if (!action %in% reads)
     web_assert(is.character(csrf) && length(csrf) == 1L && !is.null(expected_csrf) && identical(csrf, expected_csrf),
       "Refresh this page before trying again.")
   actor <- identity$user_id
   switch(action,
+    qc_start=do.call(web_c3_start,c(list(con=con,settings=settings,actor=actor),args)),
+    qc_list=do.call(web_c3_list,c(list(con=con,actor=actor),args)),
+    qc_view=do.call(web_c3_view,c(list(con=con,settings=settings,actor=actor),args)),
+    qc_accept=do.call(web_c3_accept,c(list(con=con,settings=settings,actor=actor),args)),
+    qc_resolve=do.call(web_c3_resolve,c(list(con=con,settings=settings,actor=actor),args)),
+    qc_approve=do.call(web_c3_approve,c(list(con=con,settings=settings,actor=actor),args)),
     manuscript_catalog=do.call(web_c2_catalog,c(list(con=con,settings=settings,actor=actor),args)),
     manuscript_view=do.call(web_c2_view,c(list(con=con,settings=settings,actor=actor),args)),
     manuscript_plan=do.call(web_c2_plan,c(list(con=con,settings=settings,actor=actor),args)),
