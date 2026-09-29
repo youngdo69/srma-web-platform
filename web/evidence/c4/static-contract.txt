@@ -1,0 +1,2 @@
+PASS: WEB-014 static web contract
+Changed paths against C3 baseline: 5

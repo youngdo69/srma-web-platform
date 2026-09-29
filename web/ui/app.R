@@ -2,6 +2,7 @@ source(file.path(web_root,"web/ui/evidence.R"))
 source(file.path(web_root,"web/ui/analysis.R"))
 source(file.path(web_root,"web/ui/manuscript.R"))
 source(file.path(web_root,"web/ui/final_qc.R"))
+source(file.path(web_root,"web/ui/download_center.R"))
 web_app <- function(settings) {
   ui <- shiny::fluidPage(theme = bslib::bs_theme(version = 5),
     shiny::titlePanel("Systematic Review Workspace"),
@@ -52,7 +53,7 @@ web_app <- function(settings) {
           shiny::tabPanel("Current Action", shiny::textOutput("next_action"),
             shiny::actionButton("run", "Check existing search strategies"), shiny::tableOutput("jobs")),
           shiny::tabPanel("Search / Study Import", shiny::uiOutput("search_import")),
-          web_b2_ui(), web_c1_ui(), web_c2_ui(), web_c3_ui(),
+          web_b2_ui(), web_c1_ui(), web_c2_ui(), web_c3_ui(), web_c4_ui(),
           shiny::tabPanel("Results / Artifacts", shiny::selectInput("artifact", "Available output", character()),
             shiny::downloadButton("download", "Download selected output")),
           shiny::tabPanel("Human Review Required",
@@ -64,8 +65,8 @@ web_app <- function(settings) {
             shiny::selectInput("review_decision", "Your decision", c("Choose a decision" = "", "Approve" = "APPROVED", "Reject" = "REJECTED")),
             shiny::textAreaInput("review_rationale", "Reason and supporting protocol registration reference, where applicable"),
             shiny::actionButton("record_review", "Record human review decision"),
-            shiny::p("A saved draft or completed automated check does not approve scientific decisions. Review decisions remain required.")),
-          shiny::tabPanel("Download", shiny::p("Individual verified outputs are available under Results / Artifacts. Final review packaging will be available after final quality control."))))
+            shiny::p("A saved draft or completed automated check does not approve scientific decisions. Review decisions remain required."))
+          ))
     })
     shiny::observe({
       shiny::req(token()); refresh()
@@ -85,11 +86,12 @@ web_app <- function(settings) {
     web_c1_server(input,output,session,request,safe,notice,refresh)
     web_c2_server(input,output,session,request,safe,notice,refresh)
     web_c3_server(input,output,session,request,safe,notice,refresh)
+    web_c4_server(input,output,session,request,safe,notice,refresh)
     output$overview <- shiny::renderText({x <- state(); shiny::req(x); x$project$title})
     output$workflow <- shiny::renderTable({
       x <- state(); shiny::req(x)
       data.frame(Step = c("Project Setup", "Protocol", "Search", "Study Import", "Screening", "Full-text Review", "Data Extraction", "Risk of Bias", "Meta-analysis", "Manuscript", "Final QC", "Download"),
-        Status = c("Draft saved", "Human review required", "Search validation available", "See Search / Study Import", c(rep("See Screening / Evidence",4),"See Meta-analysis","See Manuscript","See Final QC"), "Individual artifacts available"))
+        Status = c("Draft saved", "Human review required", "Search validation available", "See Search / Study Import", c(rep("See Screening / Evidence",4),"See Meta-analysis","See Manuscript","See Final QC"), "See Download Center"))
     })
     output$next_action <- shiny::renderText({
       x <- state(); shiny::req(x)

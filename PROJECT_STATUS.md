@@ -1,3 +1,13 @@
+# C4 / WEB-014 implementation checkpoint — 2026-09-29
+
+C4 / WEB-014 implementation complete in the Chat PM/implementation environment on branch `web/block-c4`, based directly on approved C3 `255932c68ced6cfd3416e96dea1b9c79e26db8ff`. Scope: user-friendly Download Center, immutable release manifest/package record, authoritative WEB-013 release gating, current/historical output presentation, authorized individual downloads and release-package construction. No scientific engine calculations or prior broad R suites were repeated; canonical scientific source and dependency locks are unchanged.
+
+User-facing behavior: reviewed individual outputs remain available even while final-package creation is blocked; historical versions are clearly labeled; mandatory operating-environment blockers are shown in plain language; optional provider checks are separated. Production `SRMA_FINAL_PACKAGE.zip` creation requires exact current WEB-013 `RELEASE_ELIGIBLE=TRUE` and is rechecked immediately before package publication.
+
+Focused validation: `web/tests/c4_static.py` PASS; final `git diff --check` and delivery integrity are performed once at packaging. Runtime Shiny/R smoke was not repeated in this Chat container because no R executable is installed and the user explicitly prioritized Web UX over repeated canonical R validation. External gates remain authoritative and unchanged.
+
+Next: PM delivery review, then WEB-015 Security & Audit. WEB-015/016/017 not implemented in this task.
+
 # C3 final implementation checkpoint — 2026-09-29
 
 C3 / WEB-013 IMPLEMENTATION COMPLETE. Phase: authorized Web Platform C3, ready for PM/Reviewer review. Last completed: recovered Final-QC integration, targeted positive/negative tests, Human Gate, UI, immutable-state and upstream invalidation verification. Existing C3 recovered at dee5b6e; partial work protected in 85479f0; positive integration/code-binding checkpoint dfbc408. Canonical baseline remains C2 153b8fb236a6084cb5c64489aa0a66a60efc23cc.

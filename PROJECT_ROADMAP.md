@@ -1,3 +1,7 @@
+# PM C4 authorization — 2026-09-29
+
+Approved C3 `255932c68ced6cfd3416e96dea1b9c79e26db8ff`. Implement WEB-014 Download Center / release packaging only. Optimize for a user-friendly Web workflow and minimal duplicate testing. Canonical scientific engine validation is not repeated in this phase. Stop before WEB-015.
+
 # PM C3 authorization — 2026-09-27
 
 Approved C2 153b8fb. Implement WEB-013 only in isolated web/block-c3. Scientific release requires actual canonical runtime and PostgreSQL acceptance. Preserve prior checkouts; stop before WEB-014.
