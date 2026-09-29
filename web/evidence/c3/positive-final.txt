@@ -22,7 +22,7 @@ The following object is masked _by_ ‘.GlobalEnv’:
 
 PASS: authenticated Shiny manuscript preview/status/precheck; approved manuscript edit rejected
 C3 Final QC reconciliation starting
-QC machine checks: lineage PASS; numerics PASS; tables_figures PASS; evidence_counts_rob PASS; prisma PASS; search_artifacts PASS; citations PASS; artifact_coverage PASS; docx PASS; leakage_placeholders PASS; figure_text_f25abf24f63b0976c8bf1d338b6bd530 PASS; figure_text_666424e57684296e03ded5db0e383dbb PASS 
+QC machine checks: lineage PASS; numerics PASS; tables_figures PASS; evidence_counts_rob PASS; prisma PASS; search_artifacts PASS; citations PASS; artifact_coverage PASS; docx PASS; leakage_placeholders PASS; figure_text_f25abf24f63b0976c8bf1d338b6bd530 PASS; figure_text_666424e57684296e03ded5db0e383dbb PASS
 PASS: actual positive automated QC -> explicit Human queue -> immutable Final-QC approval; scientific release remains FALSE
 PASS: actual QC worker, exact source/numeric/table/figure/citation checks, release blocks, immutable Human correction, security and downloads
 PASS: wrong pooled value, unverified citation, placeholders, path leakage, direction/significance, Methods/protocol, stale forest, table and Word tampering negative fixtures

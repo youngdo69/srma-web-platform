@@ -261,5 +261,6 @@
       "log": "syntax.txt",
       "reason": "Parse recovered and changed R source; 89 files"
     }
-  ]
+  ],
+  "log_normalization": "Committed text logs remove trailing spaces only; failure diagnostics and messages retained. Final baseline diff-check initially detected R console trailing spaces, then passed after this formatting-only correction."
 }
