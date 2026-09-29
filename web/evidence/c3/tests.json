@@ -1,0 +1,265 @@
+{
+  "date": "2026-09-29",
+  "development_runtime": "R 4.3.3",
+  "backend": "SQLite",
+  "canonical_acceptance": false,
+  "tests": [
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/c3_fixture.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_ROOT": "/workspace/scratch/8128cd941780/c3-verification/positive"
+      },
+      "exit_code": 1,
+      "log": "positive.txt",
+      "reason": "Initial recovery run: upstream B2/C1 completed; positive QC/Human approval passed; added synthetic-marker test had missing citation and stopped in the earlier precheck.",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/c3_resume.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library",
+        "C2_FIXTURE_STATE": "/workspace/scratch/8128cd941780/c3-verification/positive/c1-result.rds",
+        "C2_FIXTURE_DB": "/workspace/scratch/8128cd941780/c3-verification/positive/state.sqlite",
+        "C3_VALID_FIXTURE": "1"
+      },
+      "exit_code": 1,
+      "log": "positive-resume.txt",
+      "reason": "Operator test invocation used wrong empty SQLite filename; no source defect or PASS claimed.",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/c3_resume.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library",
+        "C2_FIXTURE_STATE": "/workspace/scratch/8128cd941780/c3-verification/positive/c1-result.rds",
+        "C2_FIXTURE_DB": "/workspace/scratch/8128cd941780/c3-verification/positive/platform.sqlite",
+        "C3_VALID_FIXTURE": "1"
+      },
+      "exit_code": 0,
+      "log": "positive-final.txt",
+      "reason": "Final positive QC/negative injections/UI/security/invalidation; reused completed B2/C1 to avoid repeated statistics.",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/c2_fixture.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_ROOT": "/workspace/scratch/8128cd941780/c3-verification/negative",
+        "C3_TEST": "1"
+      },
+      "exit_code": 0,
+      "log": "negative.txt",
+      "reason": "Mandatory real failed-QC/Human override case plus affected B2/C1/C2 end-to-end regressions; upstream fixture intentionally has synthetic markers/internal IDs.",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_request_policy.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library"
+      },
+      "exit_code": 0,
+      "log": "b1_request_policy.txt",
+      "reason": "Shared auth/service/worker/migration contract regression",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_security.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library"
+      },
+      "exit_code": 0,
+      "log": "b1_security.txt",
+      "reason": "Shared auth/service/worker/migration contract regression",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/state.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library"
+      },
+      "exit_code": 0,
+      "log": "state.txt",
+      "reason": "Shared auth/service/worker/migration contract regression",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/contract.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library"
+      },
+      "exit_code": 0,
+      "log": "contract.txt",
+      "reason": "Shared auth/service/worker/migration contract regression",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/c3_code_binding.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library"
+      },
+      "exit_code": 0,
+      "log": "code-binding.txt",
+      "reason": "Concrete acceptance invalidation risk from changes to auth/worker/migrations",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/c3_durability.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library",
+        "C3_SAVED_STATE": "/workspace/scratch/8128cd941780/c3-verification/positive/c3-state.rds",
+        "C3_EXPECT_STATUS": "PASSED"
+      },
+      "exit_code": 0,
+      "log": "durability.txt",
+      "reason": "Separate process verifies persisted immutable QC and invalidation, including actual leakage/figure blocks for negative fixture",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/c3_durability.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library",
+        "C3_SAVED_STATE": "/workspace/scratch/8128cd941780/c3-verification/negative/c3-state.rds",
+        "C3_EXPECT_STATUS": "FAILED"
+      },
+      "exit_code": 0,
+      "log": "durability-negative.txt",
+      "reason": "Separate process verifies persisted immutable QC and invalidation, including actual leakage/figure blocks for negative fixture",
+      "reused": false
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library"
+      },
+      "exit_code": 0,
+      "log": "reused-b1_pipeline.txt",
+      "reason": "Previous C3 evidence reused: corresponding common production files unchanged from recovery checkpoint; final C3-only code binding change does not affect these operations.",
+      "reused": true
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline_inputs.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library"
+      },
+      "exit_code": 0,
+      "log": "reused-b1_pipeline_inputs.txt",
+      "reason": "Previous C3 evidence reused: corresponding common production files unchanged from recovery checkpoint; final C3-only code binding change does not affect these operations.",
+      "reused": true
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "web/tests/b1_pipeline_ui.R"
+      ],
+      "environment": {
+        "SRMA_RSCRIPT": "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "SRMA_WEB_LIBRARY": "/workspace/scratch/284d178eb86f/c3-runtime/root/usr/lib/R/site-library",
+        "C1_TEST_LIBRARY": "/workspace/scratch/284d178eb86f/c1-runtime/root/usr/lib/R/site-library"
+      },
+      "exit_code": 0,
+      "log": "reused-b1_pipeline_ui.txt",
+      "reason": "Previous C3 evidence reused: corresponding common production files unchanged from recovery checkpoint; final C3-only code binding change does not affect these operations.",
+      "reused": true
+    },
+    {
+      "command": [
+        "python3",
+        "web/tests/c3_integrity.py"
+      ],
+      "exit_code": 0,
+      "log": "integrity.txt",
+      "reason": "Protect accepted scientific source, locks and baseline delta"
+    },
+    {
+      "command": [
+        "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+        "--vanilla",
+        "-e",
+        "f <- list.files(\"web\",pattern=\"[.]R$\",recursive=TRUE,full.names=TRUE); invisible(lapply(f,parse)); cat(\"PASS: parsed\",length(f),\"Web R files\\n\")"
+      ],
+      "exit_code": 0,
+      "log": "syntax.txt",
+      "reason": "Parse recovered and changed R source; 89 files"
+    }
+  ]
+}

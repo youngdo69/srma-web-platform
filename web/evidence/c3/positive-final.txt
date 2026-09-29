@@ -1,0 +1,34 @@
+C2 reconciliation starting
+PASS: immutable primary and sensitivity numbers exactly equal approved C1 registry, no recomputation
+PASS: auth/project/version/CSRF/actor/reviewer/paths/secrets/reference-artifact substitution and immutable schema
+$status
+[1] "PASS"
+
+$label
+[1] "WEB-012 Manuscript Pre-check — not Final QC"
+
+$issues
+list()
+
+PASS: numeric conflict/unresolved fact/invalid citation/unverified metadata blocked; deterministic numbering and genuine DOI/PMID dedup
+PASS: DOCX DEVELOPMENT SMOKE — actual worker, editable paragraphs/tables, headings, references, image artifacts, checksum and authorized download
+Loading required package: shiny
+
+Attaching package: ‘shiny’
+
+The following object is masked _by_ ‘.GlobalEnv’:
+
+    req
+
+PASS: authenticated Shiny manuscript preview/status/precheck; approved manuscript edit rejected
+C3 Final QC reconciliation starting
+QC machine checks: lineage PASS; numerics PASS; tables_figures PASS; evidence_counts_rob PASS; prisma PASS; search_artifacts PASS; citations PASS; artifact_coverage PASS; docx PASS; leakage_placeholders PASS; figure_text_f25abf24f63b0976c8bf1d338b6bd530 PASS; figure_text_666424e57684296e03ded5db0e383dbb PASS 
+PASS: actual positive automated QC -> explicit Human queue -> immutable Final-QC approval; scientific release remains FALSE
+PASS: actual QC worker, exact source/numeric/table/figure/citation checks, release blocks, immutable Human correction, security and downloads
+PASS: wrong pooled value, unverified citation, placeholders, path leakage, direction/significance, Methods/protocol, stale forest, table and Word tampering negative fixtures
+PASS: CI/heterogeneity, invalid citation, synthetic marker, source binding, checksum/job and unauthorized artifact substitution blocked
+PASS: Final QC UI separates external pending and blocked release; approval cannot bypass findings
+PASS: upstream revision invalidates exact-version QC; approval not inherited and immutable history preserved
+PASS: upstream revision invalidates exact-version QC; approval not inherited and immutable history preserved
+PASS: upstream revision invalidates exact-version QC; approval not inherited and immutable history preserved
+PASS: Human manuscript approval; plan non-inheritance; analysis revision invalidates current use while preserving historical bytes

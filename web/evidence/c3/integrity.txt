@@ -1,0 +1,1 @@
+PASS: 98 scientific hashes; both locks unchanged; no deletion; diff integrity

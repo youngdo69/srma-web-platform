@@ -1,0 +1,10 @@
+[1] 1
+[1] 1
+[1] 1
+[1] 1
+[1] 1
+[1] 1
+PASS: session-scoped workspace, project, job and artifact isolation; actor tampering
+Loading required package: shiny
+PASS: Shiny session mutation CSRF rejection, logout and safe error message
+PASS: actual Shiny upload context writes exclusively inside session-owned root

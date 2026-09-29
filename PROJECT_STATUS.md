@@ -1,3 +1,15 @@
+# C3 final implementation checkpoint — 2026-09-29
+
+C3 / WEB-013 IMPLEMENTATION COMPLETE. Phase: authorized Web Platform C3, ready for PM/Reviewer review. Last completed: recovered Final-QC integration, targeted positive/negative tests, Human Gate, UI, immutable-state and upstream invalidation verification. Existing C3 recovered at dee5b6e; partial work protected in 85479f0; positive integration/code-binding checkpoint dfbc408. Canonical baseline remains C2 153b8fb236a6084cb5c64489aa0a66a60efc23cc.
+
+Outputs: immutable QCVersion and exact-version Human Final-QC Gate; deterministic canonical audit; release eligibility with external gates; user/operator/recovery docs; web/evidence/c3; C3-001 development delta and PM report prepared by the finalization workflow. Target HEAD and packaging integrity are recorded in the external manifest/report after this commit, not self-referentially here.
+
+Final local positive manuscript/QC/Human path PASS; required faults blocked; failed QC cannot be waived; immutable decisions and independent-process persistence PASS; new manuscript/analysis/evidence invalidates eligibility with history intact. Four shared regressions rerun, three unchanged prior C3 B1 pipeline regressions reused; affected B2/C1/C2 exercised through actual canonical development pipeline. Initial test fixture and wrong SQLite invocation failures are retained and explained, not counted as final PASS. Scientific 98-file source manifest and both locks unchanged. No known remaining local WEB-013 implementation defects.
+
+SCIENTIFIC RELEASE QC ACCEPTANCE PENDING — CANONICAL RUNTIME AND MANDATORY EXTERNAL ACCEPTANCE. Development R 4.3.3/SQLite and cached genuine reference metadata do not establish R 4.6.1 locked, live-provider or PostgreSQL acceptance. RELEASE_ELIGIBLE remains FALSE. Carry-forward gates: POSTGRESQL_EXTERNAL_ACCEPTANCE_PENDING; CREDENTIALED_ACCEPTANCE_PENDING; CANONICAL_RUNTIME_ACCEPTANCE_PENDING; CREDENTIALED_AI_ACCEPTANCE_PENDING; CREDENTIALED_MANUSCRIPT_ACCEPTANCE_PENDING. Actual manuscript claim support, Methods/protocol and visual review still require explicit Human decisions.
+
+Next: PM/Reviewer acceptance and separately provisioned external acceptance only. No Human decision blocks local implementation completion. Deferred: WEB-014/Download Center, production release, push/merge/tag/deployment. Prior checkouts preserved.
+
 # C3 starting checkpoint — 2026-09-27
 
 In progress: WEB-013 Final QC. Clean isolated checkout at approved C2 153b8fb. Last complete: C2. Next: canonical QC integration, immutable decision/Human queue/release gates, targeted tests. All five external gates remain pending; no WEB-014 or deployment.

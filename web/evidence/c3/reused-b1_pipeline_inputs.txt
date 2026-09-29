@@ -1,0 +1,5 @@
+PASS: actual canonical database registry and saved strategy display
+PASS: immutable export version, checksum, project binding, audit and new gates
+PASS: traversal, unsupported type, path escape, symlink, size and project isolation rejected
+PASS: actual canonical preflight reports missing CENTRAL without generic file-not-found
+PASS: DEVELOPMENT R actual canonical preflight through worker, missing input action, complete inputs, artifact checksums, idempotence and pending gates; no scientific-runtime acceptance claimed

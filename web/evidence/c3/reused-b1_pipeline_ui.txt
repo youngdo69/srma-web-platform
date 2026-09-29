@@ -1,0 +1,3 @@
+Loading required package: shiny
+PASS: authenticated Shiny wizard saves, overview resumes, edit creates version, review gates persist, unvalidated preflight fails closed
+PASS: UI manual concept save, canonical review, explicit confirmation, new approved version, credential fail-closed dispatch
