@@ -10,7 +10,7 @@ web_worker_once(con,s);qj<-web_c3_context(con,s,actor,qc$project_id,qc$qc_id)$pa
 jq<-web_query(con,"SELECT * FROM jobs WHERE id=?j",j=qj)
 if(jq$state!="COMPLETE"){print(web_parse(jq$result_json));stop("QC worker failed")}
 qc<-web_c3_accept(con,s,actor,qc$project_id,qc$qc_id);q<-web_c3_view(con,s,actor,qc$project_id,qc$qc_id)
-print(q$result$checks);print(web_b2_table(q$result$findings)[,c("check","mode","message")])
+cat("QC machine checks:",paste(names(q$result$checks),unlist(q$result$checks),collapse="; "),"\n")
 stopifnot(q$result$checks$numerics=="PASS",q$result$checks$tables_figures=="PASS",q$result$checks$citations=="PASS",q$result$checks$lineage=="PASS")
 # Deterministic findings cannot be waived, in either a valid or intentionally invalid fixture.
 reject(web_decide_gate(con,actor,qc$project_id,q$gate,"APPROVED","Cannot bypass via generic gate"))
@@ -52,5 +52,18 @@ fig<-Filter(function(a)a$type=="figure",original$source$artifacts)[[1]];y<-origi
 tab<-Filter(function(a)a$type=="table",original$source$artifacts)[[1]];path<-file.path(testroot,tab$path);bytes<-readBin(path,"raw",file.info(path)$size);writeLines("forged",path);failcheck(original,"lineage");failcheck(original,"tables_figures");writeBin(bytes,path)
 doc<-file.path(testroot,"config/generated/final_qc_assets/manuscript.docx");bytes<-readBin(doc,"raw",file.info(doc)$size);writeBin(charToRaw("forged"),doc);failcheck(original,"docx");writeBin(bytes,doc)
 cat("PASS: wrong pooled value, unverified citation, placeholders, path leakage, direction/significance, Methods/protocol, stale forest, table and Word tampering negative fixtures\n")
+# Required fault cases operate only on isolated copies of the approved packet.
+for(k in c("lower_ci","upper_ci","i2","tau2")) {
+ y<-original;y$source$facts[[paste0("A",primary$version_id,".",k)]]$value<-999
+ failcheck(y,"numerics")
+}
+y<-original;y$sections$Discussion$text<-"Unknown reference [[PMID:999999999]]";failcheck(y,"numerics")
+y<-original;y$sections$Discussion$text<-paste(y$sections$Discussion$text,"Synthetic test fixture");failcheck(y,"leakage")
+p<-proof;p$manuscript_version<-"wrong-version";p$content_sha256<-"wrong";failcheck(original,"lineage",p)
+reject(web_c3_artifact(con,s,actor,qc$project_id,fig$id,"wrong-checksum"))
+reject(web_c3_artifact(con,s,actor,qc$project_id,fig$id,fig$sha256,"wrong-job"))
+reject(web_c3_artifact(con,s,actor,other$project_id,fig$id,fig$sha256))
+cat("PASS: CI/heterogeneity, invalid citation, synthetic marker, source binding, checksum/job and unauthorized artifact substitution blocked\n")
+qc_history_hash<-web_c3_context(con,s,actor,qc$project_id,qc$qc_id)$row$packet_sha256
 source("web/tests/c3_ui.R")
 saveRDS(list(qc=qc,approved_ms=approved_ms,settings=s),file.path(s$data_root,"c3-state.rds"))

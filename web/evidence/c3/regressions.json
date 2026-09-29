@@ -1,0 +1,38 @@
+[
+  {
+    "test": "b1_request_policy",
+    "command": [
+      "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_request_policy.R"
+    ],
+    "exit_code": 0
+  },
+  {
+    "test": "b1_security",
+    "command": [
+      "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+      "--vanilla",
+      "web/tests/b1_security.R"
+    ],
+    "exit_code": 0
+  },
+  {
+    "test": "state",
+    "command": [
+      "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+      "--vanilla",
+      "web/tests/state.R"
+    ],
+    "exit_code": 0
+  },
+  {
+    "test": "contract",
+    "command": [
+      "/workspace/scratch/284d178eb86f/c3-runtime/Rscript",
+      "--vanilla",
+      "web/tests/contract.R"
+    ],
+    "exit_code": 0
+  }
+]

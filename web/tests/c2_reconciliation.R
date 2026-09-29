@@ -77,7 +77,9 @@ source("web/tests/c2_ui.R")
 if(identical(Sys.getenv("C3_TEST"),"1"))source("web/tests/c3_reconciliation.R")
 # New plan has no inherited gate, even for identical sources.
 mp2<-web_c2_plan(con,s,actor,ready$project_id,ready$version_id,mspec);reject(web_c2_begin(con,s,actor,mp2$project_id,mp2$version_id))
+if(identical(Sys.getenv("C3_TEST"),"1"))source("web/tests/c3_invalidation.R")
 revision<-web_c1_plan(con,s,actor,ready$project_id,ready$version_id,spec)
+if(identical(Sys.getenv("C3_TEST"),"1"))source("web/tests/c3_invalidation.R")
 stopifnot(!web_c2_view(con,s,actor,approved_ms$project_id,approved_ms$version_id)$current,web_c2_view(con,s,actor,approved_ms$project_id,approved_ms$version_id)$stage=="APPROVED",web_sha(file.path(msroot,"config/generated/web_manuscript.json"))==mshash)
 reject(web_c2_begin(con,s,actor,mp2$project_id,mp2$version_id))
 stopifnot(nrow(web_query(con,"SELECT id FROM audit_events WHERE event_type='DOWNSTREAM_MANUSCRIPT_INVALIDATED' AND project_id=?p",p=primary$project_id))>0)
@@ -85,5 +87,6 @@ up<-web_b2_context(con,s,actor,ready$project_id,ready$version_id)$packet
 new_evidence<-web_b2_edit(con,s,actor,ready$project_id,ready$version_id,"Target_Outcome_Verification",up$tables$Target_Outcome_Verification[[1]]$.row_id,list(intervention_events="1"))
 stopifnot(!web_c1_view(con,s,actor,primary$project_id,primary$version_id)$current,!web_c2_view(con,s,actor,approved_ms$project_id,approved_ms$version_id)$current)
 reject(web_c2_plan(con,s,actor,ready$project_id,ready$version_id,mspec))
+if(identical(Sys.getenv("C3_TEST"),"1"))source("web/tests/c3_invalidation.R")
 web_c2_fetch_references<-fetch_original
 cat("PASS: Human manuscript approval; plan non-inheritance; analysis revision invalidates current use while preserving historical bytes\n")

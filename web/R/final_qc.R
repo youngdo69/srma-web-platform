@@ -1,7 +1,13 @@
 # Append-only QC lineage on the approved manuscript ProjectVersion; never scientific edits.
 web_c3_operations <- function() c(run_final_qc="APPROVED")
 web_c3_ruleset <- function() "web-final-qc-v1"
-web_c3_code_hash <- function(settings) {p<-c("web/R/final_qc.R","web/R/final_qc_checks.R","web/adapter/final_qc.R","web/R/manuscript.R","web/R/manuscript_render.R","web/adapter/manuscript.R");web_c2_hash(setNames(lapply(file.path(settings$engine_root,p),web_sha),p))}
+web_c3_code_hash <- function(settings) {
+ # Bind acceptance to every executable Web component and migration, including auth/worker guards.
+ dirs<-file.path(settings$engine_root,"web",c("R","adapter","db","ui"))
+ paths<-sort(unique(c(file.path(settings$engine_root,"web/load.R"),unlist(lapply(dirs,list.files,pattern="[.](R|sql)$",full.names=TRUE,recursive=TRUE)))))
+ relative<-substring(paths,nchar(settings$engine_root)+2L)
+ web_c2_hash(setNames(lapply(paths,web_sha),relative))
+}
 web_c3_source <- function(con,settings,actor,project_id,version_id) {
  c<-web_c2_context(con,settings,actor,project_id,version_id,TRUE,TRUE)
  web_assert(c$packet$stage=="APPROVED","Final QC requires an explicitly approved manuscript.","USER_ACTION_REQUIRED")
