@@ -2,6 +2,7 @@ source("web/load.R")
 settings <- web_settings()
 con <- web_db(settings)
 web_migrate(con, settings)
+web_deployment_preflight(con, settings)
 once <- "--once" %in% commandArgs(trailingOnly = TRUE)
 repeat {
   tryCatch({web_recover_stale(con, settings); web_worker_once(con, settings)},

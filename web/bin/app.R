@@ -1,6 +1,6 @@
 source("web/load.R")
 source("web/ui/app.R")
 settings <- web_settings()
-con <- web_db(settings); web_migrate(con, settings); DBI::dbDisconnect(con)
+con <- web_db(settings); web_migrate(con, settings); web_deployment_preflight(con, settings); DBI::dbDisconnect(con)
 options(shiny.sanitize.errors = TRUE, shiny.maxRequestSize = 20 * 1024^2)
-shiny::runApp(web_app(settings), host = "127.0.0.1", port = as.integer(Sys.getenv("SRMA_WEB_PORT", "3838")), launch.browser = FALSE)
+shiny::runApp(web_app(settings), host = settings$host, port = settings$port, launch.browser = FALSE)

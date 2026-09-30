@@ -1,3 +1,12 @@
+# WEB-016 Beta Deployment / production-environment integration — 2026-09-30
+
+Status: COMPLETE (code/integration boundary; real operator environment acceptance remains external).
+Completed: fail-closed beta startup; PostgreSQL requirement; trusted organization-authentication proxy; persistent storage/schema preflight; proxy-user provisioning; health/preflight commands; systemd examples; user-facing Service Status. `SRMA_WEB_MODE=production` remains explicitly blocked until WEB-017.
+Scientific source/locks: unchanged and not retested.
+Validation: `python3 web/tests/c6_static.py` PASS; `git diff --check` PASS.
+External acceptance: actual PostgreSQL/reverse-proxy/canonical-runtime acceptance remains operator-environment work.
+Next: WEB-017 Production Release / Final Integration.
+
 # WEB-015 Security & Audit — 2026-09-30
 
 Status: COMPLETE (Web-only targeted validation).

@@ -4,6 +4,7 @@ source(file.path(web_root,"web/ui/manuscript.R"))
 source(file.path(web_root,"web/ui/final_qc.R"))
 source(file.path(web_root,"web/ui/download_center.R"))
 source(file.path(web_root,"web/ui/security_audit.R"))
+source(file.path(web_root,"web/ui/deployment.R"))
 web_app <- function(settings) {
   ui <- shiny::fluidPage(theme = bslib::bs_theme(version = 5),
     shiny::titlePanel("Systematic Review Workspace"),
@@ -24,8 +25,19 @@ web_app <- function(settings) {
     request <- function(action, args = list()) web_request(con, token(), action, args,
       input$csrf, csrf, settings = settings, upload_root = upload_root)
     output$notice <- shiny::renderText(notice())
+    shiny::observe({
+      if (is.null(token()) && settings$mode %in% c("beta", "production") && isTRUE(settings$trusted_auth_proxy)) {
+        issued <- safe(web_proxy_sign_in(con, settings, session$request))
+        if (!is.null(issued)) {
+          if (inherits(session, "ShinySession")) upload_root <- safe(web_bind_upload_root(session, settings))
+          token(issued); notice("")
+        }
+      }
+    })
     output$identity_ui <- shiny::renderUI({
-      if (is.null(token()) && !identical(Sys.getenv("SRMA_WEB_TEST_IDP"), "1"))
+      if (is.null(token()) && settings$mode %in% c("beta", "production"))
+        shiny::p("Sign in through your organization's access portal. If access was granted recently, refresh this page.")
+      else if (is.null(token()) && !identical(Sys.getenv("SRMA_WEB_TEST_IDP"), "1"))
         shiny::p("Workspace sign-in is not configured yet. Contact your administrator.")
       else if (is.null(token())) shiny::tagList(
         shiny::p("Automated testing workspace. Enter the session credential supplied by the test operator."),
@@ -54,7 +66,7 @@ web_app <- function(settings) {
           shiny::tabPanel("Current Action", shiny::textOutput("next_action"),
             shiny::actionButton("run", "Check existing search strategies"), shiny::tableOutput("jobs")),
           shiny::tabPanel("Search / Study Import", shiny::uiOutput("search_import")),
-          web_b2_ui(), web_c1_ui(), web_c2_ui(), web_c3_ui(), web_c4_ui(), web_c5_ui(),
+          web_b2_ui(), web_c1_ui(), web_c2_ui(), web_c3_ui(), web_c4_ui(), web_c5_ui(), web_c6_ui(),
           shiny::tabPanel("Results / Artifacts", shiny::selectInput("artifact", "Available output", character()),
             shiny::downloadButton("download", "Download selected output")),
           shiny::tabPanel("Human Review Required",
@@ -89,6 +101,7 @@ web_app <- function(settings) {
     web_c3_server(input,output,session,request,safe,notice,refresh)
     web_c4_server(input,output,session,request,safe,notice,refresh)
     web_c5_server(input,output,session,request,safe,notice,refresh,token)
+    web_c6_server(input,output,session,request,safe,notice,refresh)
     output$overview <- shiny::renderText({x <- state(); shiny::req(x); x$project$title})
     output$workflow <- shiny::renderTable({
       x <- state(); shiny::req(x)

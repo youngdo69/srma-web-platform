@@ -66,6 +66,7 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     qc_start=c("project_id","version_id"),qc_list=c("project_id"),qc_view=c("project_id","qc_id"),qc_accept=c("project_id","qc_id"),qc_resolve=c("project_id","qc_id","finding_id","decision","rationale"),qc_approve=c("project_id","qc_id","confirmed","rationale"),
     release_qc_list=c("project_id"),release_catalog=c("project_id","qc_id"),release_build=c("project_id","qc_id"),release_package_list=c("project_id"),release_download_item=c("project_id","qc_id","item_id","destination"),release_download_package=c("project_id","package_id","destination"),
     audit_list=c("project_id"),audit_export=c("project_id","destination"),security_summary=character(),logout_all=character(),
+    service_status=c("project_id"),
     manuscript_catalog=c("project_id","version_id"),manuscript_view=c("project_id","version_id"),
     manuscript_plan=c("project_id","version_id","spec"),manuscript_begin=c("project_id","version_id"),
     manuscript_edit=c("project_id","version_id","section","text","decision","rationale"),
@@ -102,12 +103,13 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     "The request contains unsupported fields.")
   web_assert(is.list(args) && !any(c("actor", "user_id", "identity", "con", "settings", "upload_root", "private") %in% names(args)),
     "The request contains an unsupported identity field.")
-  reads <- c("audit_list","audit_export","security_summary","release_qc_list","release_catalog","release_package_list","release_download_item","release_download_package","qc_list","qc_view","manuscript_catalog","manuscript_view","analysis_catalog","analysis_view","evidence_view", "initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
+  reads <- c("service_status","audit_list","audit_export","security_summary","release_qc_list","release_catalog","release_package_list","release_download_item","release_download_package","qc_list","qc_view","manuscript_catalog","manuscript_view","analysis_catalog","analysis_view","evidence_view", "initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
   if (!action %in% reads)
     web_assert(is.character(csrf) && length(csrf) == 1L && !is.null(expected_csrf) && identical(csrf, expected_csrf),
       "Refresh this page before trying again.")
   actor <- identity$user_id
   switch(action,
+    service_status=web_deployment_status(con,settings),
     audit_list=do.call(web_c5_audit_list,c(list(con=con,actor=actor),args)),
     audit_export=do.call(web_c5_audit_export,c(list(con=con,actor=actor),args)),
     security_summary=web_c5_auth_summary(con,actor),

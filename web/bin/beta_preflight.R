@@ -1,0 +1,7 @@
+source("web/load.R")
+settings <- web_settings()
+web_assert(settings$mode == "beta", "Set SRMA_WEB_MODE=beta for the beta preflight.", "SYSTEM_FAILED")
+con <- web_db(settings); on.exit(DBI::dbDisconnect(con))
+web_migrate(con, settings)
+status <- web_deployment_preflight(con, settings)
+cat(jsonlite::toJSON(status, auto_unbox = TRUE, pretty = TRUE), "\n")

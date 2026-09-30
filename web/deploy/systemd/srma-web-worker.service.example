@@ -1,0 +1,18 @@
+[Unit]
+Description=SR-MA Web background worker
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=srma-web
+WorkingDirectory=/opt/srma-agent-toolkit
+EnvironmentFile=/etc/srma-web/runtime.env
+ExecStart=/usr/bin/Rscript --vanilla web/bin/worker.R
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/srma-web
+
+[Install]
+WantedBy=multi-user.target

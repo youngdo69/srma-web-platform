@@ -32,10 +32,15 @@ web_settings <- function(engine_root = Sys.getenv("SRMA_ENGINE_ROOT", getwd()),
                          data_root = Sys.getenv("SRMA_WEB_DATA", tools::R_user_dir("srma-web", "data")),
                          backend = Sys.getenv("SRMA_WEB_DB", "sqlite")) {
   dir.create(data_root, recursive = TRUE, showWarnings = FALSE, mode = "0700")
+  mode <- tolower(Sys.getenv("SRMA_WEB_MODE", "development"))
   list(engine_root = normalizePath(engine_root, mustWork = TRUE),
-       data_root = normalizePath(data_root, mustWork = TRUE), backend = backend,
+       data_root = normalizePath(data_root, mustWork = TRUE), backend = backend, mode = mode,
        sqlite_file = file.path(normalizePath(data_root), "platform.sqlite"),
        rscript = Sys.getenv("SRMA_RSCRIPT", file.path(R.home("bin"), "Rscript")),
+       host = Sys.getenv("SRMA_WEB_HOST", "127.0.0.1"), port = as.integer(Sys.getenv("SRMA_WEB_PORT", "3838")),
+       public_url = Sys.getenv("SRMA_PUBLIC_URL", ""),
+       trusted_auth_proxy = identical(Sys.getenv("SRMA_TRUSTED_AUTH_PROXY"), "1"),
+       auth_header = Sys.getenv("SRMA_AUTH_HEADER", "HTTP_X_SRMA_USER"),
        timeout = 120, max_attempts = 2L)
 }
 web_registry <- function() {
