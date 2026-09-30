@@ -6,7 +6,9 @@ core=(root/'web/R/core.R').read_text(); dep=(root/'web/R/deployment.R').read_tex
 for needle in ('SRMA_WEB_MODE','SRMA_TRUSTED_AUTH_PROXY','SRMA_AUTH_HEADER','SRMA_PUBLIC_URL'):
     assert needle in core or needle in dep, needle
 assert 'settings$backend == "postgres"' in dep
-assert 'SRMA_WEB_TEST_IDP' in dep and 'Production mode remains disabled until WEB-017' in dep
+assert 'SRMA_WEB_TEST_IDP' in dep and 'settings$backend == "postgres"' in dep
+assert 'web_proxy_sign_in' in dep and 'SRMA_TRUSTED_AUTH_PROXY' in core
+# WEB-017 may enable production, but beta requirements must remain intact.
 assert 'web_proxy_sign_in' in dep and "provider='trusted-proxy'" in dep
 assert 'web_deployment_preflight(con, settings)' in app and 'web_deployment_preflight(con, settings)' in worker
 assert 'Service Status' in ui
