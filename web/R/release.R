@@ -151,6 +151,8 @@ web_c4_download_item <- function(con, settings, actor, project_id, qc_id, item_i
     web_assert(identical(web_sha(item$storage_path), item$sha256), "This supplementary file failed integrity verification.", "ARTIFACT_INTEGRITY_FAILED")
     web_assert(file.copy(item$storage_path, destination, overwrite = TRUE), "Could not prepare the download.", "SYSTEM_FAILED")
   }
+  project <- web_authorize(con, actor, project_id)
+  web_audit(con, project, "DOWNLOAD_CENTER_ITEM_DOWNLOADED", item_id, actor, list(qc_id = qc_id, sha256 = item$sha256, package_path = item$package_path))
   invisible(destination)
 }
 
@@ -227,5 +229,7 @@ web_c4_download_package <- function(con, settings, actor, project_id, package_id
   web_assert(nrow(r) == 1L, "This release package is unavailable.")
   path <- web_store(settings)$get(r$storage_locator, r$package_checksum)
   web_assert(file.copy(path, destination, overwrite = TRUE), "Could not prepare the package download.", "SYSTEM_FAILED")
+  project <- web_authorize(con, actor, project_id)
+  web_audit(con, project, "RELEASE_PACKAGE_DOWNLOADED", package_id, actor, list(checksum = r$package_checksum, qc_id = r$qc_id))
   invisible(destination)
 }

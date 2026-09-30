@@ -1,3 +1,7 @@
+# PM WEB-015/016/017 authorization — 2026-09-30
+
+WEB-015 through WEB-017 are authorized as the final Web-platform hardening, beta-integration and production-release sequence. Optimize for a user-friendly Web service and minimal repeat validation. The canonical scientific engine is treated as the established source of truth and is not broadly retested; only Web changes receive targeted validation. Final delivery will be a complete integrated source archive plus Git bundle.
+
 # PM C4 authorization — 2026-09-29
 
 Approved C3 `255932c68ced6cfd3416e96dea1b9c79e26db8ff`. Implement WEB-014 Download Center / release packaging only. Optimize for a user-friendly Web workflow and minimal duplicate testing. Canonical scientific engine validation is not repeated in this phase. Stop before WEB-015.

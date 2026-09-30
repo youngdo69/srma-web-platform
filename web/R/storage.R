@@ -26,5 +26,7 @@ web_download <- function(con, settings, actor, project_id, artifact_id, destinat
   web_assert(nrow(a) == 1L, "This output is not available.")
   path <- web_store(settings)$get(a$storage_locator, a$checksum)
   web_assert(file.copy(path, destination, overwrite = TRUE), "Could not prepare the download.", "SYSTEM_FAILED")
+  project <- web_authorize(con, actor, project_id)
+  web_audit(con, project, "ARTIFACT_DOWNLOADED", artifact_id, actor, list(checksum = a$checksum, logical_name = a$logical_name))
   invisible(destination)
 }

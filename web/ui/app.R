@@ -3,6 +3,7 @@ source(file.path(web_root,"web/ui/analysis.R"))
 source(file.path(web_root,"web/ui/manuscript.R"))
 source(file.path(web_root,"web/ui/final_qc.R"))
 source(file.path(web_root,"web/ui/download_center.R"))
+source(file.path(web_root,"web/ui/security_audit.R"))
 web_app <- function(settings) {
   ui <- shiny::fluidPage(theme = bslib::bs_theme(version = 5),
     shiny::titlePanel("Systematic Review Workspace"),
@@ -53,7 +54,7 @@ web_app <- function(settings) {
           shiny::tabPanel("Current Action", shiny::textOutput("next_action"),
             shiny::actionButton("run", "Check existing search strategies"), shiny::tableOutput("jobs")),
           shiny::tabPanel("Search / Study Import", shiny::uiOutput("search_import")),
-          web_b2_ui(), web_c1_ui(), web_c2_ui(), web_c3_ui(), web_c4_ui(),
+          web_b2_ui(), web_c1_ui(), web_c2_ui(), web_c3_ui(), web_c4_ui(), web_c5_ui(),
           shiny::tabPanel("Results / Artifacts", shiny::selectInput("artifact", "Available output", character()),
             shiny::downloadButton("download", "Download selected output")),
           shiny::tabPanel("Human Review Required",
@@ -87,6 +88,7 @@ web_app <- function(settings) {
     web_c2_server(input,output,session,request,safe,notice,refresh)
     web_c3_server(input,output,session,request,safe,notice,refresh)
     web_c4_server(input,output,session,request,safe,notice,refresh)
+    web_c5_server(input,output,session,request,safe,notice,refresh,token)
     output$overview <- shiny::renderText({x <- state(); shiny::req(x); x$project$title})
     output$workflow <- shiny::renderTable({
       x <- state(); shiny::req(x)

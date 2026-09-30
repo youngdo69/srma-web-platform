@@ -1,3 +1,11 @@
+# WEB-015 Security & Audit — 2026-09-30
+
+Status: COMPLETE (Web-only targeted validation).
+Completed: user-facing Security & Audit panel; sanitized project audit export; append-only authentication audit events; sign-out-all; download auditing; secret redaction; immutable auth-audit triggers.
+Scientific source/locks: unchanged; no canonical scientific rerun.
+Validation: `python3 web/tests/c5_static.py` PASS; `git diff --check` PASS.
+Next: WEB-016 Beta Deployment / production-environment integration.
+
 # C4 / WEB-014 implementation checkpoint — 2026-09-29
 
 C4 / WEB-014 implementation complete in the Chat PM/implementation environment on branch `web/block-c4`, based directly on approved C3 `255932c68ced6cfd3416e96dea1b9c79e26db8ff`. Scope: user-friendly Download Center, immutable release manifest/package record, authoritative WEB-013 release gating, current/historical output presentation, authorized individual downloads and release-package construction. No scientific engine calculations or prior broad R suites were repeated; canonical scientific source and dependency locks are unchanged.
