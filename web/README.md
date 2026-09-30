@@ -1,3 +1,9 @@
+# SR-MA Web Platform — WEB-017 Integrated Release
+
+Current operating documentation: `docs/BETA_DEPLOYMENT.md`, `docs/PRODUCTION_DEPLOYMENT.md`, `docs/PRODUCTION_RELEASE_CHECKLIST.md`, and `docs/OPERATIONS_RUNBOOK.md`. The Web layer is an orchestration/user-experience layer around the canonical scientific engine; it does not replace the scientific source of truth. Production startup is fail-closed and per-project final package generation still requires current Human-approved Final QC.
+
+---
+
 # SR-MA Web Platform — Autonomous Block B1
 
 Local Shiny + bslib application around the unchanged, PM-authorized canonical R engine. **Check search strategies** and **Check database inputs** are enabled. Database preflight requires the separately verified scientific runtime. Neither operation approves any scientific Human Gate. Search generation and PubMed retrieval remain disabled.

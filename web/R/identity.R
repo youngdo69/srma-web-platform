@@ -109,7 +109,7 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
       "Refresh this page before trying again.")
   actor <- identity$user_id
   switch(action,
-    service_status=web_deployment_status(con,settings),
+    service_status=do.call(web_c6_status,c(list(con=con,settings=settings,actor=actor),args)),
     audit_list=do.call(web_c5_audit_list,c(list(con=con,actor=actor),args)),
     audit_export=do.call(web_c5_audit_export,c(list(con=con,actor=actor),args)),
     security_summary=web_c5_auth_summary(con,actor),

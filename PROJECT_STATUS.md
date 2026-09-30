@@ -1,3 +1,13 @@
+# WEB-017 Production Release / Final Integration — 2026-09-30
+
+Status: COMPLETE — final integrated Web source ready for transfer.
+Completed: production-mode fail-closed preflight; exact-code/lock external acceptance binding and protected acceptance import; loopback-only production Shiny boundary; TLS/organization reverse-proxy example; production environment example; production checklist; operations runbook; final integrated source documentation.
+Scientific source/locks: unchanged by WEB-015–017; canonical scientific engine was not broadly rerun.
+Validation: WEB-015/016/017 targeted static contracts PASS; SQLite auth-audit immutability probe PASS; final `git diff --check` PASS; no canonical scientific source or dependency-lock changes in WEB-015–017.
+Production operation: actual PostgreSQL/canonical-runtime acceptance remains an operator-environment action and production startup remains fail-closed until those exact-code acceptance records are imported. Individual review final-package release still requires its own current Human-approved Final QC.
+Final delivery: complete integrated source ZIP plus self-contained Git bundle; intermediate deltas are not required for the user to assemble the final source.
+Next: no further planned WEB task; operator deployment/acceptance only.
+
 # WEB-016 Beta Deployment / production-environment integration — 2026-09-30
 
 Status: COMPLETE (code/integration boundary; real operator environment acceptance remains external).

@@ -26,7 +26,15 @@ if(kind=="CANONICAL_RUNTIME") {
  DBI::dbDisconnect(db)
 }
 stopifnot(engine_before==web_c3_code_hash(s),lock==web_sha(file.path(s$engine_root,"renv.lock")))
-# Restore original operational backend from settings, not from test-process environment.
-db<-web_db(s);web_migrate(db,s);engine<-web_register_engine(db,s)
-web_exec(db,"INSERT INTO release_acceptances VALUES(?i,?e,?k,?h,?x,?t)",i=web_id(),e=engine,k=kind,h=lock,x=as.character(jsonlite::toJSON(evidence,auto_unbox=TRUE,null="null",digits=NA)),t=web_now());DBI::dbDisconnect(db)
-cat("PASS: actual",kind,"acceptance evidence recorded; project release still requires current successful QC and Human review\n")
+export_path<-Sys.getenv("SRMA_ACCEPTANCE_EXPORT","")
+if(nzchar(export_path)) {
+ dir.create(dirname(export_path),recursive=TRUE,showWarnings=FALSE,mode="0700")
+ jsonlite::write_json(list(kind=kind,lock_sha256=lock,evidence=evidence),export_path,auto_unbox=TRUE,null="null",digits=NA,pretty=TRUE)
+}
+record<-!identical(Sys.getenv("SRMA_ACCEPTANCE_RECORD","1"),"0")
+if(record) {
+ # Record only when the operator intentionally points settings at a database that may hold acceptance rows.
+ db<-web_db(s);web_migrate(db,s);engine<-web_register_engine(db,s)
+ web_exec(db,"INSERT INTO release_acceptances VALUES(?i,?e,?k,?h,?x,?t)",i=web_id(),e=engine,k=kind,h=lock,x=as.character(jsonlite::toJSON(evidence,auto_unbox=TRUE,null="null",digits=NA)),t=web_now());DBI::dbDisconnect(db)
+}
+cat("PASS: actual",kind,"acceptance evidence verified",if(nzchar(export_path))paste("and exported to",export_path) else "",if(record)"and recorded" else "without database recording","; project release still requires current successful QC and Human review\n")

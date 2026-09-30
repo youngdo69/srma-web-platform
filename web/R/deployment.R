@@ -3,11 +3,43 @@ web_schema_target_version <- function(settings) {
   versions <- suppressWarnings(as.integer(sub("^([0-9]{3}).*$", "\\1", files)))
   max(versions[is.finite(versions)], na.rm = TRUE)
 }
+web_release_acceptance_status <- function(con, settings) {
+  engine <- web_register_engine(con, settings)
+  lock <- web_sha(file.path(settings$engine_root, "renv.lock"))
+  rows <- web_query(con, "SELECT kind,evidence_json FROM release_acceptances WHERE engine_id=?e AND lock_sha256=?h", e = engine, h = lock)
+  valid <- if (!nrow(rows)) character() else rows$kind[vapply(rows$evidence_json, function(x) {
+    evidence <- tryCatch(web_parse(x), error = function(e) list())
+    identical(evidence$web_sha256, web_c3_code_hash(settings))
+  }, logical(1))]
+  list(CANONICAL_RUNTIME_ACCEPTED = "CANONICAL_RUNTIME" %in% valid,
+       POSTGRESQL_ACCEPTED = "POSTGRESQL" %in% valid,
+       engine_id = engine, lock_sha256 = lock, web_sha256 = web_c3_code_hash(settings))
+}
+web_import_release_acceptance <- function(con, settings, path) {
+  web_assert(file.exists(path), "Acceptance evidence file does not exist.", "SYSTEM_FAILED")
+  envelope <- jsonlite::read_json(path, simplifyVector = FALSE)
+  web_assert(envelope$kind %in% c("CANONICAL_RUNTIME", "POSTGRESQL") && is.list(envelope$evidence), "Acceptance evidence format is invalid.", "SYSTEM_FAILED")
+  lock <- web_sha(file.path(settings$engine_root, "renv.lock")); code <- web_c3_code_hash(settings)
+  web_assert(identical(envelope$lock_sha256, lock) && identical(envelope$evidence$lock_sha256, lock), "Acceptance evidence belongs to another dependency lock.", "SYSTEM_FAILED")
+  web_assert(identical(envelope$evidence$web_sha256, code), "Acceptance evidence belongs to another Web code version.", "SYSTEM_FAILED")
+  if (envelope$kind == "POSTGRESQL") web_assert(isTRUE(envelope$evidence$unprivileged) && identical(as.integer(envelope$evidence$exit_code), 0L), "PostgreSQL acceptance evidence did not pass.", "SYSTEM_FAILED")
+  if (envelope$kind == "CANONICAL_RUNTIME") web_assert(identical(as.integer(envelope$evidence$exit_code), 0L), "Canonical runtime acceptance evidence did not pass.", "SYSTEM_FAILED")
+  engine <- web_register_engine(con, settings)
+  duplicate <- web_query(con, "SELECT id FROM release_acceptances WHERE engine_id=?e AND kind=?k AND lock_sha256=?h AND evidence_json=?j", e = engine, k = envelope$kind, h = lock, j = as.character(web_json(envelope$evidence)))
+  if (!nrow(duplicate)) web_exec(con, "INSERT INTO release_acceptances VALUES(?i,?e,?k,?h,?x,?t)", i = web_id(), e = engine, k = envelope$kind, h = lock, x = as.character(web_json(envelope$evidence)), t = web_now())
+  invisible(TRUE)
+}
+web_c6_status <- function(con, settings, actor, project_id) {
+  web_authorize(con, actor, project_id)
+  web_deployment_status(con, settings)
+}
 web_deployment_status <- function(con, settings) {
   mode <- settings$mode
   migration <- tryCatch(web_query(con, "SELECT COALESCE(MAX(version),0) AS version FROM schema_migrations")$version[1], error = function(e) 0L)
   target <- web_schema_target_version(settings)
   data_writable <- dir.exists(settings$data_root) && file.access(settings$data_root, 2L) == 0L
+  acceptance <- tryCatch(web_release_acceptance_status(con, settings), error = function(e) list(CANONICAL_RUNTIME_ACCEPTED = FALSE, POSTGRESQL_ACCEPTED = FALSE))
+  production_ready <- settings$backend == "postgres" && isTRUE(settings$trusted_auth_proxy) && nzchar(Sys.getenv("SRMA_WEB_DATA")) && data_writable && identical(as.integer(migration), as.integer(target)) && isTRUE(acceptance$CANONICAL_RUNTIME_ACCEPTED) && isTRUE(acceptance$POSTGRESQL_ACCEPTED) && grepl("^https://", settings$public_url)
   list(
     mode = mode,
     database = if (settings$backend == "postgres") "PostgreSQL" else "SQLite development database",
@@ -18,7 +50,9 @@ web_deployment_status <- function(con, settings) {
     schema_ready = identical(as.integer(migration), as.integer(target)),
     test_identity_provider = identical(Sys.getenv("SRMA_WEB_TEST_IDP"), "1"),
     public_url = settings$public_url,
-    production_enabled = FALSE
+    canonical_runtime_acceptance = if (isTRUE(acceptance$CANONICAL_RUNTIME_ACCEPTED)) "Accepted" else "Pending",
+    postgresql_acceptance = if (isTRUE(acceptance$POSTGRESQL_ACCEPTED)) "Accepted" else "Pending",
+    production_enabled = production_ready
   )
 }
 web_deployment_preflight <- function(con, settings) {
@@ -30,7 +64,11 @@ web_deployment_preflight <- function(con, settings) {
   web_assert(isTRUE(settings$trusted_auth_proxy), "Configure the trusted organization authentication proxy before beta startup.", "SYSTEM_FAILED")
   web_assert(nzchar(Sys.getenv("SRMA_WEB_DATA")) && status$persistent_storage == "Ready", "Configure writable persistent SRMA_WEB_DATA before beta startup.", "SYSTEM_FAILED")
   web_assert(isTRUE(status$schema_ready), "Database migrations are incomplete. Run the operator preflight after applying migrations.", "SYSTEM_FAILED")
-  if (settings$mode == "production") web_error("SYSTEM_FAILED", "Production mode remains disabled until WEB-017 final integration.")
+  if (settings$mode == "production") {
+    web_assert(grepl("^https://", settings$public_url), "Production requires an HTTPS SRMA_PUBLIC_URL behind the trusted authentication proxy.", "SYSTEM_FAILED")
+    web_assert(settings$host %in% c("127.0.0.1", "localhost", "::1"), "Production Shiny must bind to loopback behind the TLS/authentication proxy.", "SYSTEM_FAILED")
+    web_assert(isTRUE(status$production_enabled), "Production acceptance is incomplete. Run the operator acceptance checks for this exact code/lock and import their evidence.", "SYSTEM_FAILED")
+  }
   status
 }
 web_proxy_subject <- function(settings, request) {
