@@ -54,12 +54,44 @@ web_c4_server <- function(input, output, session, request, safe, notice, refresh
   }
 
   refresh_center <- function() {
+    if (is.null(input$project) || !nzchar(trimws(input$project))) {
+      catalog(NULL)
+      packages(NULL)
+
+      shiny::updateSelectInput(
+        session, "release_qc",
+        choices = character(), selected = character()
+      )
+      shiny::updateSelectInput(
+        session, "release_item",
+        choices = character(), selected = character()
+      )
+      shiny::updateSelectInput(
+        session, "release_package",
+        choices = character(), selected = character()
+      )
+
+      return(invisible(NULL))
+    }
+
     load_qc()
     load_packages()
-    if (nzchar(input$release_qc %||b2% "")) load_catalog()
+
+    if (nzchar(input$release_qc %||b2% ""))
+      load_catalog()
+
+    invisible(TRUE)
   }
 
-  shiny::observeEvent(input$project, safe({catalog(NULL); packages(NULL); refresh_center()}), ignoreInit = TRUE)
+  shiny::observeEvent(input$project, {
+    catalog(NULL)
+    packages(NULL)
+
+    if (!is.null(input$project) &&
+        nzchar(trimws(input$project))) {
+      safe(refresh_center())
+    }
+  }, ignoreInit = TRUE)
   shiny::observeEvent(input$release_refresh, safe(refresh_center()))
   shiny::observeEvent(input$release_qc, safe(load_catalog()), ignoreInit = TRUE)
   shiny::observeEvent(input$release_build, safe({

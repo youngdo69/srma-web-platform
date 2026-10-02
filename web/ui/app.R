@@ -5,21 +5,391 @@ source(file.path(web_root,"web/ui/final_qc.R"))
 source(file.path(web_root,"web/ui/download_center.R"))
 source(file.path(web_root,"web/ui/security_audit.R"))
 source(file.path(web_root,"web/ui/deployment.R"))
+srma_has_text <- function(x) {
+  !is.null(x) && length(x) > 0L && nzchar(trimws(as.character(x[[1L]])))
+}
+
+empty_reviews_ui <- function() {
+  shiny::div(
+    class = "srma-empty-state",
+    shiny::div(class = "srma-empty-icon", "JS"),
+    shiny::h2("Welcome to JS SR-MA Toolkit", class = "srma-empty-title"),
+    shiny::p(
+      paste(
+        "Create your first systematic review and manage the entire workflow in one place —",
+        "from protocol setup and literature search to screening, data extraction, meta-analysis,",
+        "manuscript preparation, and final quality control."
+      ),
+      class = "srma-empty-description"
+    ),
+    shiny::div(
+      class = "srma-empty-message",
+      "You don't have any reviews yet."
+    ),
+    shiny::actionButton(
+      inputId = "start_first_review",
+      label = "Start your first systematic review",
+      class = "btn-primary srma-primary-action"
+    ),
+    shiny::p(
+      "You can return to this dashboard anytime to continue an existing review.",
+      class = "srma-empty-hint"
+    )
+  )
+}
+
+
+srma_required_label <- function(text) {
+  shiny::tagList(
+    text,
+    shiny::span(" *", class = "srma-required", `aria-hidden` = "true")
+  )
+}
+
+srma_pending_decision_count <- function(gates) {
+  if (is.null(gates) || !nrow(gates)) return(0L)
+  initial_types <- c("configuration_human_review", "protocol_registration")
+  initial <- gates$gate_type %in% initial_types
+  as.integer(sum(!initial) + length(unique(gates$gate_type[initial])))
+}
+
+srma_human_decision_card <- function(prefix, title, description, applies_to, rationale_label) {
+  shiny::div(
+    class = "srma-human-card",
+    shiny::div(
+      class = "srma-human-card-head",
+      shiny::div(
+        shiny::div(class = "srma-human-card-title", title),
+        shiny::p(description, class = "srma-human-card-description")
+      ),
+      shiny::span("Required", class = "srma-human-badge")
+    ),
+    if (nzchar(applies_to))
+      shiny::div(
+        class = "srma-human-applies",
+        shiny::strong("Applies before: "),
+        applies_to
+      ),
+    shiny::radioButtons(
+      inputId = paste0(prefix, "_decision"),
+      label = "Your decision",
+      choices = c("Approve" = "APPROVED", "Request changes" = "REJECTED"),
+      selected = character(),
+      inline = TRUE
+    ),
+    shiny::textAreaInput(
+      inputId = paste0(prefix, "_rationale"),
+      label = rationale_label,
+      rows = 4,
+      width = "100%"
+    ),
+    shiny::div(
+      class = "srma-human-card-actions",
+      shiny::actionButton(
+        inputId = paste0("save_", prefix),
+        label = "Save decision",
+        class = "btn-primary"
+      )
+    )
+  )
+}
+
 web_app <- function(settings) {
-  ui <- shiny::fluidPage(theme = bslib::bs_theme(version = 5),
-    shiny::titlePanel("Systematic Review Workspace"),
-    shiny::uiOutput("identity_ui"), shiny::textOutput("notice"), shiny::uiOutput("workspace_ui"))
+  remember_dev_session <- identical(settings$mode, "development") &&
+    identical(Sys.getenv("SRMA_WEB_TEST_IDP"), "1")
+
+  ui <- shiny::fluidPage(
+    theme = bslib::bs_theme(version = 5),
+    shiny::tags$head(
+      if (remember_dev_session) shiny::tags$script(shiny::HTML("
+        $(document).on('shiny:connected', function() {
+          if (!window.__srmaDevSessionHandler) {
+            Shiny.addCustomMessageHandler('srma-dev-session', function(message) {
+              if (message && message.token) {
+                window.localStorage.setItem('srma_dev_session', message.token);
+              } else {
+                window.localStorage.removeItem('srma_dev_session');
+              }
+            });
+            window.__srmaDevSessionHandler = true;
+          }
+          var token = window.localStorage.getItem('srma_dev_session');
+          if (token) Shiny.setInputValue('remembered_credential', token, {priority: 'event'});
+        });
+      ")),
+      shiny::tags$style(shiny::HTML("
+        body { background: #f7f9fc; color: #1f2937; }
+        .srma-shell { max-width: 1600px; margin: 0 auto; padding: 28px 34px 54px; }
+        .srma-header { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:16px; }
+        .srma-brand h1 { margin:0; font-size:38px; font-weight:800; letter-spacing:-0.025em; }
+        .srma-brand p { margin:8px 0 0; color:#6b7280; font-size:18px; }
+        .srma-identity { min-width:240px; text-align:right; font-size:17px; }
+        .srma-notice { margin: 6px 0 14px; color:#9a3412; font-weight:700; font-size:17px; }
+        .nav-tabs { gap: 3px; border-bottom-color:#cbd5e1; }
+        .nav-tabs .nav-link {
+          color:#1f5f8b;
+          font-weight:700;
+          border-radius:8px 8px 0 0;
+          padding:10px 16px;
+          transition:background-color .15s ease, color .15s ease, border-color .15s ease;
+        }
+        .nav-tabs .nav-link:hover {
+          color:#124a70;
+          background:#eaf4fb;
+          border-color:#d7e8f5 #d7e8f5 transparent;
+        }
+        .nav-tabs .nav-link.active {
+          color:#ffffff;
+          background:#2474a8;
+          border-color:#2474a8 #2474a8 #ffffff;
+          font-weight:700;
+        }
+        .tab-content { background:#fff; border:1px solid #e5e7eb; border-top:0; padding:24px; min-height:420px; border-radius:0 0 12px 12px; }
+        .srma-empty-state { max-width:1180px; min-height:calc(100vh - 365px); margin:28px auto 18px; padding:68px 76px; text-align:center; background:#fff; border:1px solid #e5e7eb; border-radius:22px; box-shadow:0 10px 34px rgba(15,23,42,.08); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+        .srma-empty-icon { width:86px; height:86px; margin:0 auto 28px; display:flex; align-items:center; justify-content:center; border-radius:22px; background:#eef4fb; color:#244a73; font-size:30px; font-weight:800; }
+        .srma-empty-title { margin:0 0 20px; font-size:42px; font-weight:800; letter-spacing:-0.02em; }
+        .srma-empty-description { max-width:900px; margin:0 auto 30px; font-size:22px; line-height:1.72; color:#4b5563; }
+        .srma-empty-message { margin-bottom:26px; font-size:21px; font-weight:700; }
+        .srma-primary-action { padding:16px 34px; font-size:20px; font-weight:800; border-radius:11px; }
+        .srma-empty-hint { margin:24px 0 0; font-size:17px; color:#6b7280; }
+        .srma-project-picker { max-width:1100px; margin:28px auto; font-size:18px; }
+        .srma-wizard-wrap { max-width:1320px; margin:20px auto 40px; }
+        .srma-wizard-heading { margin-bottom:26px; }
+        .srma-wizard-heading h2 { margin:0 0 10px; font-size:38px; font-weight:800; letter-spacing:-0.02em; }
+        .srma-wizard-heading p { margin:0; color:#64748b; font-size:20px; line-height:1.6; }
+        .srma-wizard-progress { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin:0 0 26px; }
+        .srma-wizard-step { position:relative; min-width:0; padding:16px 14px; border-radius:12px; background:#f1f5f9; color:#64748b; font-size:19px; font-weight:800; text-align:center; }
+        .srma-wizard-step.active { background:#2474a8; color:#fff; box-shadow:0 4px 14px rgba(36,116,168,.18); }
+        .srma-wizard-step.done { background:#e6f2fa; color:#1f5f8b; }
+        .srma-wizard-card { background:#fff; border:1px solid #e2e8f0; border-radius:20px; box-shadow:0 10px 32px rgba(15,23,42,.07); padding:46px 54px; min-height:690px; display:flex; flex-direction:column; }
+        .srma-wizard-kicker { color:#2474a8; font-size:17px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; margin-bottom:7px; }
+        .srma-wizard-title { margin:0 0 10px; font-size:34px; font-weight:800; letter-spacing:-0.015em; }
+        .srma-wizard-subtitle { margin:0 0 32px; color:#64748b; font-size:20px; line-height:1.65; }
+        .srma-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 28px; }
+        .srma-form-grid .form-group, .srma-form-grid .shiny-input-container { width:100% !important; max-width:none !important; }
+        .srma-form-full { grid-column:1 / -1; }
+        .srma-wizard-card textarea.form-control { min-height:154px; line-height:1.6; }
+        .srma-wizard-card label { font-weight:750; font-size:20px; color:#27364a; margin-bottom:10px; }
+        .srma-wizard-card .form-control, .srma-wizard-card .form-select { border-color:#cbd5e1; border-radius:10px; font-size:19px; min-height:52px; padding:12px 15px; }
+        .srma-required { color:#b42318; font-weight:800; }
+        .srma-field-help { margin:0 0 16px; color:#64748b; font-size:17px; line-height:1.55; }
+        .srma-field-error { margin:-2px 0 16px; color:#b42318; font-size:17px; font-weight:800; }
+        .srma-wizard-card .form-control.srma-invalid, .srma-wizard-card .form-select.srma-invalid { border-color:#dc2626; }
+        .srma-wizard-card details { margin-top:12px; border-top:1px solid #e5e7eb; padding-top:14px; }
+        .srma-wizard-card details summary { cursor:pointer; color:#475569; font-weight:800; font-size:18px; }
+        .srma-wizard-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:auto; padding-top:24px; border-top:1px solid #e5e7eb; }
+        .srma-wizard-footer-right { display:flex; gap:10px; margin-left:auto; }
+        .srma-wizard-footer .btn { min-width:150px; min-height:52px; padding:12px 24px; border-radius:10px; font-size:19px; font-weight:800; }
+        .srma-summary-section { margin-top:22px; }
+        .srma-summary-section:first-of-type { margin-top:8px; }
+        .srma-summary-section h4 { margin:0 0 14px; font-size:25px; font-weight:800; color:#1f3b57; }
+        .srma-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 18px; width:100%; }
+        .srma-summary-item { padding:14px 16px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; }
+        .srma-summary-item.full { grid-column:1 / -1; }
+        .srma-summary-label { display:block; color:#64748b; font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; margin-bottom:7px; }
+        .srma-summary-value { white-space:pre-wrap; color:#1f2937; line-height:1.65; font-size:19px; }
+        .srma-review-note { margin-top:24px; padding:18px 20px; border-radius:12px; background:#eef6fb; color:#31556f; font-size:18px; line-height:1.65; }
+        .srma-primary-nav { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0 10px; padding:10px 0 14px; border-bottom:1px solid #dbe4ee; }
+        .srma-nav-btn { appearance:none; border:1px solid transparent; background:transparent; color:#165d8c; font-weight:500; font-size:24px; line-height:1.15; padding:12px 13px; border-radius:11px; cursor:pointer; transition:all .15s ease; }
+        .srma-nav-btn:hover:not(:disabled) { color:#0f4c74; background:#eaf4fb; border-color:#d5e8f5; }
+        .srma-nav-btn.active { color:#fff; background:#2474a8; border-color:#2474a8; font-weight:700; box-shadow:0 4px 14px rgba(36,116,168,.18); }
+        .srma-nav-btn:disabled { color:#9aa8b6; cursor:not-allowed; opacity:.72; }
+        .srma-secondary-nav { display:flex; flex-wrap:wrap; gap:9px; align-items:center; margin:2px 0 16px; min-height:46px; }
+        .srma-subnav-btn { appearance:none; border:1px solid #d7e5ef; background:#f7fbfe; color:#315f7d; font-weight:600; font-size:17px; padding:10px 15px; border-radius:999px; cursor:pointer; transition:all .15s ease; }
+        .srma-subnav-btn:hover:not(:disabled) { background:#eaf4fb; color:#174f73; }
+        .srma-subnav-btn.active { background:#dceef9; border-color:#a9d2ea; color:#114f78; font-weight:700; }
+        .srma-subnav-btn:disabled { color:#9aa8b6; background:#f5f7f9; border-color:#e5e9ed; cursor:not-allowed; }
+        .srma-internal-tabs > .tabbable > .nav-tabs { display:none !important; }
+        .srma-internal-tabs > .tabbable > .tab-content { border:1px solid #e5e7eb; border-radius:14px; padding:30px; min-height:calc(100vh - 245px); background:#fff; }
+        .srma-nav-hint { color:#7a8897; font-size:16px; margin:2px 0 14px; }
+        .srma-dashboard { max-width:1320px; margin:0 auto; }
+        .srma-dashboard-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin:2px 0 24px; }
+        .srma-dashboard-heading h2 { margin:0 0 6px; font-size:34px; font-weight:750; letter-spacing:-0.02em; color:#172b3f; }
+        .srma-dashboard-heading p { margin:0; color:#64748b; font-size:18px; line-height:1.55; }
+        .srma-dashboard-selector { display:grid; grid-template-columns:minmax(0,1fr) 230px auto; gap:16px; align-items:end; padding:22px 24px; margin-bottom:22px; border:1px solid #dfe7ef; border-radius:16px; background:#f8fbfe; }
+        .srma-dashboard-selector .form-group, .srma-dashboard-selector .shiny-input-container { width:100% !important; margin-bottom:0 !important; }
+        .srma-dashboard-selector label { font-size:16px; font-weight:600; color:#3a5168; margin-bottom:7px; }
+        .srma-dashboard-selector .form-control, .srma-dashboard-selector .form-select { min-height:48px; font-size:17px; border-radius:9px; }
+        .srma-dashboard-selector .btn { min-height:48px; padding:10px 18px; border-radius:9px; font-size:16px; font-weight:600; white-space:nowrap; }
+        .srma-dashboard-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; margin-bottom:22px; }
+        .srma-dashboard-card { min-height:190px; padding:24px 26px; border:1px solid #e0e7ef; border-radius:16px; background:#fff; box-shadow:0 6px 22px rgba(15,23,42,.045); display:flex; flex-direction:column; }
+        .srma-dashboard-card.accent { background:linear-gradient(145deg,#f7fbfe,#edf6fc); border-color:#cfe5f4; }
+        .srma-card-eyebrow { color:#5b7188; font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:.055em; margin-bottom:10px; }
+        .srma-card-value { color:#17344e; font-size:29px; line-height:1.15; font-weight:750; letter-spacing:-0.015em; margin-bottom:10px; }
+        .srma-card-text { color:#617286; font-size:16px; line-height:1.55; margin:0 0 16px; }
+        .srma-card-action { margin-top:auto; align-self:flex-start; min-height:44px; padding:9px 17px; border-radius:9px; font-size:16px; font-weight:650; }
+        .srma-attention-number { font-size:42px; line-height:1; font-weight:750; color:#9a4a11; margin:2px 0 9px; }
+        .srma-attention-number.clear { color:#28734f; }
+        .srma-dashboard-panel { margin-top:20px; padding:26px; border:1px solid #e0e7ef; border-radius:16px; background:#fff; }
+        .srma-dashboard-panel h3 { margin:0 0 8px; font-size:24px; font-weight:700; color:#203b54; }
+        .srma-dashboard-panel > p { margin:0 0 22px; color:#6b7b8c; font-size:16px; }
+        .srma-workflow-map { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px; align-items:stretch; }
+        .srma-workflow-node { position:relative; padding:18px 12px; min-height:104px; border:1px solid #e1e7ed; border-radius:12px; background:#f8fafc; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+        .srma-workflow-node .dot { width:14px; height:14px; border-radius:50%; margin-bottom:10px; background:#cbd5e1; }
+        .srma-workflow-node .label { color:#506176; font-size:15px; line-height:1.3; font-weight:600; }
+        .srma-workflow-node.complete { background:#f0f8f4; border-color:#cfe6d8; }
+        .srma-workflow-node.complete .dot { background:#3c8b61; }
+        .srma-workflow-node.complete .label { color:#326b4d; }
+        .srma-workflow-node.current { background:#edf6fc; border-color:#acd4eb; box-shadow:0 4px 14px rgba(36,116,168,.08); }
+        .srma-workflow-node.current .dot { background:#2474a8; }
+        .srma-workflow-node.current .label { color:#165d8c; font-weight:700; }
+        .srma-workflow-node.upcoming { opacity:.82; }
+        .srma-activity-list { list-style:none; margin:0; padding:0; }
+        .srma-activity-list li { padding:12px 0; border-bottom:1px solid #edf1f5; color:#495c70; font-size:16px; line-height:1.45; }
+        .srma-activity-list li:last-child { border-bottom:0; }
+        .srma-activity-state { display:inline-block; min-width:86px; margin-right:10px; color:#587087; font-weight:700; }
+        .srma-human-wrap { max-width:1120px; margin:0 auto; }
+        .srma-human-heading { margin:2px 0 26px; }
+        .srma-human-heading h2 { margin:0 0 8px; font-size:34px; font-weight:750; color:#172b3f; letter-spacing:-0.02em; }
+        .srma-human-heading p { margin:0; color:#64748b; font-size:18px; line-height:1.6; }
+        .srma-human-summary { display:flex; align-items:center; gap:12px; margin:0 0 20px; padding:15px 18px; border-radius:12px; background:#eef6fb; color:#31556f; font-size:17px; }
+        .srma-human-summary strong { font-size:20px; color:#164f75; }
+        .srma-human-card { margin:0 0 20px; padding:26px 28px; border:1px solid #dfe7ef; border-radius:16px; background:#fff; box-shadow:0 6px 22px rgba(15,23,42,.045); }
+        .srma-human-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:14px; }
+        .srma-human-card-title { color:#17344e; font-size:25px; line-height:1.2; font-weight:750; margin-bottom:7px; }
+        .srma-human-card-description { margin:0; color:#617286; font-size:17px; line-height:1.6; }
+        .srma-human-badge { flex:0 0 auto; padding:7px 11px; border-radius:999px; background:#fff2df; color:#8a4b13; font-size:13px; font-weight:750; }
+        .srma-human-applies { margin:0 0 20px; padding:11px 13px; border-radius:9px; background:#f7f9fc; color:#566a7d; font-size:15px; }
+        .srma-human-card .control-label { font-size:17px; font-weight:650; color:#27364a; margin-bottom:8px; }
+        .srma-human-card .radio-inline { font-size:17px; margin-right:24px; }
+        .srma-human-card textarea.form-control { min-height:112px; font-size:16px; line-height:1.55; }
+        .srma-human-card-actions { display:flex; justify-content:flex-end; padding-top:4px; }
+        .srma-human-card-actions .btn { min-height:46px; padding:10px 20px; border-radius:9px; font-size:16px; font-weight:650; }
+        .srma-human-details { margin-top:22px; border-top:1px solid #e5e7eb; padding-top:20px; }
+        .srma-human-details summary { cursor:pointer; color:#315f7d; font-size:17px; font-weight:650; }
+        .srma-human-details-body { margin-top:18px; padding:20px; border-radius:12px; background:#f8fafc; }
+        .srma-human-complete { padding:30px; border:1px solid #cfe6d8; border-radius:16px; background:#f0f8f4; color:#326b4d; }
+        .srma-human-complete h3 { margin:0 0 8px; font-size:24px; }
+        .srma-human-fallback { margin-top:18px; padding:16px 18px; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; }
+        @media (max-width: 980px) {
+          .srma-dashboard-selector { grid-template-columns:1fr 1fr; }
+          .srma-dashboard-selector .btn { grid-column:1 / -1; justify-self:start; }
+          .srma-dashboard-cards { grid-template-columns:1fr; }
+          .srma-workflow-map { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        }
+        @media (max-width: 768px) {
+          .srma-shell { padding:16px 12px 32px; }
+          .srma-header { display:block; }
+          .srma-identity { text-align:left; margin-top:14px; }
+          .srma-empty-state { margin:24px auto; padding:32px 22px; }
+          .tab-content { padding:16px; }
+          .srma-wizard-progress { grid-template-columns:1fr; }
+          .srma-wizard-step { text-align:left; }
+          .srma-wizard-card { padding:22px 18px; }
+          .srma-form-grid, .srma-summary-grid { grid-template-columns:1fr; }
+          .srma-form-full, .srma-summary-item.full { grid-column:1; }
+          .srma-wizard-footer { align-items:stretch; flex-direction:column; }
+          .srma-wizard-footer-right { width:100%; margin-left:0; }
+          .srma-wizard-footer .btn { flex:1; }
+          .srma-primary-nav { gap:6px; }
+          .srma-nav-btn { flex:1 1 calc(50% - 6px); text-align:center; }
+          .srma-secondary-nav { gap:6px; }
+          .srma-subnav-btn { flex:1 1 auto; }
+          .srma-internal-tabs > .tabbable > .tab-content { padding:16px; min-height:520px; }
+          .srma-brand h1 { font-size:30px; }
+          .srma-brand p { font-size:16px; }
+          .srma-empty-state { min-height:520px; padding:38px 24px; }
+          .srma-empty-title { font-size:32px; }
+          .srma-empty-description { font-size:18px; }
+          .srma-nav-btn { font-size:18px; padding:10px 9px; }
+          .srma-subnav-btn { font-size:15px; }
+          .srma-wizard-heading h2 { font-size:31px; }
+          .srma-wizard-heading p { font-size:17px; }
+          .srma-wizard-step { font-size:17px; }
+          .srma-wizard-title { font-size:29px; }
+          .srma-wizard-subtitle { font-size:17px; }
+          .srma-wizard-card label { font-size:18px; }
+          .srma-wizard-card .form-control, .srma-wizard-card .form-select { font-size:17px; }
+          .srma-wizard-footer .btn { font-size:17px; }
+          .srma-dashboard-heading { display:block; }
+          .srma-dashboard-heading h2 { font-size:29px; }
+          .srma-dashboard-selector { grid-template-columns:1fr; padding:18px; }
+          .srma-dashboard-selector .btn { grid-column:auto; width:100%; }
+          .srma-dashboard-card { min-height:160px; }
+          .srma-workflow-map { grid-template-columns:1fr; }
+
+        }
+      "))
+    ),
+    shiny::div(
+      class = "srma-shell",
+      shiny::div(
+        class = "srma-header",
+        shiny::div(
+          class = "srma-brand",
+          shiny::h1("JS SR-MA Toolkit"),
+          shiny::p("Systematic review and meta-analysis workspace")
+        ),
+        shiny::div(class = "srma-identity", shiny::uiOutput("identity_ui"))
+      ),
+      shiny::div(class = "srma-notice", shiny::textOutput("notice")),
+      shiny::uiOutput("workspace_ui")
+    )
+  )
   server <- function(input, output, session) {
     con <- web_db(settings)
     session$onSessionEnded(function() DBI::dbDisconnect(con))
     token <- shiny::reactiveVal(NULL); notice <- shiny::reactiveVal("")
     refresh <- shiny::reactiveVal(0L); editing <- shiny::reactiveVal(NULL)
     draft_review <- shiny::reactiveVal(NULL)
+    nav_section <- shiny::reactiveVal("dashboard")
+    project_available <- shiny::reactiveVal(FALSE)
+    pending_project_selection <- shiny::reactiveVal(NULL)
+    wizard_step <- shiny::reactiveVal(1L)
+    wizard_errors <- shiny::reactiveVal(character())
+    wizard_values <- shiny::reactiveValues(
+      workspace = NULL,
+      title = "",
+      canonical_id = paste0("review-", substr(web_id(), 1, 12)),
+      investigator = "",
+      framework = "PICO",
+      question = "",
+      population = "",
+      intervention = "",
+      comparator = "",
+      primary = "",
+      secondary = "",
+      designs = "",
+      inclusion = "",
+      exclusion = "",
+      reason = "",
+      language = "",
+      databases = character(),
+      inception = TRUE,
+      start_date = "",
+      end_date = ""
+    )
     csrf <- web_secret()
     upload_root <- NULL
     safe <- function(expr) tryCatch(expr, error = function(e) {
-      notice(if (inherits(e, "srma_web_error")) conditionMessage(e) else "The request could not finish. Ask the operator to check it.")
-      if (inherits(e, "srma_web_error") && e$code == "UNAUTHENTICATED") token(NULL)
+
+      if (inherits(e, "shiny.silent.error"))
+        return(NULL)
+
+      message(
+        "[SRMA WEB ERROR] ",
+        paste(class(e), collapse = "/"),
+        " | ",
+        conditionMessage(e)
+      )
+
+      if (inherits(e, "srma_web_error") &&
+          !is.null(e$diagnostic) &&
+          nzchar(e$diagnostic)) {
+        message("[SRMA WEB DIAGNOSTIC] ", e$diagnostic)
+      }
+
+      notice(
+        if (inherits(e, "srma_web_error"))
+          conditionMessage(e)
+        else
+          "The request could not finish. Ask the operator to check it."
+      )
+
+      if (inherits(e, "srma_web_error") &&
+          identical(e$code, "UNAUTHENTICATED"))
+        token(NULL)
+
       NULL
     })
     request <- function(action, args = list()) web_request(con, token(), action, args,
@@ -44,57 +414,500 @@ web_app <- function(settings) {
         shiny::passwordInput("credential", "Test session credential"), shiny::actionButton("login", "Sign in"))
       else shiny::actionButton("logout", "Sign out")
     })
+    shiny::observeEvent(input$remembered_credential, {
+      if (!isTRUE(remember_dev_session) || !is.null(token())) return()
+      credential <- if (is.null(input$remembered_credential)) "" else tolower(trimws(input$remembered_credential))
+      if (!grepl("^[0-9a-f]{64}$", credential)) {
+        session$sendCustomMessage("srma-dev-session", list(token = NULL))
+        return()
+      }
+      identity <- tryCatch(web_session(con, credential), error = function(e) NULL)
+      if (is.null(identity)) {
+        session$sendCustomMessage("srma-dev-session", list(token = NULL))
+        notice("Your saved local development session expired. Generate one new test session, then sign in once.")
+        return()
+      }
+      if (inherits(session, "ShinySession")) upload_root <- safe(web_bind_upload_root(session, settings))
+      token(credential)
+      notice("")
+    }, ignoreInit = TRUE)
+
     shiny::observeEvent(input$login, {
-      identity <- safe(web_session(con, input$credential))
+      credential <- if (is.null(input$credential)) "" else tolower(trimws(input$credential))
+      identity <- safe(web_session(con, credential))
       if (!is.null(identity)) {
         if (inherits(session, "ShinySession")) upload_root <- safe(web_bind_upload_root(session, settings))
-        token(input$credential); notice(""); shiny::updateTextInput(session, "credential", value = "")}
+        token(credential)
+        notice("")
+        if (isTRUE(remember_dev_session))
+          session$sendCustomMessage("srma-dev-session", list(token = credential))
+        shiny::updateTextInput(session, "credential", value = "")
+      }
     })
     shiny::observeEvent(input$logout, {
-      if (!is.null(safe(request("logout")))) {token(NULL); notice("Signed out. This session can no longer be used.")}
+      if (!is.null(safe(request("logout")))) {
+        token(NULL)
+        if (isTRUE(remember_dev_session))
+          session$sendCustomMessage("srma-dev-session", list(token = NULL))
+        notice("Signed out. This session can no longer be used.")
+      }
     })
     output$workspace_ui <- shiny::renderUI({
       shiny::req(token())
-      shiny::tagList(shiny::div(style = "display:none", shiny::textInput("csrf", NULL, value = csrf)),
-        shiny::tabsetPanel(id = "page",
-          shiny::tabPanel("My Projects", shiny::selectInput("project", "Your reviews", character()),
-            shiny::p("Choose a review to resume its saved workflow.")),
-          shiny::tabPanel("New Systematic Review", shiny::uiOutput("wizard")),
-          shiny::tabPanel("Project Overview", shiny::textOutput("overview"),
-            shiny::selectInput("version", "Saved version", character()), shiny::actionButton("edit", "Edit as a new version")),
-          shiny::tabPanel("Workflow Progress", shiny::tableOutput("workflow")),
-          shiny::tabPanel("Current Action", shiny::textOutput("next_action"),
-            shiny::actionButton("run", "Check existing search strategies"), shiny::tableOutput("jobs")),
-          shiny::tabPanel("Search / Study Import", shiny::uiOutput("search_import")),
-          web_b2_ui(), web_c1_ui(), web_c2_ui(), web_c3_ui(), web_c4_ui(), web_c5_ui(), web_c6_ui(),
-          shiny::tabPanel("Results / Artifacts", shiny::selectInput("artifact", "Available output", character()),
-            shiny::downloadButton("download", "Download selected output")),
-          shiny::tabPanel("Human Review Required",
-            shiny::h3("Canonical configuration and concepts"),
-            shiny::selectInput("draft_job", "Draft source for selected version", c("Human-provided saved draft"="")),
-            shiny::actionButton("load_draft", "Load draft for review"), shiny::uiOutput("canonical_review"),
-            shiny::tableOutput("gates"),
-            shiny::selectInput("review_gate", "Pending review for selected version", character()),
-            shiny::selectInput("review_decision", "Your decision", c("Choose a decision" = "", "Approve" = "APPROVED", "Reject" = "REJECTED")),
-            shiny::textAreaInput("review_rationale", "Reason and supporting protocol registration reference, where applicable"),
-            shiny::actionButton("record_review", "Record human review decision"),
-            shiny::p("A saved draft or completed automated check does not approve scientific decisions. Review decisions remain required."))
-          ))
+      shiny::tagList(
+        shiny::div(style = "display:none", shiny::textInput("csrf", NULL, value = csrf)),
+        shiny::uiOutput("primary_nav"),
+        shiny::uiOutput("secondary_nav"),
+        shiny::div(
+          class = "srma-internal-tabs",
+          shiny::tabsetPanel(id = "page",
+            shiny::tabPanel(
+              title = "My Reviews",
+              value = "my_projects",
+              shiny::uiOutput("my_projects_content")
+            ),
+            shiny::tabPanel(
+              title = "New Systematic Review",
+              value = "new_review",
+              shiny::uiOutput("wizard")
+            ),
+            shiny::tabPanel("Project Overview", shiny::textOutput("overview")),
+            shiny::tabPanel("Workflow Progress", shiny::tableOutput("workflow")),
+            shiny::tabPanel("Current Action", shiny::textOutput("next_action"),
+              shiny::actionButton("run", "Check existing search strategies"), shiny::tableOutput("jobs")),
+            shiny::tabPanel("Search / Study Import", shiny::uiOutput("search_import")),
+            web_b2_ui(), web_c1_ui(), web_c2_ui(), web_c3_ui(), web_c4_ui(), web_c5_ui(), web_c6_ui(),
+            shiny::tabPanel("Results / Artifacts", shiny::selectInput("artifact", "Available output", character()),
+              shiny::downloadButton("download", "Download selected output")),
+            shiny::tabPanel(
+              "Human Review Required",
+              shiny::uiOutput("human_decisions_ui")
+            )
+          )
+        )
+      )
     })
+
+
+
+    nav_sections <- list(
+      dashboard = c("my_projects"),
+      review_setup = c("new_review", "Human Review Required"),
+      studies = c("Search / Study Import", "Screening / Evidence"),
+      analysis = c("Meta-analysis"),
+      manuscript = c("Manuscript"),
+      review_export = c("Final QC", "Download Center", "Results / Artifacts"),
+      settings = c("Security & Audit", "Service Status")
+    )
+
+    nav_defaults <- c(
+      dashboard = "my_projects",
+      review_setup = "new_review",
+      studies = "Search / Study Import",
+      analysis = "Meta-analysis",
+      manuscript = "Manuscript",
+      review_export = "Final QC",
+      settings = "Security & Audit"
+    )
+
+    nav_labels <- list(
+      dashboard = character(),
+      review_setup = c("new_review" = "New / Edit Review", "Human Review Required" = "Human Decisions"),
+      studies = c("Search / Study Import" = "Search & Import", "Screening / Evidence" = "Screening & Evidence"),
+      analysis = c("Meta-analysis" = "Meta-analysis"),
+      manuscript = c("Manuscript" = "Manuscript"),
+      review_export = c("Final QC" = "Final QC", "Download Center" = "Downloads", "Results / Artifacts" = "Results & Artifacts"),
+      settings = c("Security & Audit" = "Security & Audit", "Service Status" = "Service Status")
+    )
+
+    nav_section_for_page <- function(page) {
+      if (is.null(page) || !length(page)) return("dashboard")
+      hit <- names(Filter(function(x) page %in% x, nav_sections))
+      if (length(hit)) hit[[1L]] else "dashboard"
+    }
+
+    nav_requires_project <- function(page) {
+      !page %in% c("my_projects", "new_review", "Security & Audit")
+    }
+
+    nav_button <- function(label, section, active = FALSE, disabled = FALSE) {
+      attrs <- list(
+        type = "button",
+        class = paste("srma-nav-btn", if (isTRUE(active)) "active" else ""),
+        label
+      )
+      if (isTRUE(disabled)) {
+        attrs$disabled <- "disabled"
+        attrs$title <- "Create or select a systematic review first."
+      } else {
+        js <- as.character(jsonlite::toJSON(section, auto_unbox = TRUE))
+        attrs$onclick <- sprintf("Shiny.setInputValue('nav_section_target', %s, {priority: 'event'});", js)
+      }
+      do.call(shiny::tags$button, attrs)
+    }
+
+    subnav_button <- function(label, target, active = FALSE, disabled = FALSE) {
+      attrs <- list(
+        type = "button",
+        class = paste("srma-subnav-btn", if (isTRUE(active)) "active" else ""),
+        label
+      )
+      if (isTRUE(disabled)) {
+        attrs$disabled <- "disabled"
+        attrs$title <- "Create or select a systematic review first."
+      } else {
+        js <- as.character(jsonlite::toJSON(target, auto_unbox = TRUE))
+        attrs$onclick <- sprintf("Shiny.setInputValue('nav_target', %s, {priority: 'event'});", js)
+      }
+      do.call(shiny::tags$button, attrs)
+    }
+
+    output$primary_nav <- shiny::renderUI({
+      shiny::req(token())
+      current <- nav_section()
+      has_project <- isTRUE(project_available())
+      sections <- c(
+        dashboard = "Dashboard",
+        review_setup = "Review Setup",
+        studies = "Studies",
+        analysis = "Analysis",
+        manuscript = "Manuscript",
+        review_export = "Review & Export",
+        settings = "Settings"
+      )
+      disabled_sections <- if (has_project) character() else c("studies", "analysis", "manuscript", "review_export")
+      shiny::div(
+        class = "srma-primary-nav",
+        lapply(names(sections), function(section)
+          nav_button(
+            unname(sections[[section]]),
+            section,
+            active = identical(current, section),
+            disabled = section %in% disabled_sections
+          )
+        )
+      )
+    })
+
+    output$secondary_nav <- shiny::renderUI({
+      shiny::req(token())
+      section <- nav_section()
+      items <- nav_labels[[section]]
+      if (is.null(items) || !length(items)) return(NULL)
+      current_page <- if (srma_has_text(input$page)) as.character(input$page[[1L]]) else unname(nav_defaults[[section]])
+      has_project <- isTRUE(project_available())
+      buttons <- lapply(names(items), function(target)
+        subnav_button(
+          unname(items[[target]]),
+          target,
+          active = identical(current_page, target),
+          disabled = !has_project && nav_requires_project(target)
+        )
+      )
+      shiny::tagList(
+        shiny::div(class = "srma-secondary-nav", buttons),
+        if (!has_project && identical(section, "dashboard"))
+          shiny::p("Create your first systematic review to unlock the full workflow.", class = "srma-nav-hint")
+      )
+    })
+
+    shiny::observeEvent(input$nav_section_target, {
+      section <- input$nav_section_target
+      if (!section %in% names(nav_sections)) return()
+      if (!isTRUE(project_available()) && section %in% c("studies", "analysis", "manuscript", "review_export")) return()
+      nav_section(section)
+      target <- unname(nav_defaults[[section]])
+      shiny::updateTabsetPanel(session, "page", selected = target)
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$nav_target, {
+      target <- input$nav_target
+      valid <- unlist(nav_sections, use.names = FALSE)
+      if (!target %in% valid) return()
+      if (!isTRUE(project_available()) && nav_requires_project(target)) return()
+      nav_section(nav_section_for_page(target))
+      shiny::updateTabsetPanel(session, "page", selected = target)
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$page, {
+      nav_section(nav_section_for_page(input$page))
+    }, ignoreInit = FALSE)
+
+    output$my_projects_content <- shiny::renderUI({
+      shiny::req(token())
+      refresh()
+
+      projects <- safe(request("projects"))
+
+      if (is.null(projects)) {
+        return(NULL)
+      }
+
+      if (!nrow(projects)) {
+        return(empty_reviews_ui())
+      }
+
+      current <- shiny::isolate(input$project)
+      selected <- if (srma_has_text(current) && current %in% projects$id) current else projects$id[[1L]]
+
+      shiny::div(
+        class = "srma-dashboard",
+        shiny::div(
+          class = "srma-dashboard-heading",
+          shiny::div(
+            shiny::h2("Review dashboard"),
+            shiny::p("See where this review stands, what needs attention, and the next action to take.")
+          )
+        ),
+        shiny::div(
+          class = "srma-dashboard-selector",
+          shiny::selectInput(
+            inputId = "project",
+            label = "Current review",
+            choices = stats::setNames(projects$id, projects$title),
+            selected = selected,
+            width = "100%"
+          ),
+          shiny::selectInput(
+            inputId = "version",
+            label = "Saved version",
+            choices = character(),
+            width = "100%"
+          ),
+          shiny::actionButton("edit", "Edit as new version", class = "btn-outline-secondary")
+        ),
+        shiny::uiOutput("dashboard_cards"),
+        shiny::uiOutput("dashboard_workflow"),
+        shiny::uiOutput("dashboard_activity")
+      )
+    })
+
+    shiny::observeEvent(input$start_first_review, {
+      nav_section("review_setup")
+      shiny::updateTabsetPanel(session, "page", selected = "new_review")
+    })
+
     shiny::observe({
-      shiny::req(token()); refresh()
-      projects <- safe(request("projects")); shiny::req(projects)
-      shiny::updateSelectInput(session, "project", choices = setNames(projects$id, projects$title), selected = shiny::isolate(input$project))
+      shiny::req(token())
+      refresh()
+
+      projects <- safe(request("projects"))
+      shiny::req(!is.null(projects))
+
+      if (!nrow(projects)) {
+        project_available(FALSE)
+        shiny::updateSelectInput(
+          session,
+          "project",
+          choices = character(),
+          selected = character()
+        )
+
+        shiny::updateSelectInput(
+          session,
+          "version",
+          choices = character(),
+          selected = character()
+        )
+
+        return()
+      }
+
+      project_available(TRUE)
+      current <- shiny::isolate(input$project)
+      pending <- pending_project_selection()
+
+      selected <- if (
+        srma_has_text(pending) && pending %in% projects$id
+      ) {
+        pending
+      } else if (
+        srma_has_text(current) &&
+        current %in% projects$id
+      ) {
+        current
+      } else {
+        projects$id[[1L]]
+      }
+
+      if (srma_has_text(pending) && identical(selected, pending)) pending_project_selection(NULL)
+
+      shiny::updateSelectInput(
+        session,
+        "project",
+        choices = setNames(projects$id, projects$title),
+        selected = selected
+      )
     })
     state <- shiny::reactive({
-      shiny::invalidateLater(1500, session); shiny::req(token(), input$project)
+      shiny::invalidateLater(1500, session)
+      shiny::req(token(), srma_has_text(input$project))
       safe(request("view", list(project_id = input$project)))
     })
     shiny::observeEvent(list(input$project, refresh()), {
-      shiny::req(token(), input$project)
+      shiny::req(token(), srma_has_text(input$project))
       x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
-      shiny::updateSelectInput(session, "version", choices = if(nrow(x$versions))setNames(x$versions$id, paste("Version", x$versions$version)) else character(), selected=shiny::isolate(input$version))
+      choices <- if (nrow(x$versions)) setNames(x$versions$id, paste("Version", x$versions$version)) else character()
+      current_version <- shiny::isolate(input$version)
+      selected_version <- if (srma_has_text(current_version) && current_version %in% x$versions$id) current_version else if (nrow(x$versions)) x$versions$id[[1L]] else character()
+      shiny::updateSelectInput(session, "version", choices = choices, selected = selected_version)
     })
+
+    dashboard_context <- shiny::reactive({
+      x <- state(); shiny::req(x)
+      version_id <- if (srma_has_text(input$version)) as.character(input$version[[1L]]) else if (nrow(x$versions)) as.character(x$versions$id[[1L]]) else ""
+      gates <- if (nrow(x$gates) && nzchar(version_id)) x$gates[x$gates$version_id == version_id, , drop = FALSE] else x$gates[0, , drop = FALSE]
+      pending <- if (nrow(gates)) gates[gates$status == "PENDING", , drop = FALSE] else gates
+      pending_decisions <- srma_pending_decision_count(pending)
+      jobs <- if (nrow(x$jobs) && nzchar(version_id)) x$jobs[x$jobs$version_id == version_id, , drop = FALSE] else x$jobs[0, , drop = FALSE]
+      active_jobs <- if (nrow(jobs)) jobs[jobs$state %in% c("QUEUED", "RUNNING"), , drop = FALSE] else jobs
+      version_row <- if (nrow(x$versions) && nzchar(version_id)) x$versions[x$versions$id == version_id, , drop = FALSE] else x$versions[0, , drop = FALSE]
+      version_label <- if (nrow(version_row) && "version" %in% names(version_row)) paste("Version", version_row$version[[1L]]) else "Saved draft"
+
+      next_action <- if (nrow(pending)) {
+        list(
+          stage = "Human review",
+          title = "Complete required human decisions",
+          description = paste0(pending_decisions, if (pending_decisions == 1L) " decision is" else " decisions are", " waiting before downstream workflow steps."),
+          button = "Review decisions",
+          target = "Human Review Required"
+        )
+      } else if (nrow(active_jobs)) {
+        list(
+          stage = "Processing",
+          title = "A background task is running",
+          description = "You can continue working while the queued task finishes. Review its result before moving forward.",
+          button = "Open Studies",
+          target = "Search / Study Import"
+        )
+      } else {
+        list(
+          stage = "Search preparation",
+          title = "Prepare the search workflow",
+          description = "Review the saved protocol, then prepare and validate database search strategies for this version.",
+          button = "Continue to search setup",
+          target = "Search / Study Import"
+        )
+      }
+
+      list(
+        x = x,
+        version_id = version_id,
+        version_label = version_label,
+        pending = pending,
+        pending_decisions = pending_decisions,
+        jobs = jobs,
+        active_jobs = active_jobs,
+        next_action = next_action
+      )
+    })
+
+    output$dashboard_cards <- shiny::renderUI({
+      ctx <- dashboard_context()
+      attention <- ctx$pending_decisions + nrow(ctx$active_jobs)
+      attention_text <- if (attention == 0L) "Nothing urgent" else paste(attention, if (attention == 1L) "item" else "items")
+      shiny::div(
+        class = "srma-dashboard-cards",
+        shiny::div(
+          class = "srma-dashboard-card",
+          shiny::div(class = "srma-card-eyebrow", "Current stage"),
+          shiny::div(class = "srma-card-value", ctx$next_action$stage),
+          shiny::p(paste(ctx$version_label, "is the active immutable review version."), class = "srma-card-text")
+        ),
+        shiny::div(
+          class = "srma-dashboard-card accent",
+          shiny::div(class = "srma-card-eyebrow", "Next action"),
+          shiny::div(class = "srma-card-value", ctx$next_action$title),
+          shiny::p(ctx$next_action$description, class = "srma-card-text"),
+          shiny::actionButton("dashboard_continue", ctx$next_action$button, class = "btn-primary srma-card-action")
+        ),
+        shiny::div(
+          class = "srma-dashboard-card",
+          shiny::div(class = "srma-card-eyebrow", "Needs attention"),
+          shiny::div(class = paste("srma-attention-number", if (attention == 0L) "clear" else ""), if (attention == 0L) "✓" else attention),
+          shiny::div(class = "srma-card-value", attention_text),
+          shiny::p(
+            if (ctx$pending_decisions > 0L) paste(ctx$pending_decisions, "human review decision(s) pending.") else if (nrow(ctx$active_jobs)) paste(nrow(ctx$active_jobs), "background task(s) active.") else "No pending human decisions or active background jobs.",
+            class = "srma-card-text"
+          )
+        )
+      )
+    })
+
+    output$dashboard_workflow <- shiny::renderUI({
+      ctx <- dashboard_context()
+      human_pending <- nrow(ctx$pending) > 0L
+      processing <- nrow(ctx$active_jobs) > 0L
+      labels <- c("Review setup", "Human review", "Studies", "Analysis", "Manuscript", "Final QC", "Export")
+      classes <- if (human_pending) {
+        c("complete", "current", rep("upcoming", 5L))
+      } else if (processing) {
+        c("complete", "complete", "current", rep("upcoming", 4L))
+      } else {
+        c("complete", "complete", "current", rep("upcoming", 4L))
+      }
+      shiny::div(
+        class = "srma-dashboard-panel",
+        shiny::h3("Workflow map"),
+        shiny::p("A simple view of the recommended review sequence. Scientific gates still control when downstream work can proceed."),
+        shiny::div(
+          class = "srma-workflow-map",
+          lapply(seq_along(labels), function(i)
+            shiny::div(
+              class = paste("srma-workflow-node", classes[[i]]),
+              shiny::span(class = "dot"),
+              shiny::span(labels[[i]], class = "label")
+            )
+          )
+        )
+      )
+    })
+
+    output$dashboard_activity <- shiny::renderUI({
+      ctx <- dashboard_context()
+      jobs <- ctx$jobs
+      items <- list(
+        shiny::tags$li(
+          shiny::span("SAVED", class = "srma-activity-state"),
+          paste(ctx$version_label, "is available and bound to this review.")
+        )
+      )
+      if (nrow(jobs)) {
+        take <- seq_len(min(4L, nrow(jobs)))
+        job_items <- lapply(take, function(i) {
+          state_value <- if ("state" %in% names(jobs)) as.character(jobs$state[[i]]) else "JOB"
+          operation <- if ("operation" %in% names(jobs)) gsub("_", " ", as.character(jobs$operation[[i]])) else "Background task"
+          raw_message <- if ("message" %in% names(jobs)) as.character(jobs$message[[i]]) else ""
+          message_value <- if (length(raw_message) && !is.na(raw_message) && nzchar(trimws(raw_message))) raw_message else operation
+          shiny::tags$li(
+            shiny::span(state_value, class = "srma-activity-state"),
+            message_value
+          )
+        })
+        items <- c(items, job_items)
+      } else if (nrow(ctx$pending)) {
+        items <- c(items, list(
+          shiny::tags$li(
+            shiny::span("ACTION", class = "srma-activity-state"),
+            "Human review is required before the next version-bound scientific workflow step."
+          )
+        ))
+      }
+      shiny::div(
+        class = "srma-dashboard-panel",
+        shiny::h3("Recent activity"),
+        shiny::p("Review the latest saved state and background activity for the selected version."),
+        do.call(shiny::tags$ul, c(list(class = "srma-activity-list"), items))
+      )
+    })
+
+    shiny::observeEvent(input$dashboard_continue, {
+      ctx <- dashboard_context()
+      target <- ctx$next_action$target
+      nav_section(nav_section_for_page(target))
+      shiny::updateTabsetPanel(session, "page", selected = target)
+    })
+
     web_b2_server(input,output,session,request,safe,notice,refresh)
     web_c1_server(input,output,session,request,safe,notice,refresh)
     web_c2_server(input,output,session,request,safe,notice,refresh)
@@ -115,41 +928,150 @@ web_app <- function(settings) {
       else "Review the project metadata and protocol decisions. Existing canonical search strategies can be checked here; a draft with no strategies needs search preparation first. Next, review the report and database-specific import requirements."
     })
     output$jobs <- shiny::renderTable({x <- state(); shiny::req(x); x$jobs[x$jobs$version_id==input$version, c("state", "message", "progress"), drop = FALSE]})
-    output$gates <- shiny::renderTable({
-      x <- state(); shiny::req(x, input$version)
-      gates <- x$gates[x$gates$version_id == input$version, , drop = FALSE]
-      labels <- c(protocol_registration = "Protocol registration confirmation", configuration_human_review = "Review configuration approval")
-      label <- unname(labels[gates$gate_type]); label[is.na(label)] <- "Human review requirement"
-      data.frame(Review = label, Status = gates$status)
-    })
-    shiny::observe({
+    human_gate_applies <- function(gates) {
+      if (is.null(gates) || !nrow(gates) || !"required_operation" %in% names(gates)) return("")
+      labels <- c(
+        generate_search = "search generation",
+        retrieve_pubmed = "PubMed retrieval"
+      )
+      operations <- unique(as.character(gates$required_operation))
+      text <- unname(labels[operations])
+      text[is.na(text)] <- gsub("_", " ", operations[is.na(text)])
+      paste(text[nzchar(text)], collapse = " · ")
+    }
+
+    output$human_decisions_ui <- shiny::renderUI({
       x <- state(); shiny::req(x, input$version)
       pending <- x$gates[x$gates$version_id == input$version & x$gates$status == "PENDING", , drop = FALSE]
-      labels <- c(protocol_registration = "Protocol registration", configuration_human_review = "Review configuration")
-      operations <- c(generate_search = "search generation", retrieve_pubmed = "PubMed retrieval")
-      label <- unname(labels[pending$gate_type]); label[is.na(label)] <- "Human review"
-      step <- unname(operations[pending$required_operation]); step[is.na(step)] <- "the next workflow step"
-      shiny::updateSelectInput(session, "review_gate", choices = if(nrow(pending))setNames(pending$id, paste(label, "before", step)) else character(),
-        selected = shiny::isolate(input$review_gate))
+      config_gates <- pending[pending$gate_type == "configuration_human_review", , drop = FALSE]
+      protocol_gates <- pending[pending$gate_type == "protocol_registration", , drop = FALSE]
+      known <- pending$gate_type %in% c("configuration_human_review", "protocol_registration")
+      other <- pending[!known, , drop = FALSE]
+      count <- srma_pending_decision_count(pending)
+
+      shiny::div(
+        class = "srma-human-wrap",
+        shiny::div(
+          class = "srma-human-heading",
+          shiny::h2("Human Review"),
+          shiny::p("Scientific decisions remain under your control. Complete the items below before the review can continue.")
+        ),
+        if (count == 0L) {
+          shiny::div(
+            class = "srma-human-complete",
+            shiny::h3("No human decisions are pending"),
+            shiny::p("This saved version has no pending initial review decisions. Return to the Dashboard to continue the workflow.")
+          )
+        } else {
+          shiny::tagList(
+            shiny::div(
+              class = "srma-human-summary",
+              shiny::strong(count),
+              if (count == 1L) "decision needs your attention." else "decisions need your attention."
+            ),
+            if (nrow(config_gates)) srma_human_decision_card(
+              "configuration_review",
+              "Review configuration",
+              "Confirm that the review question, eligibility criteria, outcomes, and selected databases represent the systematic review you intend to conduct.",
+              human_gate_applies(config_gates),
+              "Reason / notes *"
+            ),
+            if (nrow(protocol_gates)) srma_human_decision_card(
+              "protocol_review",
+              "Protocol registration",
+              "Confirm that the protocol registration decision and any supporting registry reference are correct before search-related workflow steps proceed.",
+              human_gate_applies(protocol_gates),
+              "Reason / protocol registration reference *"
+            ),
+            if (nrow(other)) shiny::div(
+              class = "srma-human-fallback",
+              shiny::strong("Additional human review items"),
+              shiny::p("Additional workflow-specific review items are pending and will be handled in their dedicated workflow screens."),
+              shiny::tableOutput("other_human_gates")
+            )
+          )
+        },
+        shiny::tags$details(
+          class = "srma-human-details",
+          shiny::tags$summary("Review details and canonical concepts"),
+          shiny::div(
+            class = "srma-human-details-body",
+            shiny::selectInput("draft_job", "Draft source for selected version", c("Human-provided saved draft" = "")),
+            shiny::actionButton("load_draft", "Load review details"),
+            shiny::uiOutput("canonical_review")
+          )
+        )
+      )
     })
-    shiny::observeEvent(input$record_review, {
-      shiny::req(input$project, input$version, input$review_gate)
+
+    output$other_human_gates <- shiny::renderTable({
+      x <- state(); shiny::req(x, input$version)
+      pending <- x$gates[x$gates$version_id == input$version & x$gates$status == "PENDING", , drop = FALSE]
+      other <- pending[!pending$gate_type %in% c("configuration_human_review", "protocol_registration"), , drop = FALSE]
+      if (!nrow(other)) return(NULL)
+      data.frame(Review = gsub("_", " ", other$gate_type), Status = other$status)
+    })
+
+    record_gate_group <- function(gate_type, decision, rationale, success_message) {
+      shiny::req(input$project, input$version)
+      decision <- if (is.null(decision)) "" else as.character(decision)
+      rationale <- if (is.null(rationale)) "" else trimws(as.character(rationale))
+      if (!decision %in% c("APPROVED", "REJECTED") || !nzchar(rationale)) {
+        notice("Choose a decision and provide the required reason or registration reference.")
+        return(invisible(FALSE))
+      }
       x <- state(); shiny::req(x)
-      if (!input$review_gate %in% x$gates$id[x$gates$version_id == input$version & x$gates$status == "PENDING"] ||
-          !input$review_decision %in% c("APPROVED", "REJECTED") ||
-          is.null(input$review_rationale) || !nzchar(trimws(input$review_rationale))) {
-        notice("Select a pending review, choose your decision, and provide its reason or registration reference.")
-        return()
+      gates <- x$gates[
+        x$gates$version_id == input$version &
+          x$gates$status == "PENDING" &
+          x$gates$gate_type == gate_type,
+        , drop = FALSE
+      ]
+      if (!nrow(gates)) {
+        notice("This human review decision has already been recorded for the selected version.")
+        return(invisible(FALSE))
       }
-      done <- safe({request("decide_gate", list(project_id = input$project, gate_id = input$review_gate,
-        decision = input$review_decision, rationale = input$review_rationale)); TRUE})
-      if (isTRUE(done)) {
-        refresh(refresh() + 1L)
-        shiny::updateSelectInput(session, "review_decision", selected = "")
-        shiny::updateTextAreaInput(session, "review_rationale", value = "")
-        notice("Human decision recorded for this saved version. It cannot be changed or carried to a new version automatically. Scientific runtime and search quality checks still apply.")
+      for (gate_id in gates$id) {
+        done <- safe({
+          request("decide_gate", list(
+            project_id = input$project,
+            gate_id = gate_id,
+            decision = decision,
+            rationale = rationale
+          ))
+          TRUE
+        })
+        if (!isTRUE(done)) return(invisible(FALSE))
+      }
+      refresh(refresh() + 1L)
+      notice(success_message)
+      invisible(TRUE)
+    }
+
+    shiny::observeEvent(input$save_configuration_review, {
+      if (isTRUE(record_gate_group(
+        "configuration_human_review",
+        input$configuration_review_decision,
+        input$configuration_review_rationale,
+        "Configuration review recorded for this saved version."
+      ))) {
+        shiny::updateRadioButtons(session, "configuration_review_decision", selected = character())
+        shiny::updateTextAreaInput(session, "configuration_review_rationale", value = "")
       }
     })
+
+    shiny::observeEvent(input$save_protocol_review, {
+      if (isTRUE(record_gate_group(
+        "protocol_registration",
+        input$protocol_review_decision,
+        input$protocol_review_rationale,
+        "Protocol registration review recorded for this saved version."
+      ))) {
+        shiny::updateRadioButtons(session, "protocol_review_decision", selected = character())
+        shiny::updateTextAreaInput(session, "protocol_review_rationale", value = "")
+      }
+    })
+
     shiny::observeEvent(input$run, {
       shiny::req(input$project, input$version)
       id <- safe(request("submit", list(project_id = input$project, version_id = input$version)))
@@ -165,68 +1087,616 @@ web_app <- function(settings) {
       if (is.null(safe(request("download", list(project_id = input$project, artifact_id = input$artifact, destination = file)))))
         stop("This download is unavailable.", call. = FALSE)
     })
-    output$wizard <- shiny::renderUI({
-      shiny::req(token()); workspaces <- safe(request("workspaces")); shiny::req(workspaces)
-      shiny::tagList(
-        shiny::p("Describe your review. Scientific choices are yours to edit. Saving creates an immutable draft and does not approve the protocol or generate search terms."),
-        shiny::selectInput("workspace", "Workspace", setNames(workspaces$id, workspaces$name)),
-        shiny::textInput("title", "Review title"), shiny::textInput("canonical_id", "Project identifier", paste0("review-", substr(web_id(), 1, 12))),
-        shiny::helpText("Use letters, numbers, hyphens or underscores. Keep this identifier when editing the same review."),
-        shiny::textInput("investigator", "Principal investigator (optional)"),
-        shiny::selectInput("framework", "Question framework", c("PICO", "PICOS")),
-        shiny::textAreaInput("question", "Review question"),
-        shiny::textAreaInput("population", "Population"), shiny::textAreaInput("intervention", "Intervention or exposure"),
-        shiny::textAreaInput("comparator", "Comparator"), shiny::textAreaInput("primary", "Primary outcomes — one per line"),
-        shiny::textAreaInput("secondary", "Secondary outcomes — optional, one per line"),
-        shiny::textAreaInput("designs", "Eligible study designs — one per line"),
-        shiny::textAreaInput("inclusion", "Inclusion criteria — one per line"),
-        shiny::textAreaInput("exclusion", "Exclusion criteria — one per line"),
-        shiny::textInput("reason", "Initial screening exclusion reason"),
-        shiny::textInput("language", "Language restriction — state your decision"),
-        shiny::checkboxGroupInput("databases", "Databases", c("PubMed" = "pubmed", "Embase" = "embase", "CENTRAL" = "central")),
-        shiny::checkboxInput("inception", "Search from database inception", TRUE),
-        shiny::textInput("start_date", "Search start date if not inception (YYYY-MM-DD)"),
-        shiny::textInput("end_date", "Search end date (optional, YYYY-MM-DD)"),
-        shiny::actionButton("save", "Save validated draft as new version"), shiny::actionButton("new_draft", "Start a separate review"))
-    })
-    lines <- function(value) as.list(Filter(nzchar, trimws(strsplit(if (is.null(value)) "" else value, "\n", fixed = TRUE)[[1]])))
-    shiny::observeEvent(input$new_draft, {editing(NULL); shiny::updateTextInput(session, "canonical_id", value = paste0("review-", substr(web_id(), 1, 12))); notice("The next save will create a separate review. Review every field before saving.")})
-    shiny::observeEvent(input$save, {
-      if (!isTRUE(input$inception) && !nzchar(trimws(input$start_date))) {
-        notice("Enter a search start date or choose database inception."); return()
+    wizard_text <- function(x, fallback = "Not specified") {
+      if (is.null(x) || !length(x)) return(fallback)
+      value <- paste(as.character(x), collapse = "\n")
+      if (!nzchar(trimws(value))) fallback else value
+    }
+
+    wizard_multiline <- function(x, fallback = "Not specified") {
+      value <- wizard_text(x, "")
+      if (!nzchar(value)) return(fallback)
+      parts <- trimws(strsplit(value, "\n", fixed = TRUE)[[1L]])
+      parts <- parts[nzchar(parts)]
+      if (!length(parts)) fallback else paste(parts, collapse = "\n")
+    }
+
+    wizard_capture <- function(step = wizard_step()) {
+      capture <- function(name, current) {
+        value <- input[[name]]
+        if (is.null(value)) current else value
       }
-      values <- list("project.title" = input$title, "project.project_id" = input$canonical_id,
-        "project.principal_investigator" = input$investigator, "research_question.framework" = input$framework,
-        "research_question.question" = input$question, "research_question.population.description" = input$population,
-        "research_question.intervention.description" = input$intervention, "research_question.comparator.description" = input$comparator,
-        "research_question.outcomes.primary" = lines(input$primary), "research_question.outcomes.secondary" = lines(input$secondary),
-        "eligibility.study_designs.include" = lines(input$designs), "eligibility.inclusion" = lines(input$inclusion), "eligibility.exclusion" = lines(input$exclusion),
-        "eligibility.language_restriction" = input$language, "search.search_start_date" = if (isTRUE(input$inception)) "" else input$start_date,
-        "search.search_end_date" = input$end_date, databases = as.list(input$databases), exclusion_reason = input$reason)
-      edit <- editing()
-      saved <- safe(request("save_configuration", list(workspace_id = input$workspace, values = values,
-        project_id = if (!is.null(edit)) edit$project_id else NULL, version_id = if (!is.null(edit)) edit$version_id else NULL)))
-      if (!is.null(saved)) {editing(saved); refresh(refresh() + 1L); notice("Validated draft saved as a new version. Protocol and scientific choices still require human review.")}
+
+      if (identical(step, 1L)) {
+        wizard_values$workspace <- capture("workspace", wizard_values$workspace)
+        wizard_values$title <- capture("title", wizard_values$title)
+        wizard_values$canonical_id <- capture("canonical_id", wizard_values$canonical_id)
+        wizard_values$investigator <- capture("investigator", wizard_values$investigator)
+        wizard_values$framework <- capture("framework", wizard_values$framework)
+        wizard_values$question <- capture("question", wizard_values$question)
+      } else if (identical(step, 2L)) {
+        wizard_values$population <- capture("population", wizard_values$population)
+        wizard_values$intervention <- capture("intervention", wizard_values$intervention)
+        wizard_values$comparator <- capture("comparator", wizard_values$comparator)
+        wizard_values$primary <- capture("primary", wizard_values$primary)
+        wizard_values$secondary <- capture("secondary", wizard_values$secondary)
+      } else if (identical(step, 3L)) {
+        wizard_values$designs <- capture("designs", wizard_values$designs)
+        wizard_values$inclusion <- capture("inclusion", wizard_values$inclusion)
+        wizard_values$exclusion <- capture("exclusion", wizard_values$exclusion)
+        wizard_values$reason <- capture("reason", wizard_values$reason)
+        wizard_values$language <- capture("language", wizard_values$language)
+      } else if (identical(step, 4L)) {
+        wizard_values$databases <- capture("databases", wizard_values$databases)
+        wizard_values$inception <- isTRUE(capture("inception", wizard_values$inception))
+        wizard_values$start_date <- capture("start_date", wizard_values$start_date)
+        wizard_values$end_date <- capture("end_date", wizard_values$end_date)
+      }
+      invisible(TRUE)
+    }
+
+    reset_wizard <- function(keep_workspace = TRUE) {
+      workspace <- if (isTRUE(keep_workspace)) wizard_values$workspace else NULL
+      wizard_values$workspace <- workspace
+      wizard_values$title <- ""
+      wizard_values$canonical_id <- paste0("review-", substr(web_id(), 1, 12))
+      wizard_values$investigator <- ""
+      wizard_values$framework <- "PICO"
+      wizard_values$question <- ""
+      wizard_values$population <- ""
+      wizard_values$intervention <- ""
+      wizard_values$comparator <- ""
+      wizard_values$primary <- ""
+      wizard_values$secondary <- ""
+      wizard_values$designs <- ""
+      wizard_values$inclusion <- ""
+      wizard_values$exclusion <- ""
+      wizard_values$reason <- ""
+      wizard_values$language <- ""
+      wizard_values$databases <- character()
+      wizard_values$inception <- TRUE
+      wizard_values$start_date <- ""
+      wizard_values$end_date <- ""
+      wizard_step(1L)
+      wizard_errors(character())
+      invisible(TRUE)
+    }
+
+    wizard_progress_ui <- function(step) {
+      labels <- c("Review basics", "Research question", "Eligibility", "Search sources", "Review & create")
+      shiny::div(
+        class = "srma-wizard-progress",
+        lapply(seq_along(labels), function(i) {
+          status <- if (i < step) "done" else if (i == step) "active" else ""
+          shiny::div(
+            class = paste("srma-wizard-step", status),
+            paste0(i, ". ", labels[[i]])
+          )
+        })
+      )
+    }
+
+    wizard_footer_ui <- function(step) {
+      if (identical(step, 1L)) {
+        return(shiny::div(
+          class = "srma-wizard-footer",
+          shiny::actionButton("wizard_cancel", "Cancel", class = "btn-outline-secondary"),
+          shiny::div(
+            class = "srma-wizard-footer-right",
+            shiny::actionButton("wizard_next", "Continue", class = "btn-primary")
+          )
+        ))
+      }
+
+      if (step < 5L) {
+        return(shiny::div(
+          class = "srma-wizard-footer",
+          shiny::actionButton("wizard_back", "Back", class = "btn-outline-secondary"),
+          shiny::div(
+            class = "srma-wizard-footer-right",
+            shiny::actionButton("wizard_next", "Continue", class = "btn-primary")
+          )
+        ))
+      }
+
+      save_label <- if (is.null(editing())) "Create systematic review" else "Save as new version"
+      shiny::div(
+        class = "srma-wizard-footer",
+        shiny::actionButton("wizard_back", "Back", class = "btn-outline-secondary"),
+        shiny::div(
+          class = "srma-wizard-footer-right",
+          if (!is.null(editing())) shiny::actionButton("new_draft", "Start as a separate review", class = "btn-outline-secondary"),
+          shiny::actionButton("save", save_label, class = "btn-primary")
+        )
+      )
+    }
+
+    summary_item <- function(label, value, full = FALSE) {
+      shiny::div(
+        class = paste("srma-summary-item", if (isTRUE(full)) "full" else ""),
+        shiny::span(class = "srma-summary-label", label),
+        shiny::div(class = "srma-summary-value", value)
+      )
+    }
+
+    summary_section <- function(title, ...) {
+      shiny::div(
+        class = "srma-summary-section",
+        shiny::h4(title),
+        shiny::div(class = "srma-summary-grid", ...)
+      )
+    }
+
+    field_error <- function(key, message) {
+      if (!key %in% wizard_errors()) return(NULL)
+      shiny::div(class = "srma-field-error", message)
+    }
+
+    output$wizard <- shiny::renderUI({
+      shiny::req(token())
+      workspaces <- safe(request("workspaces"))
+      shiny::req(!is.null(workspaces), nrow(workspaces) > 0L)
+
+      if (is.null(wizard_values$workspace) || !wizard_values$workspace %in% workspaces$id) {
+        wizard_values$workspace <- workspaces$id[[1L]]
+      }
+
+      step <- wizard_step()
+      workspace_ui <- if (nrow(workspaces) > 1L) {
+        shiny::selectInput(
+          "workspace", "Workspace",
+          choices = setNames(workspaces$id, workspaces$name),
+          selected = wizard_values$workspace,
+          width = "100%"
+        )
+      } else {
+        shiny::div(
+          style = "display:none",
+          shiny::selectInput(
+            "workspace", NULL,
+            choices = setNames(workspaces$id, workspaces$name),
+            selected = wizard_values$workspace
+          )
+        )
+      }
+
+      step_body <- switch(
+        as.character(step),
+        `1` = shiny::tagList(
+          shiny::div(class = "srma-wizard-kicker", "Step 1 of 5"),
+          shiny::h3("Review basics", class = "srma-wizard-title"),
+          shiny::p(
+            "Start with the identity and core question of your review. You can refine scientific details before saving.",
+            class = "srma-wizard-subtitle"
+          ),
+          shiny::div(
+            class = "srma-form-grid",
+            shiny::div(class = "srma-form-full", workspace_ui),
+            shiny::div(
+              class = "srma-form-full",
+              shiny::textInput("title", srma_required_label("Review title"), value = wizard_values$title, width = "100%"),
+              field_error("title", "Enter a review title to continue.")
+            ),
+            shiny::textInput(
+              "investigator", "Principal investigator (optional)",
+              value = wizard_values$investigator, width = "100%",
+              placeholder = "e.g., J. Smith"
+            ),
+            shiny::selectInput(
+              "framework", "Question framework",
+              choices = c("PICO", "PICOS"), selected = wizard_values$framework, width = "100%"
+            ),
+            shiny::div(
+              class = "srma-form-full",
+              shiny::textAreaInput(
+                "question", srma_required_label("Review question"),
+                value = wizard_values$question, rows = 4, width = "100%",
+                placeholder = "State the clinical or research question this review will answer."
+              ),
+              shiny::div(
+                class = "srma-field-help",
+                "Example: In adults with condition X, does intervention A improve outcome B compared with standard care?"
+              ),
+              field_error("question", "Enter the review question to continue.")
+            ),
+            shiny::div(
+              class = "srma-form-full",
+              shiny::tags$details(
+                shiny::tags$summary("Advanced options"),
+                shiny::textInput(
+                  "canonical_id", "Project identifier",
+                  value = wizard_values$canonical_id, width = "100%"
+                ),
+                shiny::helpText(
+                  "This identifier is generated automatically and usually does not need to be changed. ",
+                  "Use only letters, numbers, hyphens or underscores if you edit it."
+                )
+              )
+            )
+          )
+        ),
+        `2` = shiny::tagList(
+          shiny::div(class = "srma-wizard-kicker", "Step 2 of 5"),
+          shiny::h3("Research question", class = "srma-wizard-title"),
+          shiny::p(
+            "Describe the key elements of the question. Keep each field concise; detailed eligibility rules come next.",
+            class = "srma-wizard-subtitle"
+          ),
+          shiny::div(
+            class = "srma-form-grid",
+            shiny::div(
+              shiny::textAreaInput("population", srma_required_label("Population"), value = wizard_values$population, rows = 4, width = "100%"),
+              field_error("population", "Describe the review population.")
+            ),
+            shiny::div(
+              shiny::textAreaInput("intervention", srma_required_label("Intervention or exposure"), value = wizard_values$intervention, rows = 4, width = "100%"),
+              field_error("intervention", "Describe the intervention or exposure.")
+            ),
+            shiny::div(
+              shiny::textAreaInput("comparator", srma_required_label("Comparator"), value = wizard_values$comparator, rows = 4, width = "100%"),
+              shiny::div(class = "srma-field-help", "If the review has no active comparator, state the intended non-comparative reference explicitly (for example, 'No comparator / single-arm evidence')."),
+              field_error("comparator", "Describe the comparator or explicitly state that no comparator applies.")
+            ),
+            shiny::div(
+              shiny::textAreaInput("primary", srma_required_label("Primary outcomes — one per line"), value = wizard_values$primary, rows = 4, width = "100%"),
+              field_error("primary", "Enter at least one primary outcome.")
+            ),
+            shiny::div(
+              class = "srma-form-full",
+              shiny::textAreaInput(
+                "secondary", "Secondary outcomes — optional, one per line",
+                value = wizard_values$secondary, rows = 4, width = "100%"
+              )
+            )
+          )
+        ),
+        `3` = shiny::tagList(
+          shiny::div(class = "srma-wizard-kicker", "Step 3 of 5"),
+          shiny::h3("Eligibility criteria", class = "srma-wizard-title"),
+          shiny::p(
+            "Define which studies belong in the review. Enter one study design or criterion per line where requested.",
+            class = "srma-wizard-subtitle"
+          ),
+          shiny::div(
+            class = "srma-form-grid",
+            shiny::div(
+              shiny::textAreaInput("designs", srma_required_label("Eligible study designs — one per line"), value = wizard_values$designs, rows = 4, width = "100%"),
+              field_error("designs", "Enter at least one eligible study design.")
+            ),
+            shiny::textInput("language", "Language restriction (optional)", value = wizard_values$language, width = "100%", placeholder = "e.g., No language restriction"),
+            shiny::div(
+              shiny::textAreaInput("inclusion", srma_required_label("Inclusion criteria — one per line"), value = wizard_values$inclusion, rows = 5, width = "100%"),
+              field_error("inclusion", "Enter the inclusion criteria.")
+            ),
+            shiny::div(
+              shiny::textAreaInput("exclusion", srma_required_label("Exclusion criteria — one per line"), value = wizard_values$exclusion, rows = 5, width = "100%"),
+              field_error("exclusion", "Enter the exclusion criteria.")
+            ),
+            shiny::div(
+              class = "srma-form-full",
+              shiny::textInput(
+                "reason", srma_required_label("Default screening exclusion reason"),
+                value = wizard_values$reason, width = "100%",
+                placeholder = "e.g., Does not meet eligibility criteria"
+              ),
+              shiny::div(class = "srma-field-help", "This becomes the first screening exclusion reason. Additional reasons can be added later during screening."),
+              field_error("reason", "Enter one default screening exclusion reason.")
+            )
+          )
+        ),
+        `4` = shiny::tagList(
+          shiny::div(class = "srma-wizard-kicker", "Step 4 of 5"),
+          shiny::h3("Search sources", class = "srma-wizard-title"),
+          shiny::p(
+            "Choose the databases and search date range. Search strategies are generated and reviewed later in the workflow.",
+            class = "srma-wizard-subtitle"
+          ),
+          shiny::div(
+            class = "srma-form-grid",
+            shiny::div(
+              class = "srma-form-full",
+              shiny::checkboxGroupInput(
+                "databases", srma_required_label("Databases"),
+                choices = c("PubMed" = "pubmed", "Embase" = "embase", "CENTRAL" = "central"),
+                selected = wizard_values$databases,
+                inline = TRUE
+              ),
+              shiny::div(class = "srma-field-help", "Select at least one database."),
+              field_error("databases", "Select at least one database to continue.")
+            ),
+            shiny::div(
+              class = "srma-form-full",
+              shiny::checkboxInput("inception", "Search from database inception", value = isTRUE(wizard_values$inception))
+            ),
+            shiny::conditionalPanel(
+              condition = "!input.inception",
+              shiny::div(
+                shiny::textInput("start_date", srma_required_label("Search start date (YYYY-MM-DD)"), value = wizard_values$start_date, width = "100%"),
+                field_error("start_date", "Enter a start date or select database inception.")
+              )
+            ),
+            shiny::textInput("end_date", "Search end date (optional, YYYY-MM-DD)", value = wizard_values$end_date, width = "100%")
+          )
+        ),
+        `5` = {
+          db_labels <- c(pubmed = "PubMed", embase = "Embase", central = "CENTRAL")
+          selected_db <- unname(db_labels[wizard_values$databases])
+          selected_db <- selected_db[!is.na(selected_db)]
+          date_range <- if (isTRUE(wizard_values$inception)) {
+            if (nzchar(trimws(wizard_values$end_date))) paste("Database inception to", wizard_values$end_date) else "Database inception to current search date"
+          } else {
+            start_value <- wizard_text(wizard_values$start_date)
+            end_value <- if (nzchar(trimws(wizard_values$end_date))) wizard_values$end_date else "current search date"
+            paste(start_value, "to", end_value)
+          }
+
+          shiny::tagList(
+            shiny::div(class = "srma-wizard-kicker", "Step 5 of 5"),
+            shiny::h3("Review & create", class = "srma-wizard-title"),
+            shiny::p(
+              "Review the setup below. Creating the review saves an immutable draft; it does not approve scientific decisions or generate search terms.",
+              class = "srma-wizard-subtitle"
+            ),
+            summary_section(
+              "Review basics",
+              summary_item("Review title", wizard_text(wizard_values$title), TRUE),
+              summary_item("Principal investigator", wizard_text(wizard_values$investigator)),
+              summary_item("Framework", wizard_text(wizard_values$framework)),
+              summary_item("Review question", wizard_text(wizard_values$question), TRUE)
+            ),
+            summary_section(
+              "Research question",
+              summary_item("Population", wizard_multiline(wizard_values$population)),
+              summary_item("Intervention / exposure", wizard_multiline(wizard_values$intervention)),
+              summary_item("Comparator", wizard_multiline(wizard_values$comparator)),
+              summary_item("Primary outcomes", wizard_multiline(wizard_values$primary)),
+              summary_item("Secondary outcomes", wizard_multiline(wizard_values$secondary), TRUE)
+            ),
+            summary_section(
+              "Eligibility",
+              summary_item("Eligible study designs", wizard_multiline(wizard_values$designs)),
+              summary_item("Language restriction", wizard_text(wizard_values$language)),
+              summary_item("Inclusion criteria", wizard_multiline(wizard_values$inclusion), TRUE),
+              summary_item("Exclusion criteria", wizard_multiline(wizard_values$exclusion), TRUE),
+              summary_item("Default screening exclusion reason", wizard_text(wizard_values$reason), TRUE)
+            ),
+            summary_section(
+              "Search",
+              summary_item("Databases", if (length(selected_db)) paste(selected_db, collapse = ", ") else "Not selected"),
+              summary_item("Search period", date_range)
+            ),
+            shiny::div(
+              class = "srma-review-note",
+              "Scientific choices remain subject to the toolkit's Human Review gates. Search generation, screening, analysis, and manuscript steps remain version-bound after creation."
+            ),
+            shiny::tags$details(
+              shiny::tags$summary("Technical details"),
+              shiny::p(paste("Project identifier:", wizard_values$canonical_id))
+            )
+          )
+        }
+      )
+
+      shiny::div(
+        class = "srma-wizard-wrap",
+        shiny::div(
+          class = "srma-wizard-heading",
+          shiny::h2(if (is.null(editing())) "New Systematic Review" else "Edit Review as a New Version"),
+          shiny::p("Complete the setup in five short steps. Your entries are kept while you move between steps.")
+        ),
+        wizard_progress_ui(step),
+        shiny::div(
+          class = "srma-wizard-card",
+          step_body,
+          wizard_footer_ui(step)
+        )
+      )
     })
+
+    shiny::observeEvent(input$wizard_cancel, {
+      wizard_capture(wizard_step())
+      wizard_errors(character())
+      shiny::updateTabsetPanel(session, "page", selected = "my_projects")
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$wizard_back, {
+      step <- wizard_step()
+      wizard_capture(step)
+      wizard_errors(character())
+      wizard_step(max(1L, step - 1L))
+      notice("")
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$wizard_next, {
+      step <- wizard_step()
+      wizard_capture(step)
+
+      errors <- character()
+
+      if (identical(step, 1L)) {
+        if (!nzchar(trimws(wizard_values$title))) errors <- c(errors, "title")
+        if (!nzchar(trimws(wizard_values$question))) errors <- c(errors, "question")
+        if (!nzchar(trimws(wizard_values$canonical_id))) errors <- c(errors, "canonical_id")
+      }
+
+      if (identical(step, 2L)) {
+        if (!nzchar(trimws(wizard_values$population))) errors <- c(errors, "population")
+        if (!nzchar(trimws(wizard_values$intervention))) errors <- c(errors, "intervention")
+        if (!nzchar(trimws(wizard_values$comparator))) errors <- c(errors, "comparator")
+        if (!nzchar(trimws(wizard_values$primary))) errors <- c(errors, "primary")
+      }
+
+      if (identical(step, 3L)) {
+        if (!nzchar(trimws(wizard_values$designs))) errors <- c(errors, "designs")
+        if (!nzchar(trimws(wizard_values$inclusion))) errors <- c(errors, "inclusion")
+        if (!nzchar(trimws(wizard_values$exclusion))) errors <- c(errors, "exclusion")
+        if (!nzchar(trimws(wizard_values$reason))) errors <- c(errors, "reason")
+      }
+
+      if (identical(step, 4L)) {
+        if (!length(wizard_values$databases)) errors <- c(errors, "databases")
+        if (!isTRUE(wizard_values$inception) && !nzchar(trimws(wizard_values$start_date))) {
+          errors <- c(errors, "start_date")
+        }
+      }
+
+      wizard_errors(unique(errors))
+      if (length(errors)) {
+        notice("Complete the required fields marked below before continuing.")
+        return()
+      }
+
+      wizard_errors(character())
+      wizard_step(min(5L, step + 1L))
+      notice("")
+    }, ignoreInit = TRUE)
+
+    lines <- function(value) as.list(Filter(nzchar, trimws(strsplit(if (is.null(value)) "" else value, "\n", fixed = TRUE)[[1]])))
+
+    shiny::observeEvent(input$new_draft, {
+      editing(NULL)
+      reset_wizard(keep_workspace = TRUE)
+      notice("A separate review is ready to set up. Review every field before creating it.")
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$save, {
+      required_values <- c(
+        title = wizard_values$title,
+        question = wizard_values$question,
+        population = wizard_values$population,
+        intervention = wizard_values$intervention,
+        comparator = wizard_values$comparator,
+        primary = wizard_values$primary,
+        designs = wizard_values$designs,
+        inclusion = wizard_values$inclusion,
+        exclusion = wizard_values$exclusion,
+        reason = wizard_values$reason
+      )
+      missing <- names(required_values)[!nzchar(trimws(required_values))]
+      if (length(missing)) {
+        if (any(missing %in% c("population", "intervention", "comparator", "primary"))) {
+          wizard_errors(unique(missing[missing %in% c("population", "intervention", "comparator", "primary")]))
+          wizard_step(2L)
+        } else if (any(missing %in% c("designs", "inclusion", "exclusion", "reason"))) {
+          wizard_errors(unique(missing[missing %in% c("designs", "inclusion", "exclusion", "reason")]))
+          wizard_step(3L)
+        } else {
+          wizard_errors(unique(missing[missing %in% c("title", "question")]))
+          wizard_step(1L)
+        }
+        notice("Complete the required fields marked below before creating the review.")
+        return()
+      }
+      if (!isTRUE(wizard_values$inception) && !nzchar(trimws(wizard_values$start_date))) {
+        notice("Enter a search start date or choose database inception.")
+        return()
+      }
+      if (!length(wizard_values$databases)) {
+        notice("Select at least one database before creating the review.")
+        return()
+      }
+
+      values <- list(
+        "project.title" = wizard_values$title,
+        "project.project_id" = wizard_values$canonical_id,
+        "project.principal_investigator" = wizard_values$investigator,
+        "research_question.framework" = wizard_values$framework,
+        "research_question.question" = wizard_values$question,
+        "research_question.population.description" = wizard_values$population,
+        "research_question.intervention.description" = wizard_values$intervention,
+        "research_question.comparator.description" = wizard_values$comparator,
+        "research_question.outcomes.primary" = lines(wizard_values$primary),
+        "research_question.outcomes.secondary" = lines(wizard_values$secondary),
+        "eligibility.study_designs.include" = lines(wizard_values$designs),
+        "eligibility.inclusion" = lines(wizard_values$inclusion),
+        "eligibility.exclusion" = lines(wizard_values$exclusion),
+        "eligibility.language_restriction" = wizard_values$language,
+        "search.search_start_date" = if (isTRUE(wizard_values$inception)) "" else wizard_values$start_date,
+        "search.search_end_date" = wizard_values$end_date,
+        databases = as.list(wizard_values$databases),
+        exclusion_reason = wizard_values$reason
+      )
+
+      wizard_errors(character())
+      notice("Creating the systematic review…")
+
+      edit <- editing()
+      saved <- safe(request(
+        "save_configuration",
+        list(
+          workspace_id = wizard_values$workspace,
+          values = values,
+          project_id = if (!is.null(edit)) edit$project_id else NULL,
+          version_id = if (!is.null(edit)) edit$version_id else NULL
+        )
+      ))
+
+      if (!is.null(saved)) {
+        was_new <- is.null(edit)
+        editing(saved)
+        if (!is.null(saved$project_id) && srma_has_text(saved$project_id)) pending_project_selection(as.character(saved$project_id[[1L]]))
+        refresh(refresh() + 1L)
+        wizard_step(1L)
+        notice(if (was_new) {
+          "Systematic review created as an immutable draft. Scientific choices still require Human Review before downstream workflow steps."
+        } else {
+          "A new immutable version was saved. Scientific choices still require Human Review before downstream workflow steps."
+        })
+        nav_section("dashboard")
+        shiny::updateTabsetPanel(session, "page", selected = "my_projects")
+      }
+    })
+
     shiny::observeEvent(input$edit, {
-      cfg <- safe(request("configuration", list(project_id = input$project, version_id = input$version))); shiny::req(cfg)
+      cfg <- safe(request("configuration", list(project_id = input$project, version_id = input$version)))
+      shiny::req(cfg)
       editing(list(project_id = input$project, version_id = input$version))
+
       description <- function(x) if (is.list(x)) x$description else x
-      fields <- list(title = cfg$project$title, canonical_id = cfg$project$project_id, investigator = cfg$project$principal_investigator,
-        question = cfg$research_question$question, population = description(cfg$research_question$population),
-        intervention = description(cfg$research_question$intervention), comparator = description(cfg$research_question$comparator),
-        primary = if (is.list(cfg$research_question$outcomes)) cfg$research_question$outcomes$primary else cfg$research_question$outcomes,
-        secondary = if (is.list(cfg$research_question$outcomes)) cfg$research_question$outcomes$secondary else NULL,
-        designs = cfg$eligibility$study_designs$include, inclusion = cfg$eligibility$inclusion, exclusion = cfg$eligibility$exclusion,
-        reason = cfg$screening$exclusion_reasons[[1]]$label, language = cfg$eligibility$language_restriction,
-        start_date = cfg$search$search_start_date, end_date = cfg$search$search_end_date)
-      for (name in names(fields)) shiny::updateTextInput(session, name, value = paste(unlist(fields[[name]]), collapse = "\n"))
-      shiny::updateSelectInput(session, "framework", selected = cfg$research_question$framework)
-      shiny::updateCheckboxGroupInput(session, "databases", selected = names(Filter(function(x) if (is.list(x)) isTRUE(x$enabled) else isTRUE(x), cfg$search$databases)))
-      shiny::updateCheckboxInput(session, "inception", value = !nzchar(paste0(cfg$search$search_start_date)))
-      projects <- safe(request("projects")); shiny::req(projects)
-      shiny::updateSelectInput(session, "workspace", selected = projects$workspace_id[projects$id == input$project])
-      shiny::updateTabsetPanel(session, "page", selected = "New Systematic Review")
+      collapse_value <- function(x) {
+        if (is.null(x) || !length(x)) "" else paste(unlist(x), collapse = "\n")
+      }
+
+      wizard_values$title <- collapse_value(cfg$project$title)
+      wizard_values$canonical_id <- collapse_value(cfg$project$project_id)
+      wizard_values$investigator <- collapse_value(cfg$project$principal_investigator)
+      wizard_values$framework <- collapse_value(cfg$research_question$framework)
+      wizard_values$question <- collapse_value(cfg$research_question$question)
+      wizard_values$population <- collapse_value(description(cfg$research_question$population))
+      wizard_values$intervention <- collapse_value(description(cfg$research_question$intervention))
+      wizard_values$comparator <- collapse_value(description(cfg$research_question$comparator))
+      wizard_values$primary <- collapse_value(if (is.list(cfg$research_question$outcomes)) cfg$research_question$outcomes$primary else cfg$research_question$outcomes)
+      wizard_values$secondary <- collapse_value(if (is.list(cfg$research_question$outcomes)) cfg$research_question$outcomes$secondary else NULL)
+      wizard_values$designs <- collapse_value(cfg$eligibility$study_designs$include)
+      wizard_values$inclusion <- collapse_value(cfg$eligibility$inclusion)
+      wizard_values$exclusion <- collapse_value(cfg$eligibility$exclusion)
+      wizard_values$language <- collapse_value(cfg$eligibility$language_restriction)
+      wizard_values$start_date <- collapse_value(cfg$search$search_start_date)
+      wizard_values$end_date <- collapse_value(cfg$search$search_end_date)
+      wizard_values$inception <- !nzchar(trimws(wizard_values$start_date))
+
+      reasons <- cfg$screening$exclusion_reasons
+      wizard_values$reason <- if (!is.null(reasons) && length(reasons) && !is.null(reasons[[1L]]$label)) {
+        collapse_value(reasons[[1L]]$label)
+      } else {
+        ""
+      }
+
+      wizard_values$databases <- names(Filter(
+        function(x) if (is.list(x)) isTRUE(x$enabled) else isTRUE(x),
+        cfg$search$databases
+      ))
+
+      projects <- safe(request("projects"))
+      if (!is.null(projects) && nrow(projects)) {
+        match_idx <- match(input$project, projects$id)
+        if (!is.na(match_idx)) wizard_values$workspace <- projects$workspace_id[[match_idx]]
+      }
+
+      wizard_step(1L)
+      notice("")
+      nav_section("review_setup")
+      shiny::updateTabsetPanel(session, "page", selected = "new_review")
     })
     database_info <- shiny::reactive({
       shiny::invalidateLater(3000,session)

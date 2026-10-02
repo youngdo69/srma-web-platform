@@ -6,8 +6,53 @@ web_identity_provider <- function(name, verify) {
   structure(list(name = name, verify = verify), class = "web_identity_provider")
 }
 web_secret <- function() {
-  web_assert(file.exists("/dev/urandom"), "Secure session creation is unavailable.", "SYSTEM_FAILED")
-  con <- file("/dev/urandom", "rb", raw = TRUE); on.exit(close(con))
+  if (.Platform$OS.type == "windows") {
+    powershell <- Sys.which("powershell.exe")
+    web_assert(
+      nzchar(powershell),
+      "Secure session creation is unavailable.",
+      "SYSTEM_FAILED"
+    )
+
+    script <- tempfile(fileext = ".ps1")
+    on.exit(unlink(script), add = TRUE)
+
+    writeLines(c(
+      "$bytes = New-Object byte[] 32",
+      "$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()",
+      "try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }",
+      "($bytes | ForEach-Object { $_.ToString('x2') }) -join ''"
+    ), script, useBytes = TRUE)
+
+    value <- suppressWarnings(system2(
+      powershell,
+      c(
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy", "Bypass",
+        "-File", shQuote(script)
+      ),
+      stdout = TRUE,
+      stderr = TRUE
+    ))
+
+    value <- tolower(trimws(paste(value, collapse = "")))
+    web_assert(
+      length(value) == 1L && grepl("^[0-9a-f]{64}$", value),
+      "Secure session creation is unavailable.",
+      "SYSTEM_FAILED"
+    )
+    return(value)
+  }
+
+  web_assert(
+    file.exists("/dev/urandom"),
+    "Secure session creation is unavailable.",
+    "SYSTEM_FAILED"
+  )
+  con <- file("/dev/urandom", "rb", raw = TRUE)
+  on.exit(close(con), add = TRUE)
   value <- readBin(con, "raw", n = 32L)
   web_assert(length(value) == 32L, "Secure session creation is unavailable.", "SYSTEM_FAILED")
   paste(format(value), collapse = "")
@@ -26,9 +71,18 @@ web_sign_in <- function(con, provider, credential, ttl = 3600) {
   user <- web_query(con, "SELECT user_id FROM external_identities WHERE provider=?p AND subject=?s",
     p = provider$name, s = identity$subject)
   web_assert(nrow(user) == 1L, "Ask your workspace administrator to grant access.", "UNAUTHENTICATED")
+
+  requested_ttl <- suppressWarnings(as.numeric(ttl)[1L])
+  if (!is.finite(requested_ttl)) requested_ttl <- 3600
+  # Production-capable providers remain capped at one hour. The local-test provider
+  # may last up to 12 hours only when the explicit development test IDP is enabled.
+  max_ttl <- if (identical(provider$name, "local-test") &&
+                 identical(Sys.getenv("SRMA_WEB_TEST_IDP"), "1")) 43200 else 3600
+
   token <- web_secret(); now <- as.numeric(Sys.time())
   web_exec(con, "INSERT INTO auth_sessions VALUES(?h,?u,?p,?n,?e,0)",
-    h = web_token_hash(token), u = user$user_id, p = provider$name, n = now, e = now + min(3600, max(1, ttl)))
+    h = web_token_hash(token), u = user$user_id, p = provider$name, n = now,
+    e = now + min(max_ttl, max(1, requested_ttl)))
   if (exists("web_auth_audit", mode = "function")) web_auth_audit(con, user$user_id, provider$name, "SIGN_IN")
   token
 }
