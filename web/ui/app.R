@@ -94,29 +94,101 @@ srma_human_decision_card <- function(prefix, title, description, applies_to, rat
   )
 }
 
+
+srma_protocol_registration_card <- function() {
+  shiny::div(
+    class = "srma-human-card srma-protocol-card",
+    shiny::div(
+      class = "srma-human-card-head",
+      shiny::div(
+        shiny::div(class = "srma-human-card-title", "Protocol registration"),
+        shiny::p(
+          "Select the current registration status. The registration gate remains open until a completed registration is confirmed.",
+          class = "srma-human-card-description"
+        )
+      ),
+      shiny::span("Required", class = "srma-human-badge")
+    ),
+    shiny::div(
+      class = "srma-human-applies",
+      shiny::strong("Required before: "),
+      "literature search begins"
+    ),
+    shiny::radioButtons(
+      inputId = "protocol_registration_status",
+      label = "Registration status",
+      choices = c(
+        "Registered" = "REGISTERED",
+        "Registration in progress" = "IN_PROGRESS",
+        "Not registered" = "NOT_REGISTERED"
+      ),
+      selected = character(),
+      inline = FALSE
+    ),
+    shiny::conditionalPanel(
+      condition = "input.protocol_registration_status == 'REGISTERED'",
+      shiny::div(
+        class = "srma-protocol-panel",
+        shiny::selectInput(
+          "protocol_registry",
+          "Registry *",
+          choices = c("PROSPERO" = "PROSPERO", "Other accepted registry" = "OTHER"),
+          selected = "PROSPERO"
+        ),
+        shiny::textInput(
+          "protocol_registration_reference",
+          "Registration ID or URL *",
+          placeholder = "e.g., CRD420... or registry URL"
+        ),
+        shiny::textAreaInput(
+          "protocol_registration_notes",
+          "Notes (optional)",
+          rows = 3,
+          width = "100%",
+          placeholder = "Optional note about the registered protocol."
+        ),
+        shiny::div(
+          class = "srma-protocol-guidance srma-protocol-guidance-ok",
+          "Confirming a completed registration will satisfy this Human Gate for the selected saved version."
+        ),
+        shiny::div(
+          class = "srma-human-card-actions",
+          shiny::actionButton(
+            "confirm_protocol_registration",
+            "Confirm registration",
+            class = "btn-primary"
+          )
+        )
+      )
+    ),
+    shiny::conditionalPanel(
+      condition = "input.protocol_registration_status == 'IN_PROGRESS'",
+      shiny::div(
+        class = "srma-protocol-guidance srma-protocol-guidance-warn",
+        shiny::strong("Registration remains pending."),
+        shiny::br(),
+        "Complete the registration and return here to enter the registry reference. No Human Gate is closed at this stage."
+      )
+    ),
+    shiny::conditionalPanel(
+      condition = "input.protocol_registration_status == 'NOT_REGISTERED'",
+      shiny::div(
+        class = "srma-protocol-guidance srma-protocol-guidance-block",
+        shiny::strong("Registration is required before the literature-search workflow can continue."),
+        shiny::br(),
+        "The Human Gate will remain pending until a completed registration is confirmed."
+      )
+    )
+  )
+}
+
 web_app <- function(settings) {
-  remember_dev_session <- identical(settings$mode, "development") &&
+  auto_dev_session <- identical(settings$mode, "development") &&
     identical(Sys.getenv("SRMA_WEB_TEST_IDP"), "1")
 
   ui <- shiny::fluidPage(
     theme = bslib::bs_theme(version = 5),
     shiny::tags$head(
-      if (remember_dev_session) shiny::tags$script(shiny::HTML("
-        $(document).on('shiny:connected', function() {
-          if (!window.__srmaDevSessionHandler) {
-            Shiny.addCustomMessageHandler('srma-dev-session', function(message) {
-              if (message && message.token) {
-                window.localStorage.setItem('srma_dev_session', message.token);
-              } else {
-                window.localStorage.removeItem('srma_dev_session');
-              }
-            });
-            window.__srmaDevSessionHandler = true;
-          }
-          var token = window.localStorage.getItem('srma_dev_session');
-          if (token) Shiny.setInputValue('remembered_credential', token, {priority: 'event'});
-        });
-      ")),
       shiny::tags$style(shiny::HTML("
         body { background: #f7f9fc; color: #1f2937; }
         .srma-shell { max-width: 1600px; margin: 0 auto; padding: 28px 34px 54px; }
@@ -255,6 +327,12 @@ web_app <- function(settings) {
         .srma-human-card textarea.form-control { min-height:112px; font-size:16px; line-height:1.55; }
         .srma-human-card-actions { display:flex; justify-content:flex-end; padding-top:4px; }
         .srma-human-card-actions .btn { min-height:46px; padding:10px 20px; border-radius:9px; font-size:16px; font-weight:650; }
+        .srma-protocol-card .shiny-options-group { margin-bottom:8px; }
+        .srma-protocol-panel { margin-top:10px; }
+        .srma-protocol-guidance { margin-top:14px; padding:14px 16px; border-radius:10px; line-height:1.55; font-size:15px; }
+        .srma-protocol-guidance-ok { background:#eef8f1; border:1px solid #b9dfc4; color:#245c34; }
+        .srma-protocol-guidance-warn { background:#fff8e8; border:1px solid #efd79a; color:#795600; }
+        .srma-protocol-guidance-block { background:#fff1f1; border:1px solid #efb8b8; color:#8a2525; }
         .srma-human-details { margin-top:22px; border-top:1px solid #e5e7eb; padding-top:20px; }
         .srma-human-details summary { cursor:pointer; color:#315f7d; font-size:17px; font-weight:650; }
         .srma-human-details-body { margin-top:18px; padding:20px; border-radius:12px; background:#f8fafc; }
@@ -361,6 +439,28 @@ web_app <- function(settings) {
     )
     csrf <- web_secret()
     upload_root <- NULL
+
+    # Local development authentication is intentionally zero-touch. When both
+    # development mode and the explicit test identity provider are enabled, the
+    # server issues a local-only opaque session internally. No browser-visible
+    # session key is required. Beta and production authentication are unchanged.
+    issue_local_dev_session <- function() {
+      web_assert(isTRUE(auto_dev_session), "Local development sign-in is disabled.", "UNAUTHENTICATED")
+      web_local_identity(con)
+      linked <- web_query(
+        con,
+        "SELECT user_id FROM external_identities WHERE provider='local-test' AND subject='fixture'"
+      )
+      if (!nrow(linked)) {
+        DBI::dbExecute(
+          con,
+          "INSERT INTO external_identities VALUES('local-test','fixture','local-researcher')"
+        )
+      }
+      provider <- web_test_provider("fixture")
+      web_sign_in(con, provider$provider, provider$credential, ttl = 43200)
+    }
+
     safe <- function(expr) tryCatch(expr, error = function(e) {
 
       if (inherits(e, "shiny.silent.error"))
@@ -392,11 +492,37 @@ web_app <- function(settings) {
 
       NULL
     })
-    request <- function(action, args = list()) web_request(con, token(), action, args,
-      input$csrf, csrf, settings = settings, upload_root = upload_root)
+    request <- function(action, args = list()) {
+      current_token <- token()
+      tryCatch(
+        web_request(con, current_token, action, args,
+          input$csrf, csrf, settings = settings, upload_root = upload_root),
+        error = function(e) {
+          # If a local development session expires while the app is still open,
+          # renew it transparently and retry the original request once.
+          if (isTRUE(auto_dev_session) &&
+              inherits(e, "srma_web_error") &&
+              identical(e$code, "UNAUTHENTICATED")) {
+            renewed <- issue_local_dev_session()
+            token(renewed)
+            return(web_request(con, renewed, action, args,
+              input$csrf, csrf, settings = settings, upload_root = upload_root))
+          }
+          stop(e)
+        }
+      )
+    }
     output$notice <- shiny::renderText(notice())
     shiny::observe({
-      if (is.null(token()) && settings$mode %in% c("beta", "production") && isTRUE(settings$trusted_auth_proxy)) {
+      if (isTRUE(auto_dev_session) && is.null(token())) {
+        issued <- safe(issue_local_dev_session())
+        if (!is.null(issued)) {
+          if (inherits(session, "ShinySession"))
+            upload_root <- safe(web_bind_upload_root(session, settings))
+          token(issued)
+          notice("")
+        }
+      } else if (is.null(token()) && settings$mode %in% c("beta", "production") && isTRUE(settings$trusted_auth_proxy)) {
         issued <- safe(web_proxy_sign_in(con, settings, session$request))
         if (!is.null(issued)) {
           if (inherits(session, "ShinySession")) upload_root <- safe(web_bind_upload_root(session, settings))
@@ -405,33 +531,28 @@ web_app <- function(settings) {
       }
     })
     output$identity_ui <- shiny::renderUI({
-      if (is.null(token()) && settings$mode %in% c("beta", "production"))
+      if (isTRUE(auto_dev_session)) {
+        if (is.null(token()))
+          shiny::p("Starting local development session…")
+        else
+          shiny::span("Local development session", style = "color:#64748b;font-weight:700;")
+      } else if (is.null(token()) && settings$mode %in% c("beta", "production")) {
         shiny::p("Sign in through your organization's access portal. If access was granted recently, refresh this page.")
-      else if (is.null(token()) && !identical(Sys.getenv("SRMA_WEB_TEST_IDP"), "1"))
+      } else if (is.null(token()) && !identical(Sys.getenv("SRMA_WEB_TEST_IDP"), "1")) {
         shiny::p("Workspace sign-in is not configured yet. Contact your administrator.")
-      else if (is.null(token())) shiny::tagList(
-        shiny::p("Automated testing workspace. Enter the session credential supplied by the test operator."),
-        shiny::passwordInput("credential", "Test session credential"), shiny::actionButton("login", "Sign in"))
-      else shiny::actionButton("logout", "Sign out")
+      } else if (is.null(token())) {
+        shiny::tagList(
+          shiny::p("Automated testing workspace. Enter the session credential supplied by the test operator."),
+          shiny::passwordInput("credential", "Test session credential"),
+          shiny::actionButton("login", "Sign in")
+        )
+      } else {
+        shiny::actionButton("logout", "Sign out")
+      }
     })
-    shiny::observeEvent(input$remembered_credential, {
-      if (!isTRUE(remember_dev_session) || !is.null(token())) return()
-      credential <- if (is.null(input$remembered_credential)) "" else tolower(trimws(input$remembered_credential))
-      if (!grepl("^[0-9a-f]{64}$", credential)) {
-        session$sendCustomMessage("srma-dev-session", list(token = NULL))
-        return()
-      }
-      identity <- tryCatch(web_session(con, credential), error = function(e) NULL)
-      if (is.null(identity)) {
-        session$sendCustomMessage("srma-dev-session", list(token = NULL))
-        notice("Your saved local development session expired. Generate one new test session, then sign in once.")
-        return()
-      }
-      if (inherits(session, "ShinySession")) upload_root <- safe(web_bind_upload_root(session, settings))
-      token(credential)
-      notice("")
-    }, ignoreInit = TRUE)
 
+    # Manual test-credential sign-in remains available for non-development test
+    # environments. It is not rendered during the zero-touch local development flow.
     shiny::observeEvent(input$login, {
       credential <- if (is.null(input$credential)) "" else tolower(trimws(input$credential))
       identity <- safe(web_session(con, credential))
@@ -439,16 +560,12 @@ web_app <- function(settings) {
         if (inherits(session, "ShinySession")) upload_root <- safe(web_bind_upload_root(session, settings))
         token(credential)
         notice("")
-        if (isTRUE(remember_dev_session))
-          session$sendCustomMessage("srma-dev-session", list(token = credential))
         shiny::updateTextInput(session, "credential", value = "")
       }
     })
     shiny::observeEvent(input$logout, {
-      if (!is.null(safe(request("logout")))) {
+      if (!isTRUE(auto_dev_session) && !is.null(safe(request("logout")))) {
         token(NULL)
-        if (isTRUE(remember_dev_session))
-          session$sendCustomMessage("srma-dev-session", list(token = NULL))
         notice("Signed out. This session can no longer be used.")
       }
     })
@@ -481,7 +598,20 @@ web_app <- function(settings) {
               shiny::downloadButton("download", "Download selected output")),
             shiny::tabPanel(
               "Human Review Required",
-              shiny::uiOutput("human_decisions_ui")
+              shiny::uiOutput("human_decisions_ui"),
+              shiny::div(
+                class = "srma-human-wrap srma-human-details-static",
+                shiny::tags$details(
+                  class = "srma-human-details",
+                  shiny::tags$summary("Review details and canonical concepts"),
+                  shiny::div(
+                    class = "srma-human-details-body",
+                    shiny::selectInput("draft_job", "Review details source", c("Saved review configuration" = "")),
+                    shiny::actionButton("load_draft", "Load review details"),
+                    shiny::uiOutput("canonical_review")
+                  )
+                )
+              )
             )
           )
         )
@@ -941,7 +1071,19 @@ web_app <- function(settings) {
     }
 
     output$human_decisions_ui <- shiny::renderUI({
-      x <- state(); shiny::req(x, input$version)
+      # Human decision controls must remain stable while the user is typing.
+      # The general project state polls in the background every 1.5 seconds,
+      # so do not make this editable UI depend directly on that polling timer.
+      # Rebuild it only when the selected project/version changes or after an
+      # explicit workflow refresh (for example, after a saved decision).
+      refresh()
+      shiny::req(input$project, input$version)
+      # Fetch a fresh backend snapshot when this editable UI is explicitly
+      # rebuilt. Using isolate(state()) here can return the cached pre-save
+      # snapshot, because state() polls independently every 1.5 seconds.
+      # A direct view request keeps typing stable between refreshes while
+      # making a saved decision visible immediately.
+      x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
       pending <- x$gates[x$gates$version_id == input$version & x$gates$status == "PENDING", , drop = FALSE]
       config_gates <- pending[pending$gate_type == "configuration_human_review", , drop = FALSE]
       protocol_gates <- pending[pending$gate_type == "protocol_registration", , drop = FALSE]
@@ -973,16 +1115,10 @@ web_app <- function(settings) {
               "configuration_review",
               "Review configuration",
               "Confirm that the review question, eligibility criteria, outcomes, and selected databases represent the systematic review you intend to conduct.",
-              human_gate_applies(config_gates),
+              "literature search begins",
               "Reason / notes *"
             ),
-            if (nrow(protocol_gates)) srma_human_decision_card(
-              "protocol_review",
-              "Protocol registration",
-              "Confirm that the protocol registration decision and any supporting registry reference are correct before search-related workflow steps proceed.",
-              human_gate_applies(protocol_gates),
-              "Reason / protocol registration reference *"
-            ),
+            if (nrow(protocol_gates)) srma_protocol_registration_card(),
             if (nrow(other)) shiny::div(
               class = "srma-human-fallback",
               shiny::strong("Additional human review items"),
@@ -990,17 +1126,7 @@ web_app <- function(settings) {
               shiny::tableOutput("other_human_gates")
             )
           )
-        },
-        shiny::tags$details(
-          class = "srma-human-details",
-          shiny::tags$summary("Review details and canonical concepts"),
-          shiny::div(
-            class = "srma-human-details-body",
-            shiny::selectInput("draft_job", "Draft source for selected version", c("Human-provided saved draft" = "")),
-            shiny::actionButton("load_draft", "Load review details"),
-            shiny::uiOutput("canonical_review")
-          )
-        )
+        }
       )
     })
 
@@ -1060,15 +1186,40 @@ web_app <- function(settings) {
       }
     })
 
-    shiny::observeEvent(input$save_protocol_review, {
+    shiny::observeEvent(input$confirm_protocol_registration, {
+      status <- if (is.null(input$protocol_registration_status)) "" else as.character(input$protocol_registration_status)
+      if (!identical(status, "REGISTERED")) {
+        notice("The protocol registration gate remains pending until a completed registration is confirmed.")
+        return()
+      }
+
+      registry <- if (is.null(input$protocol_registry)) "" else trimws(as.character(input$protocol_registry))
+      reference <- if (is.null(input$protocol_registration_reference)) "" else trimws(as.character(input$protocol_registration_reference))
+      notes <- if (is.null(input$protocol_registration_notes)) "" else trimws(as.character(input$protocol_registration_notes))
+
+      if (!nzchar(registry) || !nzchar(reference)) {
+        notice("Choose the registry and enter the registration ID or URL before confirming registration.")
+        return()
+      }
+
+      registry_label <- if (identical(registry, "PROSPERO")) "PROSPERO" else "Other accepted registry"
+      rationale <- paste0(
+        "Registration status: Registered\n",
+        "Registry: ", registry_label, "\n",
+        "Registration ID or URL: ", reference,
+        if (nzchar(notes)) paste0("\nNotes: ", notes) else ""
+      )
+
       if (isTRUE(record_gate_group(
         "protocol_registration",
-        input$protocol_review_decision,
-        input$protocol_review_rationale,
-        "Protocol registration review recorded for this saved version."
+        "APPROVED",
+        rationale,
+        "Protocol registration confirmed for this saved version."
       ))) {
-        shiny::updateRadioButtons(session, "protocol_review_decision", selected = character())
-        shiny::updateTextAreaInput(session, "protocol_review_rationale", value = "")
+        shiny::updateRadioButtons(session, "protocol_registration_status", selected = character())
+        shiny::updateSelectInput(session, "protocol_registry", selected = "PROSPERO")
+        shiny::updateTextInput(session, "protocol_registration_reference", value = "")
+        shiny::updateTextAreaInput(session, "protocol_registration_notes", value = "")
       }
     })
 
@@ -1739,31 +1890,127 @@ web_app <- function(settings) {
     shiny::observe({
       x<-state();shiny::req(x,input$version)
       jobs<-x$jobs[x$jobs$version_id==input$version & x$jobs$operation=="initialize_project" & x$jobs$state=="COMPLETE",,drop=FALSE]
-      shiny::updateSelectInput(session,"draft_job",choices=c("Human-provided saved draft"="",if(nrow(jobs))setNames(jobs$id,paste("Prepared draft",jobs$created_at)) else character()),selected=shiny::isolate(input$draft_job))
+      shiny::updateSelectInput(session,"draft_job",choices=c("Saved review configuration"="",if(nrow(jobs))setNames(jobs$id,paste("Prepared canonical draft",jobs$created_at)) else character()),selected=shiny::isolate(input$draft_job))
     })
     shiny::observeEvent(input$load_draft, {
       shiny::req(input$project,input$version)
-      review<-safe(request("initialization_review",list(project_id=input$project,version_id=input$version,
-        job_id=if(is.null(input$draft_job)||!nzchar(input$draft_job))NULL else input$draft_job)))
-      draft_review(review)
+      shiny::withProgress(message = "Loading review details...", value = 0.2, {
+        cfg <- safe(request("configuration", list(project_id = input$project, version_id = input$version)))
+        if (is.null(cfg)) {
+          draft_review(NULL)
+          shiny::showNotification("Review details could not be loaded.", type = "error", duration = 5)
+          return()
+        }
+        shiny::incProgress(0.45)
+        job_id <- if (is.null(input$draft_job) || !nzchar(input$draft_job)) NULL else input$draft_job
+        canonical <- NULL
+        if (!is.null(job_id)) {
+          canonical <- safe(request("initialization_review", list(
+            project_id = input$project, version_id = input$version, job_id = job_id
+          )))
+        }
+        draft_review(list(
+          project_id = input$project,
+          version_id = input$version,
+          job_id = job_id,
+          configuration = cfg,
+          canonical = canonical
+        ))
+        shiny::incProgress(0.35)
+      })
     })
     output$canonical_review<-shiny::renderUI({
       r<-draft_review();shiny::req(r)
-      shiny::tagList(shiny::h4("Proposed configuration"),shiny::tags$pre(r$config),
-        shiny::h4("Proposed search concepts"),shiny::tags$pre(r$terms),
-        lapply(seq_along(r$decisions),function(i){d<-r$decisions[[i]];shiny::tagList(
-          shiny::h4(d$question),shiny::p(d$why_it_matters),
-          shiny::p(paste("Canonical recommendation:",d$recommended_option)),shiny::p(d$recommendation_rationale),
-          shiny::selectInput(paste0("canonical_decision_",i),"Your explicit choice",c("Choose an option"="",unlist(d$suggested_options))))}),
-        shiny::textAreaInput("activation_rationale","Review rationale"),
-        shiny::checkboxInput("approve_canonical","I reviewed this configuration, these concepts and all listed decisions",FALSE),
-        shiny::actionButton("activate_canonical","Approve and activate as a new saved version"))
+      cfg <- r$configuration
+      value_text <- function(x) {
+        if (is.null(x) || !length(x)) return("Not specified")
+        if (is.list(x) && !is.null(x$description)) x <- x$description
+        y <- trimws(paste(unlist(x), collapse = "; "))
+        if (nzchar(y)) y else "Not specified"
+      }
+      enabled_db <- names(Filter(function(x) if (is.list(x)) isTRUE(x$enabled) else isTRUE(x), cfg$search$databases))
+      search_start <- value_text(cfg$search$search_start_date)
+      search_end <- value_text(cfg$search$search_end_date)
+      if (identical(search_start, "Not specified")) search_start <- "Database inception"
+      if (identical(search_end, "Not specified")) search_end <- "Current / not specified"
+
+      canonical_block <- if (is.null(r$canonical)) {
+        shiny::div(
+          class = "srma-review-note",
+          shiny::strong("Canonical search concepts have not been prepared for this saved version yet."),
+          shiny::br(),
+          "That is expected for a review created in the setup wizard. Search concepts will be prepared and explicitly reviewed before literature search generation."
+        )
+      } else {
+        c <- r$canonical
+        shiny::tagList(
+          shiny::div(class = "srma-summary-section",
+            shiny::h4("Prepared canonical search concepts"),
+            shiny::tags$pre(c$terms)
+          ),
+          lapply(seq_along(c$decisions), function(i) {
+            d <- c$decisions[[i]]
+            shiny::div(class = "srma-summary-section",
+              shiny::h4(d$question),
+              shiny::p(d$why_it_matters),
+              shiny::p(paste("Canonical recommendation:", d$recommended_option)),
+              shiny::p(d$recommendation_rationale),
+              shiny::selectInput(
+                paste0("canonical_decision_", i), "Your explicit choice",
+                c("Choose an option" = "", unlist(d$suggested_options))
+              )
+            )
+          }),
+          shiny::textAreaInput("activation_rationale", "Review rationale"),
+          shiny::checkboxInput(
+            "approve_canonical",
+            "I reviewed this configuration, these concepts and all listed decisions",
+            FALSE
+          ),
+          shiny::actionButton("activate_canonical", "Approve and activate as a new saved version")
+        )
+      }
+
+      shiny::tagList(
+        shiny::div(class = "srma-summary-section",
+          shiny::h4("Saved review configuration"),
+          shiny::div(class = "srma-summary-grid",
+            summary_item("Review title", value_text(cfg$project$title), TRUE),
+            summary_item("Framework", value_text(cfg$research_question$framework)),
+            summary_item("Project identifier", value_text(cfg$project$project_id)),
+            summary_item("Review question", value_text(cfg$research_question$question), TRUE),
+            summary_item("Population", value_text(cfg$research_question$population), TRUE),
+            summary_item("Intervention / exposure", value_text(cfg$research_question$intervention), TRUE),
+            summary_item("Comparator", value_text(cfg$research_question$comparator), TRUE),
+            summary_item("Primary outcomes", value_text(cfg$research_question$outcomes$primary), TRUE),
+            summary_item("Secondary outcomes", value_text(cfg$research_question$outcomes$secondary), TRUE)
+          )
+        ),
+        shiny::div(class = "srma-summary-section",
+          shiny::h4("Eligibility"),
+          shiny::div(class = "srma-summary-grid",
+            summary_item("Study designs", value_text(cfg$eligibility$study_designs$include), TRUE),
+            summary_item("Inclusion criteria", value_text(cfg$eligibility$inclusion), TRUE),
+            summary_item("Exclusion criteria", value_text(cfg$eligibility$exclusion), TRUE),
+            summary_item("Language", value_text(cfg$eligibility$language_restriction), TRUE)
+          )
+        ),
+        shiny::div(class = "srma-summary-section",
+          shiny::h4("Search scope"),
+          shiny::div(class = "srma-summary-grid",
+            summary_item("Databases", if (length(enabled_db)) paste(enabled_db, collapse = ", ") else "Not specified"),
+            summary_item("Search period", paste(search_start, "to", search_end))
+          )
+        ),
+        canonical_block
+      )
     })
     shiny::observeEvent(input$activate_canonical, {
-      r<-draft_review();shiny::req(r,input$project,input$version)
+      r<-draft_review();shiny::req(r,input$project,input$version,r$canonical)
+      c <- r$canonical
       if(!identical(r$project_id,input$project)||!identical(r$version_id,input$version)) {notice("Reload the draft for this selected version.");return()}
-      selections<-setNames(lapply(seq_along(r$decisions),function(i)input[[paste0("canonical_decision_",i)]]),
-        vapply(r$decisions,`[[`,character(1),"decision_id"))
+      selections<-setNames(lapply(seq_along(c$decisions),function(i)input[[paste0("canonical_decision_",i)]]),
+        vapply(c$decisions,`[[`,character(1),"decision_id"))
       saved<-safe(request("activate_draft",list(project_id=r$project_id,version_id=r$version_id,job_id=r$job_id,
         selections=selections,rationale=input$activation_rationale,human_approved=isTRUE(input$approve_canonical))))
       if(!is.null(saved)){draft_review(NULL);refresh(refresh()+1L);notice("Approved canonical inputs saved as a new immutable version. Select it and record its protocol decisions before search generation.")}
