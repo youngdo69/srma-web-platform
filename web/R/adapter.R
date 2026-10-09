@@ -30,7 +30,7 @@ srma_run <- function(settings, project_id, operation, payload, job_id, project_d
   reg <- web_registry()[[operation]]
   if (is.null(reg) || !isTRUE(reg$enabled) || length(payload))
     return(web_result(operation, project_id, job_id, "FAILED", "This operation is not enabled in this release.", engine_version, "VALIDATION_FAILED"))
-  if (operation %in% c("validate_database_inputs",web_pipeline_operations())) {
+  if (operation %in% c("validate_database_inputs","prepare_prospero",web_pipeline_operations())) {
     if(operation %in% web_pipeline_operations() && !web_provider_ready(settings))
       return(web_result(operation,project_id,job_id,"USER_ACTION_REQUIRED",
         "Ask the operator to configure the provider credential. Saved work is retained.",engine_version,"USER_ACTION_REQUIRED"))
@@ -53,10 +53,52 @@ web_science_settings <- function(settings, verify = TRUE) {
   library <- Sys.getenv("SRMA_SCIENTIFIC_LIBRARY", "")
   web_assert(nzchar(script) && file.exists(script) && nzchar(library) && dir.exists(library),
     "The scientific processing environment needs maintenance.", "DEPENDENCY_FAILED")
-  scientific <- settings; scientific$rscript <- script; scientific$engine_library <- normalizePath(library)
-  if (verify) {
+
+  scientific <- settings
+  scientific$rscript <- script
+  scientific$engine_library <- normalizePath(library)
+
+  # Local-development UAT seam only.
+  #
+  # The release/production path remains strict: runtime_probe must match the
+  # canonical lock exactly.  For local development, an operator may explicitly
+  # permit the already-installed scientific runtime to execute canonical code
+  # even when runtime_probe reports DEPENDENCY_FAILED (for example, an R-version
+  # mismatch against renv.lock).  The probe must still launch successfully;
+  # SYSTEM_FAILED and other failures remain blocked.
+  #
+  # This seam does NOT constitute canonical-runtime acceptance.  Child-process
+  # provenance continues to record the actual R version used, and release gates
+  # remain independent.
+  dev_runtime_seam <- identical(tolower(as.character(settings$mode)), "development") &&
+    identical(Sys.getenv("SRMA_DEV_ALLOW_UNVERIFIED_SCIENTIFIC_RUNTIME", ""), "1")
+
+  if (isTRUE(verify)) {
     probe <- web_engine_call(scientific, list(action = "runtime_probe"))
-    web_assert(probe$status == "COMPLETE", "The scientific processing environment needs maintenance.", "DEPENDENCY_FAILED")
+    exact_runtime <- identical(probe$status, "COMPLETE")
+    allowed_dev_mismatch <- isTRUE(dev_runtime_seam) &&
+      identical(probe$status, "FAILED") &&
+      identical(probe$error_code, "DEPENDENCY_FAILED")
+
+    if (!isTRUE(exact_runtime) && !isTRUE(allowed_dev_mismatch)) {
+      diagnostic <- paste(
+        "runtime_probe status:", as.character(probe$status %||% "UNKNOWN"),
+        "error_code:", as.character(probe$error_code %||% ""),
+        "R:", as.character(probe$R %||% "")
+      )
+      web_error(
+        "DEPENDENCY_FAILED",
+        "The scientific processing environment needs maintenance.",
+        diagnostic
+      )
+    }
+
+    scientific$runtime_acceptance <- if (isTRUE(exact_runtime)) {
+      "EXACT_CANONICAL_RUNTIME"
+    } else {
+      "DEVELOPMENT_UNVERIFIED_RUNTIME"
+    }
   }
+
   scientific
 }

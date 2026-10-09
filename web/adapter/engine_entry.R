@@ -13,6 +13,61 @@ result <- tryCatch({
   e <- new.env(parent = globalenv())
   sys.source(file.path(request$engine_root, "R/utils/config_utils.R"), envir = e)
   sys.source(file.path(request$engine_root, "R/utils/path_utils.R"), envir = e)
+
+  seed_initialization <- identical(request$action, "initialize_project") &&
+    file.exists("config/project_seed.yml") &&
+    !file.exists("config/project_config.yml")
+  seed_activation <- identical(request$action, "activate_initialization") &&
+    !file.exists("config/project_config.yml") &&
+    file.exists("config/generated/project_config_draft.yml") &&
+    file.exists("config/generated/search_terms_draft.yml") &&
+    file.exists("config/generated/initialization_decisions_required.yml")
+
+  if (seed_initialization) {
+    seed_path <- web_inside("config/project_seed.yml", root)
+    manifest <- setNames(list(web_sha(seed_path)), "config/project_seed.yml")
+    source(file.path(request$engine_root, "web/adapter/initialization.R"))
+    produced <- web_initialization_action(request, config = NULL, root = root)
+    web_result(
+      request$action,
+      request$project_id,
+      request$job_id,
+      "COMPLETE",
+      "Toolkit-generated review plan is ready for Human Review.",
+      request$engine_version,
+      artifacts = produced$outputs,
+      provenance = list(
+        input_hashes = manifest,
+        initialization_source = "CANONICAL_PROJECT_SEED",
+        R = R.version.string
+      )
+    )
+  } else if (seed_activation) {
+    activation_inputs <- c(
+      if (file.exists("config/project_seed.yml")) "config/project_seed.yml" else character(),
+      "config/generated/project_config_draft.yml",
+      "config/generated/search_terms_draft.yml",
+      "config/generated/initialization_decisions_required.yml"
+    )
+    activation_manifest <- setNames(lapply(activation_inputs, function(p) web_sha(web_inside(p, root))), activation_inputs)
+    source(file.path(request$engine_root, "web/adapter/initialization.R"))
+    draft_config <- yaml::read_yaml("config/generated/project_config_draft.yml")
+    produced <- web_initialization_action(request, config = draft_config, root = root)
+    web_result(
+      request$action,
+      request$project_id,
+      request$job_id,
+      "COMPLETE",
+      "Human-reviewed canonical inputs were activated.",
+      request$engine_version,
+      artifacts = produced$outputs,
+      provenance = list(
+        input_hashes = activation_manifest,
+        activation_source = "HUMAN_REVIEWED_CANONICAL_DRAFT",
+        R = R.version.string
+      )
+    )
+  } else {
   if (identical(request$action, "write_configuration")) {
     source(file.path(request$engine_root, "web/adapter/wizard.R"))
     previous <- if (file.exists("config/project_config.yml")) yaml::read_yaml("config/project_config.yml") else NULL
@@ -33,8 +88,8 @@ result <- tryCatch({
   source(file.path(request$engine_root,"web/R/manuscript_render.R"))
   source(file.path(request$engine_root,"web/R/final_qc.R"))
   source(file.path(request$engine_root,"web/R/final_qc_checks.R"))
-  configuration_only <- request$action=="run_final_qc" || request$action %in% names(web_c2_operations()) || request$action %in% names(web_c1_operations()) || request$action %in% names(web_b2_operations()) || request$action %in% c("initialize_project", "prepare_manual_concepts", "activate_initialization", "inspect_configuration", "write_configuration", "database_context", "validate_database_inputs", "generate_search", "retrieve_pubmed")
-  inputs <- c("config/project_config.yml", paths$search_terms_file)
+  configuration_only <- request$action=="run_final_qc" || request$action %in% names(web_c2_operations()) || request$action %in% names(web_c1_operations()) || request$action %in% names(web_b2_operations()) || request$action %in% c("initialize_project", "prepare_prospero", "prepare_manual_concepts", "activate_initialization", "inspect_configuration", "write_configuration", "database_context", "validate_database_inputs", "generate_search", "retrieve_pubmed")
+  inputs <- if (identical(request$action, "prepare_prospero")) "config/project_config.yml" else c("config/project_config.yml", paths$search_terms_file)
   if (!configuration_only) inputs <- c(inputs,
     unlist(paths[paste0(e$get_enabled_databases(config, validate = FALSE), "_search")], use.names = FALSE))
   if (configuration_only) {
@@ -67,6 +122,9 @@ result <- tryCatch({
     web_result(request$action,request$project_id,request$job_id,"COMPLETE",
       "Canonical draft processing finished. Explicit human review is required before search generation.",request$engine_version,
       artifacts=produced$outputs,provenance=list(input_hashes=manifest,R=R.version.string))
+  } else if (identical(request$action, "prepare_prospero")) {
+    source(file.path(request$engine_root, "web/adapter/prospero.R"))
+    web_prepare_prospero_canonical(request, config, root, manifest)
   } else if (request$action %in% c("generate_search", "retrieve_pubmed")) {
     source(file.path(request$engine_root, "web/adapter/search.R"))
     produced <- web_canonical_search(request$action, e, paths, root, request$engine_root)
@@ -103,6 +161,7 @@ result <- tryCatch({
       "Search checks completed. Test each search in its database next.", request$engine_version,
       artifacts = lapply(outputs, function(p) list(path = normalizePath(p), logical_name = basename(p), type = "validation")),
       started = started, provenance = list(input_hashes = manifest, engine_script_sha256 = web_sha(file.path(request$engine_root, "R/12_validate_search_strategies.R")), R = R.version.string))
+  }
   }
 }, error = function(e) {
   code <- if (inherits(e, "srma_web_error")) e$code else if (request$action == "inspect") "VALIDATION_FAILED" else "ENGINE_FAILED"

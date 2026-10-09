@@ -103,7 +103,7 @@ srma_protocol_registration_card <- function() {
       shiny::div(
         shiny::div(class = "srma-human-card-title", "Protocol registration"),
         shiny::p(
-          "Select the current registration status. The registration gate remains open until a completed registration is confirmed.",
+          "Select the current registration status. Literature search may begin once registration has been submitted and is in progress, or once registration is complete.",
           class = "srma-human-card-description"
         )
       ),
@@ -164,10 +164,18 @@ srma_protocol_registration_card <- function() {
     shiny::conditionalPanel(
       condition = "input.protocol_registration_status == 'IN_PROGRESS'",
       shiny::div(
-        class = "srma-protocol-guidance srma-protocol-guidance-warn",
-        shiny::strong("Registration remains pending."),
+        class = "srma-protocol-guidance srma-protocol-guidance-ok",
+        shiny::strong("Registration submission is in progress."),
         shiny::br(),
-        "Complete the registration and return here to enter the registry reference. No Human Gate is closed at this stage."
+        "If the PROSPERO submission has been initiated, the literature-search workflow can continue while the final registration ID is pending."
+      ),
+      shiny::div(
+        class = "srma-human-card-actions",
+        shiny::actionButton(
+          "confirm_protocol_in_progress",
+          "Continue to literature search",
+          class = "btn-primary"
+        )
       )
     ),
     shiny::conditionalPanel(
@@ -176,7 +184,57 @@ srma_protocol_registration_card <- function() {
         class = "srma-protocol-guidance srma-protocol-guidance-block",
         shiny::strong("Registration is required before the literature-search workflow can continue."),
         shiny::br(),
-        "The Human Gate will remain pending until a completed registration is confirmed."
+        "The toolkit can prepare a near-complete PROSPERO draft from the saved review. Human-only fields remain clearly marked for your review."
+      ),
+      shiny::div(
+        class = "srma-human-card-actions srma-prospero-start-actions",
+        shiny::actionButton(
+          "prepare_prospero_registration",
+          "Prepare PROSPERO registration",
+          class = "btn-primary"
+        )
+      )
+    ),
+    shiny::uiOutput("prospero_preparation_ui")
+  )
+}
+
+
+srma_job_progress_ui <- function(job) {
+  if (is.null(job) || !nrow(job)) return(NULL)
+
+  progress <- if ("progress" %in% names(job)) suppressWarnings(as.numeric(job$progress[[1L]])) else 0
+  if (!is.finite(progress)) progress <- 0
+  progress <- max(0, min(100, progress))
+
+  state <- if ("state" %in% names(job)) as.character(job$state[[1L]]) else ""
+  active <- state %in% c("QUEUED", "RUNNING")
+  state_label <- switch(
+    state,
+    QUEUED = "Waiting for worker",
+    RUNNING = "Initialization Agent running",
+    COMPLETE = "Review plan ready",
+    FAILED = "Preparation stopped",
+    USER_ACTION_REQUIRED = "Action required",
+    state
+  )
+
+  shiny::div(
+    class = "srma-job-progress",
+    shiny::div(
+      class = "srma-job-progress-head",
+      shiny::span(state_label),
+      shiny::strong(paste0(as.integer(round(progress)), "%"))
+    ),
+    shiny::div(
+      class = "srma-job-progress-track",
+      shiny::div(
+        class = paste("srma-job-progress-bar", if (isTRUE(active)) "active" else ""),
+        style = paste0("width:", progress, "%;"),
+        `aria-valuemin` = "0",
+        `aria-valuemax` = "100",
+        `aria-valuenow` = as.character(as.integer(round(progress))),
+        role = "progressbar"
       )
     )
   )
@@ -278,7 +336,11 @@ web_app <- function(settings) {
         .srma-dashboard-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin:2px 0 24px; }
         .srma-dashboard-heading h2 { margin:0 0 6px; font-size:34px; font-weight:750; letter-spacing:-0.02em; color:#172b3f; }
         .srma-dashboard-heading p { margin:0; color:#64748b; font-size:18px; line-height:1.55; }
-        .srma-dashboard-selector { display:grid; grid-template-columns:minmax(0,1fr) 230px auto; gap:16px; align-items:end; padding:22px 24px; margin-bottom:22px; border:1px solid #dfe7ef; border-radius:16px; background:#f8fbfe; }
+
+        .srma-dashboard-selector-actions { display:flex; gap:10px; align-items:flex-end; }
+        .srma-dashboard-selector-actions .btn { flex:1 1 auto; }
+        .srma-delete-warning { margin:14px 0; padding:14px 16px; border-radius:10px; background:#fff4f4; border:1px solid #fecaca; color:#8b1e1e; line-height:1.55; }
+.srma-dashboard-selector { display:grid; grid-template-columns:minmax(0,1fr) 230px auto; gap:16px; align-items:end; padding:22px 24px; margin-bottom:22px; border:1px solid #dfe7ef; border-radius:16px; background:#f8fbfe; }
         .srma-dashboard-selector .form-group, .srma-dashboard-selector .shiny-input-container { width:100% !important; margin-bottom:0 !important; }
         .srma-dashboard-selector label { font-size:16px; font-weight:600; color:#3a5168; margin-bottom:7px; }
         .srma-dashboard-selector .form-control, .srma-dashboard-selector .form-select { min-height:48px; font-size:17px; border-radius:9px; }
@@ -339,13 +401,96 @@ web_app <- function(settings) {
         .srma-human-complete { padding:30px; border:1px solid #cfe6d8; border-radius:16px; background:#f0f8f4; color:#326b4d; }
         .srma-human-complete h3 { margin:0 0 8px; font-size:24px; }
         .srma-human-fallback { margin-top:18px; padding:16px 18px; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; }
+        .srma-review-record { margin-top:24px; padding:26px 28px; border:1px solid #dfe7ef; border-radius:16px; background:#fff; box-shadow:0 6px 22px rgba(15,23,42,.04); }
+        .srma-review-record h3 { margin:0 0 8px; font-size:26px; color:#17344e; font-weight:750; }
+        .srma-review-record > p { margin:0 0 18px; color:#64748b; font-size:16px; }
+        .srma-record-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-bottom:18px; }
+        .srma-record-card { padding:18px; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; }
+        .srma-record-card h4 { margin:0 0 10px; font-size:19px; color:#21425d; font-weight:700; }
+        .srma-record-meta { color:#64748b; font-size:14px; margin-bottom:10px; }
+        .srma-record-rationale { white-space:pre-wrap; margin:0; color:#334155; font-size:15px; line-height:1.55; }
+        .srma-prospero-panel { margin-top:18px; padding:18px; border:1px solid #cfe0ec; border-radius:12px; background:#f7fbfe; }
+        .srma-prospero-panel h4 { margin:0 0 8px; font-size:20px; color:#174f75; font-weight:750; }
+        .srma-prospero-metrics { display:flex; flex-wrap:wrap; gap:10px; margin:14px 0; }
+        .srma-prospero-metric { padding:9px 12px; border-radius:9px; background:#fff; border:1px solid #dbe7ef; font-size:14px; color:#425b70; }
+        .srma-prospero-required { margin:14px 0 0; padding-left:20px; color:#475569; }
+        .srma-prospero-required li { margin:6px 0; line-height:1.45; }
+        .srma-prospero-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:16px; }
+        .srma-prospero-link { display:inline-flex; align-items:center; min-height:42px; padding:8px 14px; border:1px solid #0d6efd; border-radius:8px; color:#0d6efd; text-decoration:none; font-weight:650; background:#fff; }
+        .srma-info { margin:14px 0; padding:14px 16px; border-radius:10px; line-height:1.5; }
+        .srma-search-status { display:flex; align-items:flex-start; gap:10px; margin:10px 0 18px; padding:12px 14px; border:1px solid #d7e0e8; border-radius:10px; font-size:15px; line-height:1.45; font-weight:650; }
+        .srma-search-status::before { content:''; flex:0 0 10px; width:10px; height:10px; margin-top:5px; border-radius:50%; background:#94a3b8; }
+        .srma-search-status.status-running { background:#eef6ff; border-color:#a9cef2; color:#15558a; }
+        .srma-search-status.status-running::before { background:#2474a8; box-shadow:0 0 0 4px rgba(36,116,168,.10); }
+        .srma-search-status.status-complete { background:#eef8f1; border-color:#b9dfc4; color:#245c34; }
+        .srma-search-status.status-complete::before { background:#3c8b61; box-shadow:0 0 0 4px rgba(60,139,97,.10); }
+        .srma-search-status.status-action { background:#fff8e8; border-color:#efd79a; color:#795600; }
+        .srma-search-status.status-action::before { background:#d39a22; box-shadow:0 0 0 4px rgba(211,154,34,.10); }
+        .srma-search-status.status-failed { background:#fff1f1; border-color:#efb8b8; color:#8a2525; }
+        .srma-search-status.status-failed::before { background:#c84b4b; box-shadow:0 0 0 4px rgba(200,75,75,.10); }
+        .srma-search-status.status-idle { background:#f8fafc; border-color:#e2e8f0; color:#64748b; font-weight:500; }
+        .srma-handoff { margin:18px 0 22px; padding:16px; border:1px solid #dbe5ee; border-radius:12px; background:#fbfdff; }
+        .srma-handoff h4 { margin:0 0 6px; font-size:18px; }
+        .srma-handoff-intro { margin:0 0 14px; color:#64748b; }
+        .srma-handoff-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+        .srma-handoff-step { min-height:118px; padding:12px; border:1px solid #dbe5ee; border-radius:10px; background:#fff; }
+        .srma-handoff-step.complete { background:#f0f9f3; border-color:#b9dfc4; }
+        .srma-handoff-step.running { background:#eef6ff; border-color:#a9cef2; }
+        .srma-handoff-step.action { background:#fff8e8; border-color:#efd79a; }
+        .srma-handoff-step.failed { background:#fff1f1; border-color:#efb8b8; }
+        .srma-handoff-step.pending { background:#f8fafc; border-color:#e2e8f0; }
+        .srma-handoff-step-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+        .srma-handoff-step-title { font-weight:750; color:#243746; }
+        .srma-handoff-badge { display:inline-flex; align-items:center; min-height:24px; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:750; letter-spacing:.01em; background:#e2e8f0; color:#475569; }
+        .srma-handoff-step.complete .srma-handoff-badge { background:#d9f0df; color:#245c34; }
+        .srma-handoff-step.running .srma-handoff-badge { background:#d9ebfb; color:#15558a; }
+        .srma-handoff-step.action .srma-handoff-badge { background:#f8e8bc; color:#795600; }
+        .srma-handoff-step.failed .srma-handoff-badge { background:#f5d6d6; color:#8a2525; }
+        .srma-handoff-step p { margin:0; color:#566575; line-height:1.42; }
+        .srma-handoff-next { margin-top:14px; padding:14px; border-radius:10px; border:1px solid #b9dfc4; background:#eef8f1; color:#245c34; }
+        .srma-handoff-next strong { display:block; margin-bottom:4px; font-size:15px; }
+        .srma-handoff-next .btn { margin-top:10px; }
+        .srma-handoff-guidance { margin-top:14px; padding:12px 14px; border-radius:10px; border:1px solid #dbe5ee; background:#fff; color:#475569; }
+        .srma-handoff-guidance strong { color:#243746; }
+        .srma-search-action[disabled], .srma-search-action.disabled { opacity:.48; cursor:not-allowed; pointer-events:none; }
+        .srma-results-library { margin:10px 0 24px; }
+        .srma-results-header { margin-bottom:14px; padding:16px; border:1px solid #dbe5ee; border-radius:12px; background:#fbfdff; }
+        .srma-results-header h3 { margin:0 0 6px; }
+        .srma-results-header p { margin:0; color:#64748b; line-height:1.5; }
+        .srma-results-summary { display:flex; flex-wrap:wrap; gap:10px; margin:14px 0; }
+        .srma-results-metric { min-width:150px; padding:10px 12px; border:1px solid #dbe5ee; border-radius:10px; background:#fff; }
+        .srma-results-metric strong { display:block; font-size:20px; line-height:1.1; color:#243746; }
+        .srma-results-metric span { display:block; margin-top:3px; font-size:12px; color:#64748b; }
+        .srma-results-current { margin:12px 0; padding:10px 12px; border-radius:10px; background:#eef6ff; border:1px solid #a9cef2; color:#15558a; }
+        .srma-results-empty { padding:16px; border:1px dashed #cbd5e1; border-radius:10px; color:#64748b; background:#f8fafc; }
+        .srma-results-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin-top:16px; }
+        .srma-results-actions .form-group { margin-bottom:0; min-width:360px; flex:1 1 520px; }
+        .srma-results-help { margin-top:10px; color:#64748b; font-size:13px; }
+        .srma-pubmed-files-note { margin-top:12px; padding:12px 14px; border:1px solid #b9dfc4; border-radius:10px; background:#f0f9f3; color:#245c34; }
+        .srma-pubmed-files-note .btn { margin-top:8px; }
+        .srma-info-blue { background:#eef7ff; border:1px solid #c9e2f7; color:#284f6d; }
+        .srma-info-amber { background:#fff8e8; border:1px solid #f1ddb0; color:#6d5420; }
+        .srma-canonical-launcher { max-width:1120px; margin:24px auto 0; }
+        .srma-summary-label-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:7px; }
+        .srma-summary-label-row .srma-summary-label { margin-bottom:0; }
+        .srma-inline-edit { padding:3px 10px; min-height:30px; border-radius:7px; font-size:13px; font-weight:700; }
+        .srma-job-progress { margin-top:14px; }
+        .srma-job-progress-head { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:7px; color:#31556f; font-size:15px; }
+        .srma-job-progress-track { width:100%; height:12px; overflow:hidden; border-radius:999px; background:#dce8f1; }
+        .srma-job-progress-bar { position:relative; height:100%; border-radius:999px; background:#2474a8; transition:width .35s ease; overflow:hidden; }
+        .srma-job-progress-bar.active::after { content:''; position:absolute; inset:0; width:45%; transform:translateX(-130%); background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent); animation:srma-progress-sweep 1.25s linear infinite; }
+        @keyframes srma-progress-sweep { to { transform:translateX(300%); } }
         @media (max-width: 980px) {
           .srma-dashboard-selector { grid-template-columns:1fr 1fr; }
+          .srma-dashboard-selector-actions { grid-column:1 / -1; }
           .srma-dashboard-selector .btn { grid-column:1 / -1; justify-self:start; }
           .srma-dashboard-cards { grid-template-columns:1fr; }
           .srma-workflow-map { grid-template-columns:repeat(2,minmax(0,1fr)); }
+          .srma-handoff-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
         }
         @media (max-width: 768px) {
+
+          .srma-handoff-grid { grid-template-columns:1fr; }
           .srma-shell { padding:16px 12px 32px; }
           .srma-header { display:block; }
           .srma-identity { text-align:left; margin-top:14px; }
@@ -354,7 +499,7 @@ web_app <- function(settings) {
           .srma-wizard-progress { grid-template-columns:1fr; }
           .srma-wizard-step { text-align:left; }
           .srma-wizard-card { padding:22px 18px; }
-          .srma-form-grid, .srma-summary-grid { grid-template-columns:1fr; }
+          .srma-form-grid, .srma-summary-grid, .srma-record-grid { grid-template-columns:1fr; }
           .srma-form-full, .srma-summary-item.full { grid-column:1; }
           .srma-wizard-footer { align-items:stretch; flex-direction:column; }
           .srma-wizard-footer-right { width:100%; margin-left:0; }
@@ -383,6 +528,8 @@ web_app <- function(settings) {
           .srma-dashboard-heading h2 { font-size:29px; }
           .srma-dashboard-selector { grid-template-columns:1fr; padding:18px; }
           .srma-dashboard-selector .btn { grid-column:auto; width:100%; }
+          .srma-dashboard-selector-actions { width:100%; flex-direction:column; }
+          .srma-dashboard-selector-actions .btn { width:100%; }
           .srma-dashboard-card { min-height:160px; }
           .srma-workflow-map { grid-template-columns:1fr; }
 
@@ -413,11 +560,15 @@ web_app <- function(settings) {
     nav_section <- shiny::reactiveVal("dashboard")
     project_available <- shiny::reactiveVal(FALSE)
     pending_project_selection <- shiny::reactiveVal(NULL)
+    pending_version_selection <- shiny::reactiveVal(NULL)
+    seed_handoff <- shiny::reactiveVal(NULL)
+    delete_review_target <- shiny::reactiveVal(NULL)
     wizard_step <- shiny::reactiveVal(1L)
     wizard_errors <- shiny::reactiveVal(character())
     wizard_values <- shiny::reactiveValues(
       workspace = NULL,
       title = "",
+      topic = "",
       canonical_id = paste0("review-", substr(web_id(), 1, 12)),
       investigator = "",
       framework = "PICO",
@@ -518,14 +669,14 @@ web_app <- function(settings) {
         issued <- safe(issue_local_dev_session())
         if (!is.null(issued)) {
           if (inherits(session, "ShinySession"))
-            upload_root <- safe(web_bind_upload_root(session, settings))
+            upload_root <<- safe(web_bind_upload_root(session, settings))
           token(issued)
           notice("")
         }
       } else if (is.null(token()) && settings$mode %in% c("beta", "production") && isTRUE(settings$trusted_auth_proxy)) {
         issued <- safe(web_proxy_sign_in(con, settings, session$request))
         if (!is.null(issued)) {
-          if (inherits(session, "ShinySession")) upload_root <- safe(web_bind_upload_root(session, settings))
+          if (inherits(session, "ShinySession")) upload_root <<- safe(web_bind_upload_root(session, settings))
           token(issued); notice("")
         }
       }
@@ -557,7 +708,7 @@ web_app <- function(settings) {
       credential <- if (is.null(input$credential)) "" else tolower(trimws(input$credential))
       identity <- safe(web_session(con, credential))
       if (!is.null(identity)) {
-        if (inherits(session, "ShinySession")) upload_root <- safe(web_bind_upload_root(session, settings))
+        if (inherits(session, "ShinySession")) upload_root <<- safe(web_bind_upload_root(session, settings))
         token(credential)
         notice("")
         shiny::updateTextInput(session, "credential", value = "")
@@ -592,26 +743,34 @@ web_app <- function(settings) {
             shiny::tabPanel("Workflow Progress", shiny::tableOutput("workflow")),
             shiny::tabPanel("Current Action", shiny::textOutput("next_action"),
               shiny::actionButton("run", "Check existing search strategies"), shiny::tableOutput("jobs")),
-            shiny::tabPanel("Search / Study Import", shiny::uiOutput("search_import")),
+            shiny::tabPanel(
+              "Search / Study Import",
+              shiny::uiOutput("search_import"),
+              shiny::uiOutput("canonical_review_launcher")
+            ),
             web_b2_ui(), web_c1_ui(), web_c2_ui(), web_c3_ui(), web_c4_ui(), web_c5_ui(), web_c6_ui(),
-            shiny::tabPanel("Results / Artifacts", shiny::selectInput("artifact", "Available output", character()),
-              shiny::downloadButton("download", "Download selected output")),
+            shiny::tabPanel(
+              "Results / Artifacts",
+              shiny::div(
+                class = "srma-results-library",
+                shiny::uiOutput("results_library_header"),
+                shiny::tableOutput("results_library_table"),
+                shiny::div(
+                  class = "srma-results-actions",
+                  shiny::selectInput("artifact", "Result file to download", character()),
+                  shiny::downloadButton("download", "Download selected result")
+                ),
+                shiny::p(
+                  "This Results Library is the review's user-facing results folder. It shows registered workflow outputs with version and provenance, rather than exposing temporary worker directories.",
+                  class = "srma-results-help"
+                )
+              )
+            ),
             shiny::tabPanel(
               "Human Review Required",
               shiny::uiOutput("human_decisions_ui"),
-              shiny::div(
-                class = "srma-human-wrap srma-human-details-static",
-                shiny::tags$details(
-                  class = "srma-human-details",
-                  shiny::tags$summary("Review details and canonical concepts"),
-                  shiny::div(
-                    class = "srma-human-details-body",
-                    shiny::selectInput("draft_job", "Review details source", c("Saved review configuration" = "")),
-                    shiny::actionButton("load_draft", "Load review details"),
-                    shiny::uiOutput("canonical_review")
-                  )
-                )
-              )
+              shiny::uiOutput("seed_canonical_review"),
+              shiny::uiOutput("human_review_record")
             )
           )
         )
@@ -642,7 +801,7 @@ web_app <- function(settings) {
 
     nav_labels <- list(
       dashboard = character(),
-      review_setup = c("new_review" = "New / Edit Review", "Human Review Required" = "Human Decisions"),
+      review_setup = c("new_review" = "New Review", "Human Review Required" = "Human Decisions"),
       studies = c("Search / Study Import" = "Search & Import", "Screening / Evidence" = "Screening & Evidence"),
       analysis = c("Meta-analysis" = "Meta-analysis"),
       manuscript = c("Manuscript" = "Manuscript"),
@@ -745,6 +904,9 @@ web_app <- function(settings) {
       section <- input$nav_section_target
       if (!section %in% names(nav_sections)) return()
       if (!isTRUE(project_available()) && section %in% c("studies", "analysis", "manuscript", "review_export")) return()
+      # Action confirmations are page-local. Do not carry an old confirmation
+      # banner across unrelated top-level sections.
+      notice("")
       nav_section(section)
       target <- unname(nav_defaults[[section]])
       shiny::updateTabsetPanel(session, "page", selected = target)
@@ -755,6 +917,10 @@ web_app <- function(settings) {
       valid <- unlist(nav_sections, use.names = FALSE)
       if (!target %in% valid) return()
       if (!isTRUE(project_available()) && nav_requires_project(target)) return()
+      notice("")
+      # Human Review is deliberately rebuilt on entry so a hidden/suspended
+      # render cannot leave the user on an empty white panel.
+      if (identical(target, "Human Review Required")) refresh(refresh() + 1L)
       nav_section(nav_section_for_page(target))
       shiny::updateTabsetPanel(session, "page", selected = target)
     }, ignoreInit = TRUE)
@@ -762,6 +928,25 @@ web_app <- function(settings) {
     shiny::observeEvent(input$page, {
       nav_section(nav_section_for_page(input$page))
     }, ignoreInit = FALSE)
+
+    # A newly saved project seed is selected asynchronously because the project
+    # and version selectors are rebuilt from the persistent backend.  Do not
+    # clear the user's seed form until both selectors actually point at the new
+    # immutable seed version.  Once they do, hand the user to Human Decisions.
+    # This avoids the confusing blank Stage 1 screen that occurred when a
+    # credential-dependent initialization request could not be queued.
+    shiny::observe({
+      handoff <- seed_handoff()
+      if (is.null(handoff)) return()
+      if (!srma_has_text(input$project) || !srma_has_text(input$version)) return()
+      if (!identical(as.character(input$project[[1L]]), handoff$project_id)) return()
+      if (!identical(as.character(input$version[[1L]]), handoff$version_id)) return()
+
+      nav_section("review_setup")
+      shiny::updateTabsetPanel(session, "page", selected = "Human Review Required")
+      reset_wizard(keep_workspace = TRUE)
+      seed_handoff(NULL)
+    })
 
     output$my_projects_content <- shiny::renderUI({
       shiny::req(token())
@@ -804,7 +989,21 @@ web_app <- function(settings) {
             choices = character(),
             width = "100%"
           ),
-          shiny::actionButton("edit", "Edit as new version", class = "btn-outline-secondary")
+          shiny::div(
+            class = "srma-dashboard-selector-actions",
+            shiny::actionButton(
+              "edit",
+              "Edit",
+              class = "btn-outline-secondary",
+              title = "Edit the selected saved version. Saving changes creates a new immutable version."
+            ),
+            shiny::actionButton(
+              "delete_review",
+              "Archive entire review",
+              class = "btn-outline-danger",
+              title = "Archives the entire Current review, including every saved version. The Saved version selector does not limit this action."
+            )
+          )
         ),
         shiny::uiOutput("dashboard_cards"),
         shiny::uiOutput("dashboard_workflow"),
@@ -813,9 +1012,82 @@ web_app <- function(settings) {
     })
 
     shiny::observeEvent(input$start_first_review, {
+      editing(NULL)
+      reset_wizard(keep_workspace = TRUE)
       nav_section("review_setup")
       shiny::updateTabsetPanel(session, "page", selected = "new_review")
     })
+
+    shiny::observeEvent(input$delete_review, {
+      shiny::req(token(), srma_has_text(input$project))
+      projects <- safe(request("projects")); shiny::req(!is.null(projects))
+      row <- projects[projects$id == input$project, , drop = FALSE]
+      shiny::req(nrow(row) == 1L)
+      delete_review_target(list(id = as.character(row$id[[1L]]), title = as.character(row$title[[1L]])))
+      shiny::showModal(shiny::modalDialog(
+        title = "Archive the entire current review?",
+        shiny::p(shiny::strong(row$title[[1L]])),
+        shiny::div(
+          class = "srma-delete-warning",
+          shiny::tagList(
+            shiny::strong("Scope: the entire review — not only the selected Saved version."),
+            shiny::br(),
+            "All saved versions of this review will disappear from the active Current review list. Saved versions, artifacts, and audit history are retained internally for research integrity."
+          )
+        ),
+        shiny::textInput("delete_review_confirmation", "Type DELETE REVIEW to confirm", value = ""),
+        footer = shiny::tagList(
+          shiny::modalButton("Cancel"),
+          shiny::actionButton("confirm_delete_review", "Archive entire review", class = "btn-danger")
+        ),
+        easyClose = FALSE
+      ))
+    })
+
+    shiny::observeEvent(input$confirm_delete_review, {
+      target <- delete_review_target(); shiny::req(!is.null(target))
+      confirmation <- if (is.null(input$delete_review_confirmation)) "" else trimws(input$delete_review_confirmation)
+      if (!identical(confirmation, "DELETE REVIEW")) {
+        notice("Type DELETE REVIEW exactly to confirm archiving the entire current review.")
+        return()
+      }
+      deleted <- safe(request("delete_project", list(project_id = target$id, confirmation = "DELETE")))
+      if (is.null(deleted)) return()
+      shiny::removeModal()
+      delete_review_target(NULL)
+      projects <- safe(request("projects"))
+      if (!is.null(projects) && nrow(projects)) {
+        next_id <- as.character(projects$id[[1L]])
+        pending_project_selection(next_id)
+        project_available(TRUE)
+      } else {
+        pending_project_selection(NULL)
+        project_available(FALSE)
+      }
+
+      # Do not freeze project/version here. The Dashboard selector is rendered
+      # reactively; freezing these inputs during the same flush can abort the
+      # render and leave a blank page after a successful delete.
+      refresh(refresh() + 1L)
+      nav_section("dashboard")
+      shiny::updateTabsetPanel(session, "page", selected = "my_projects")
+
+      # Apply the next valid review only after the refreshed Dashboard controls
+      # exist in the browser. If no reviews remain, empty_reviews_ui() is shown.
+      if (!is.null(projects) && nrow(projects)) {
+        next_id <- as.character(projects$id[[1L]])
+        session$onFlushed(function() {
+          shiny::updateSelectInput(
+            session,
+            "project",
+            choices = setNames(projects$id, projects$title),
+            selected = next_id
+          )
+        }, once = TRUE)
+      }
+
+      notice(paste0("Review deleted from the active workspace: ", target$title))
+    }, ignoreInit = TRUE)
 
     shiny::observe({
       shiny::req(token())
@@ -874,12 +1146,65 @@ web_app <- function(settings) {
       shiny::req(token(), srma_has_text(input$project))
       safe(request("view", list(project_id = input$project)))
     })
+
+    # Stable Search / Study Import context. The general project-state poll remains
+    # available for lightweight status outputs, but the large Search UI must not
+    # re-render every 1.5 seconds because Shiny fades recalculating UI outputs.
+    search_view <- shiny::reactive({
+      refresh()
+      shiny::req(token(), srma_has_text(input$project), srma_has_text(input$version))
+      safe(request("view", list(project_id = input$project)))
+    })
+
+    # The editable Human Review UI intentionally does not depend on the global
+    # 1.5-second state poll. While a SEED initialization job is active, poll only
+    # that job so progress can update without destabilizing later review inputs.
+    seed_initialization_status <- shiny::reactive({
+      shiny::req(token(), srma_has_text(input$project), srma_has_text(input$version))
+      refresh()
+      x <- safe(request("view", list(project_id = input$project)))
+      shiny::req(x)
+
+      version_row <- x$versions[x$versions$id == input$version, , drop = FALSE]
+      if (!nrow(version_row) ||
+          !"kind" %in% names(version_row) ||
+          !identical(as.character(version_row$kind[[1L]]), "SEED")) {
+        return(NULL)
+      }
+
+      jobs <- x$jobs[
+        x$jobs$version_id == input$version &
+          x$jobs$operation == "initialize_project",
+        , drop = FALSE
+      ]
+      if (nrow(jobs) && "created_at" %in% names(jobs)) {
+        jobs <- jobs[order(jobs$created_at, decreasing = TRUE), , drop = FALSE]
+      }
+
+      latest <- if (nrow(jobs)) jobs[1L, , drop = FALSE] else jobs
+      latest_state <- if (nrow(latest) && "state" %in% names(latest)) as.character(latest$state[[1L]]) else ""
+
+      if (latest_state %in% c("QUEUED", "RUNNING")) {
+        shiny::invalidateLater(1200, session)
+      }
+
+      list(x = x, version_row = version_row, job = latest, state = latest_state)
+    })
+
     shiny::observeEvent(list(input$project, refresh()), {
       shiny::req(token(), srma_has_text(input$project))
       x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
       choices <- if (nrow(x$versions)) setNames(x$versions$id, paste("Version", x$versions$version)) else character()
       current_version <- shiny::isolate(input$version)
-      selected_version <- if (srma_has_text(current_version) && current_version %in% x$versions$id) current_version else if (nrow(x$versions)) x$versions$id[[1L]] else character()
+      pending_version <- pending_version_selection()
+      selected_version <- if (srma_has_text(pending_version) && pending_version %in% x$versions$id) {
+        pending_version
+      } else if (srma_has_text(current_version) && current_version %in% x$versions$id) {
+        current_version
+      } else if (nrow(x$versions)) {
+        x$versions$id[[1L]]
+      } else character()
+      if (srma_has_text(pending_version) && identical(selected_version, pending_version)) pending_version_selection(NULL)
       shiny::updateSelectInput(session, "version", choices = choices, selected = selected_version)
     })
 
@@ -893,8 +1218,74 @@ web_app <- function(settings) {
       active_jobs <- if (nrow(jobs)) jobs[jobs$state %in% c("QUEUED", "RUNNING"), , drop = FALSE] else jobs
       version_row <- if (nrow(x$versions) && nzchar(version_id)) x$versions[x$versions$id == version_id, , drop = FALSE] else x$versions[0, , drop = FALSE]
       version_label <- if (nrow(version_row) && "version" %in% names(version_row)) paste("Version", version_row$version[[1L]]) else "Saved draft"
+      version_kind <- if (nrow(version_row) && "kind" %in% names(version_row)) as.character(version_row$kind[[1L]]) else "CANONICAL"
+      origin_kind <- if (nrow(version_row) && "origin_kind" %in% names(version_row)) as.character(version_row$origin_kind[[1L]]) else ""
+      init_jobs <- if (nrow(jobs)) jobs[jobs$operation == "initialize_project", , drop = FALSE] else jobs
+      init_active <- if (nrow(init_jobs)) init_jobs[init_jobs$state %in% c("QUEUED", "RUNNING"), , drop = FALSE] else init_jobs
+      init_complete <- if (nrow(init_jobs)) init_jobs[init_jobs$state == "COMPLETE", , drop = FALSE] else init_jobs
+      init_failed <- if (nrow(init_jobs)) init_jobs[init_jobs$state %in% c("FAILED", "USER_ACTION_REQUIRED"), , drop = FALSE] else init_jobs
+      prospero_active <- if (nrow(jobs)) jobs[
+        jobs$operation == "prepare_prospero" &
+          jobs$state %in% c("QUEUED", "RUNNING"),
+        , drop = FALSE
+      ] else jobs
+      prospero_failed <- if (nrow(jobs)) jobs[
+        jobs$operation == "prepare_prospero" &
+          jobs$state == "FAILED",
+        , drop = FALSE
+      ] else jobs
 
-      next_action <- if (nrow(pending)) {
+      next_action <- if (identical(version_kind, "SEED")) {
+        if (nrow(init_active)) {
+          list(
+            stage = "Review setup",
+            title = "Toolkit is preparing the review plan",
+            description = "The canonical Project Initialization Agent is inferring the protocol structure, search concepts, and any decisions that genuinely need human review.",
+            button = "Open Human Review",
+            target = "Human Review Required"
+          )
+        } else if (nrow(init_complete)) {
+          list(
+            stage = "Human review",
+            title = "Review the toolkit-generated plan",
+            description = "The canonical draft is ready. Review the generated protocol, search concepts, and only the unresolved methodological choices before activation.",
+            button = "Review generated plan",
+            target = "Human Review Required"
+          )
+        } else if (nrow(init_failed)) {
+          list(
+            stage = "Review setup",
+            title = "Review-plan preparation needs attention",
+            description = "Your project seed is saved. Open Human Review to see the preparation status and retry after the reported requirement is addressed.",
+            button = "Open Human Review",
+            target = "Human Review Required"
+          )
+        } else {
+          list(
+            stage = "Review setup",
+            title = "Prepare the review plan",
+            description = "Start the canonical Initialization Agent from your saved research topic. The toolkit will infer the remaining review structure before asking for Human Review.",
+            button = "Prepare review plan",
+            target = "Human Review Required"
+          )
+        }
+      } else if (nrow(prospero_active)) {
+        list(
+          stage = "Protocol registration",
+          title = "PROSPERO draft is being prepared",
+          description = "The background worker is creating the registration draft. You can leave this page and return to Human Decisions to see its current status.",
+          button = "View registration status",
+          target = "Human Review Required"
+        )
+      } else if (nrow(prospero_failed)) {
+        list(
+          stage = "Protocol registration",
+          title = "PROSPERO draft needs another attempt",
+          description = "The registration draft was not created. Return to Human Decisions and try preparation again.",
+          button = "Retry PROSPERO preparation",
+          target = "Human Review Required"
+        )
+      } else if (nrow(pending)) {
         list(
           stage = "Human review",
           title = "Complete required human decisions",
@@ -924,17 +1315,24 @@ web_app <- function(settings) {
         x = x,
         version_id = version_id,
         version_label = version_label,
+        version_kind = version_kind,
+        origin_kind = origin_kind,
         pending = pending,
         pending_decisions = pending_decisions,
         jobs = jobs,
         active_jobs = active_jobs,
+        init_active = init_active,
+        init_complete = init_complete,
+        init_failed = init_failed,
         next_action = next_action
       )
     })
 
     output$dashboard_cards <- shiny::renderUI({
       ctx <- dashboard_context()
-      attention <- ctx$pending_decisions + nrow(ctx$active_jobs)
+      seed_review_ready <- identical(ctx$version_kind, "SEED") && nrow(ctx$init_complete) > 0L
+      seed_action_needed <- identical(ctx$version_kind, "SEED") && nrow(ctx$init_active) == 0L
+      attention <- ctx$pending_decisions + nrow(ctx$active_jobs) + if (seed_action_needed) 1L else 0L
       attention_text <- if (attention == 0L) "Nothing urgent" else paste(attention, if (attention == 1L) "item" else "items")
       shiny::div(
         class = "srma-dashboard-cards",
@@ -957,7 +1355,7 @@ web_app <- function(settings) {
           shiny::div(class = paste("srma-attention-number", if (attention == 0L) "clear" else ""), if (attention == 0L) "✓" else attention),
           shiny::div(class = "srma-card-value", attention_text),
           shiny::p(
-            if (ctx$pending_decisions > 0L) paste(ctx$pending_decisions, "human review decision(s) pending.") else if (nrow(ctx$active_jobs)) paste(nrow(ctx$active_jobs), "background task(s) active.") else "No pending human decisions or active background jobs.",
+            if (seed_review_ready) "The toolkit-generated review plan is ready for Human Review." else if (identical(ctx$version_kind, "SEED") && nrow(ctx$init_failed)) "Review-plan preparation needs attention." else if (identical(ctx$version_kind, "SEED") && !nrow(ctx$init_active)) "The project seed is waiting for review-plan preparation." else if (ctx$pending_decisions > 0L) paste(ctx$pending_decisions, "human review decision(s) pending.") else if (nrow(ctx$active_jobs)) paste(nrow(ctx$active_jobs), "background task(s) active.") else "No pending human decisions or active background jobs.",
             class = "srma-card-text"
           )
         )
@@ -969,7 +1367,9 @@ web_app <- function(settings) {
       human_pending <- nrow(ctx$pending) > 0L
       processing <- nrow(ctx$active_jobs) > 0L
       labels <- c("Review setup", "Human review", "Studies", "Analysis", "Manuscript", "Final QC", "Export")
-      classes <- if (human_pending) {
+      classes <- if (identical(ctx$version_kind, "SEED")) {
+        if (nrow(ctx$init_complete)) c("complete", "current", rep("upcoming", 5L)) else c("current", rep("upcoming", 6L))
+      } else if (human_pending) {
         c("complete", "current", rep("upcoming", 5L))
       } else if (processing) {
         c("complete", "complete", "current", rep("upcoming", 4L))
@@ -1034,6 +1434,8 @@ web_app <- function(settings) {
     shiny::observeEvent(input$dashboard_continue, {
       ctx <- dashboard_context()
       target <- ctx$next_action$target
+      notice("")
+      if (identical(target, "Human Review Required")) refresh(refresh() + 1L)
       nav_section(nav_section_for_page(target))
       shiny::updateTabsetPanel(session, "page", selected = target)
     })
@@ -1084,6 +1486,95 @@ web_app <- function(settings) {
       # A direct view request keeps typing stable between refreshes while
       # making a saved decision visible immediately.
       x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
+      version_row <- x$versions[x$versions$id == input$version, , drop = FALSE]
+      is_seed <- nrow(version_row) && "kind" %in% names(version_row) && identical(as.character(version_row$kind[[1L]]), "SEED")
+
+      if (is_seed) {
+        init_status <- seed_initialization_status()
+        latest <- if (!is.null(init_status)) init_status$job else x$jobs[0, , drop = FALSE]
+        latest_state <- if (!is.null(init_status)) init_status$state else ""
+        loaded <- draft_review()
+        loaded_current <- !is.null(loaded) &&
+          identical(loaded$project_id, input$project) &&
+          identical(loaded$version_id, input$version) &&
+          nrow(latest) &&
+          identical(loaded$job_id, as.character(latest$id[[1L]]))
+
+        status_ui <- if (latest_state %in% c("QUEUED", "RUNNING")) {
+          message_text <- if ("message" %in% names(latest) &&
+                              !is.na(latest$message[[1L]]) &&
+                              nzchar(trimws(as.character(latest$message[[1L]])))) {
+            as.character(latest$message[[1L]])
+          } else if (identical(latest_state, "QUEUED")) {
+            "The request is waiting for the background worker."
+          } else {
+            "The canonical Initialization Agent is generating and validating the review plan."
+          }
+
+          shiny::div(
+            class = "srma-info srma-info-blue",
+            shiny::strong("The toolkit is preparing the review plan."),
+            shiny::br(),
+            message_text,
+            srma_job_progress_ui(latest)
+          )
+        } else if (identical(latest_state, "COMPLETE")) {
+          shiny::div(
+            class = "srma-human-complete",
+            shiny::h3("Toolkit-generated review plan is ready"),
+            shiny::p(
+              if (isTRUE(loaded_current))
+                "The generated plan has been loaded automatically below. Review the protocol configuration, search concepts, and unresolved methodological choices."
+              else
+                "The generated plan is ready. It is loading automatically for Human Review."
+            ),
+            srma_job_progress_ui(latest),
+            if (!isTRUE(loaded_current))
+              shiny::actionButton("load_seed_plan", "Load review plan", class = "btn-primary")
+          )
+        } else if (latest_state %in% c("FAILED", "USER_ACTION_REQUIRED")) {
+          shiny::div(
+            class = "srma-protocol-guidance srma-protocol-guidance-block",
+            shiny::strong("Review-plan preparation needs attention."),
+            shiny::br(),
+            if ("message" %in% names(latest) &&
+                !is.na(latest$message[[1L]]) &&
+                nzchar(trimws(as.character(latest$message[[1L]]))))
+              as.character(latest$message[[1L]])
+            else
+              "The project seed is saved, but canonical initialization did not finish.",
+            srma_job_progress_ui(latest),
+            shiny::div(
+              style = "margin-top:10px;",
+              shiny::actionButton("prepare_seed_plan", "Try preparing the review plan again", class = "btn-primary")
+            )
+          )
+        } else {
+          shiny::div(
+            class = "srma-info srma-info-amber",
+            shiny::strong("The project seed is saved; the review plan has not been prepared yet."),
+            shiny::br(),
+            "Start the canonical Initialization Agent. The toolkit will infer the remaining review structure automatically.",
+            shiny::div(style = "margin-top:10px;", shiny::actionButton("prepare_seed_plan", "Prepare review plan", class = "btn-primary"))
+          )
+        }
+
+        return(shiny::div(
+          class = "srma-human-wrap",
+          shiny::div(
+            class = "srma-human-heading",
+            shiny::h2("Human Review"),
+            shiny::p("New reviews begin from a minimal project seed. The scientific engine prepares the protocol proposal first; Human Review follows only for the generated plan and unresolved decisions.")
+          ),
+          shiny::div(
+            class = "srma-review-record",
+            shiny::h3("Agent-driven Review Setup"),
+            shiny::p("Canonical sequence: project seed → Project Initialization Agent → structural validation → Human Review → activated immutable configuration → protocol registration."),
+            status_ui
+          )
+        ))
+      }
+
       pending <- x$gates[x$gates$version_id == input$version & x$gates$status == "PENDING", , drop = FALSE]
       config_gates <- pending[pending$gate_type == "configuration_human_review", , drop = FALSE]
       protocol_gates <- pending[pending$gate_type == "protocol_registration", , drop = FALSE]
@@ -1129,6 +1620,156 @@ web_app <- function(settings) {
         }
       )
     })
+
+    # Keep the Human Review container rendered while another section is open.
+    # Its editable controls still rebuild only on explicit refresh/project/version
+    # changes, so typing stability is preserved.
+    shiny::outputOptions(output, "human_decisions_ui", suspendWhenHidden = FALSE)
+
+    shiny::observeEvent(input$prepare_seed_plan, {
+      shiny::req(input$project, input$version)
+      id <- safe(request("submit", list(
+        project_id = input$project,
+        version_id = input$version,
+        operation = "initialize_project"
+      )))
+      if (!is.null(id)) {
+        refresh(refresh() + 1L)
+        notice("Canonical review-plan preparation requested. The Project Initialization Agent is running in the background.")
+      }
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$load_seed_plan, {
+      shiny::req(input$project, input$version)
+      x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
+      jobs <- x$jobs[
+        x$jobs$version_id == input$version &
+          x$jobs$operation == "initialize_project" &
+          x$jobs$state == "COMPLETE",
+        , drop = FALSE
+      ]
+      if (nrow(jobs) && "created_at" %in% names(jobs)) jobs <- jobs[order(jobs$created_at, decreasing = TRUE), , drop = FALSE]
+      if (!nrow(jobs)) {
+        notice("The toolkit-generated review plan is not ready yet.")
+        return()
+      }
+      job_id <- as.character(jobs$id[[1L]])
+      canonical <- safe(request("initialization_review", list(
+        project_id = input$project,
+        version_id = input$version,
+        job_id = job_id
+      )))
+      if (is.null(canonical)) return()
+      cfg <- tryCatch(
+        yaml::yaml.load(canonical$config, eval.expr = FALSE),
+        error = function(e) NULL
+      )
+      if (is.null(cfg)) {
+        notice("The generated review configuration could not be parsed. Ask the operator to inspect the initialization artifact.")
+        return()
+      }
+      draft_review(list(
+        project_id = input$project,
+        version_id = input$version,
+        job_id = job_id,
+        configuration = cfg,
+        canonical = canonical,
+        agent_driven = TRUE
+      ))
+      notice("Toolkit-generated review plan loaded. Review the proposal and resolve only the listed Human Decisions before activation.")
+    }, ignoreInit = TRUE)
+
+    output$human_review_record <- shiny::renderUI({
+      refresh()
+      shiny::req(input$project, input$version)
+      x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
+      decided <- x$gates[
+        x$gates$version_id == input$version &
+          x$gates$status %in% c("APPROVED", "REJECTED") &
+          x$gates$gate_type %in% c("configuration_human_review", "protocol_registration"),
+        , drop = FALSE
+      ]
+      if (!nrow(decided)) return(NULL)
+      pending_initial <- x$gates[
+        x$gates$version_id == input$version &
+          x$gates$status == "PENDING" &
+          x$gates$gate_type %in% c("configuration_human_review", "protocol_registration"),
+        , drop = FALSE
+      ]
+
+      cfg <- safe(request("configuration", list(project_id = input$project, version_id = input$version)))
+      value_text <- function(v) {
+        if (is.null(v) || !length(v)) return("Not specified")
+        if (is.list(v) && !is.null(v$description)) v <- v$description
+        y <- trimws(paste(unlist(v), collapse = "; "))
+        if (nzchar(y)) y else "Not specified"
+      }
+      record_summary_item <- function(label, value, full = FALSE) {
+        shiny::div(
+          class = paste("srma-summary-item", if (isTRUE(full)) "full" else ""),
+          shiny::span(class = "srma-summary-label", label),
+          shiny::div(class = "srma-summary-value", value)
+        )
+      }
+      gate_record <- function(type, title) {
+        rows <- decided[decided$gate_type == type, , drop = FALSE]
+        if (!nrow(rows)) return(NULL)
+        row <- rows[1, , drop = FALSE]
+        reviewer <- if ("reviewer_name" %in% names(row) && !is.na(row$reviewer_name[[1]]) && nzchar(row$reviewer_name[[1]])) row$reviewer_name[[1]] else row$reviewer_id[[1]]
+        when <- if ("decided_at" %in% names(row) && !is.na(row$decided_at[[1]])) row$decided_at[[1]] else ""
+        rationale <- if ("rationale" %in% names(row) && !is.na(row$rationale[[1]]) && nzchar(row$rationale[[1]])) row$rationale[[1]] else "No rationale recorded."
+        shiny::div(
+          class = "srma-record-card",
+          shiny::h4(title),
+          shiny::div(class = "srma-record-meta", paste(row$status[[1]], "·", reviewer, if (nzchar(when)) paste("·", when) else "")),
+          shiny::p(rationale, class = "srma-record-rationale")
+        )
+      }
+
+      config_summary <- if (is.null(cfg)) NULL else shiny::div(
+        class = "srma-summary-section",
+        shiny::h4("Saved review configuration"),
+        shiny::div(
+          class = "srma-summary-grid",
+          record_summary_item("Review title", value_text(cfg$project$title), TRUE),
+          record_summary_item("Review question", value_text(cfg$research_question$question), TRUE),
+          record_summary_item("Population", value_text(cfg$research_question$population), TRUE),
+          record_summary_item("Intervention / exposure", value_text(cfg$research_question$intervention), TRUE),
+          record_summary_item("Comparator", value_text(cfg$research_question$comparator), TRUE),
+          record_summary_item("Primary outcomes", value_text(cfg$research_question$outcomes$primary), TRUE),
+          record_summary_item("Study designs", value_text(cfg$eligibility$study_designs$include), TRUE),
+          record_summary_item("Databases", paste(names(Filter(function(z) if (is.list(z)) isTRUE(z$enabled) else isTRUE(z), cfg$search$databases)), collapse = ", "), TRUE)
+        )
+      )
+
+      shiny::div(
+        class = "srma-human-wrap",
+        shiny::div(
+          class = "srma-review-record",
+          shiny::h3("Human Review Record"),
+          shiny::p("Completed decisions for this immutable saved version are retained here as a read-only audit record."),
+          shiny::div(
+            class = "srma-record-grid",
+            gate_record("configuration_human_review", "Review configuration"),
+            gate_record("protocol_registration", "Protocol registration")
+          ),
+          config_summary,
+          if (!nrow(pending_initial)) shiny::div(
+            class = "srma-human-card-actions",
+            shiny::actionButton(
+              "continue_to_canonical_search",
+              "Continue to Studies",
+              class = "btn-primary"
+            )
+          )
+        )
+      )
+    })
+
+    shiny::observeEvent(input$continue_to_canonical_search, {
+      nav_section("studies")
+      shiny::updateTabsetPanel(session, "page", selected = "Search / Study Import")
+    }, ignoreInit = TRUE)
 
     output$other_human_gates <- shiny::renderTable({
       x <- state(); shiny::req(x, input$version)
@@ -1186,6 +1827,28 @@ web_app <- function(settings) {
       }
     })
 
+    shiny::observeEvent(input$confirm_protocol_in_progress, {
+      status <- if (is.null(input$protocol_registration_status)) "" else as.character(input$protocol_registration_status)
+      if (!identical(status, "IN_PROGRESS")) return()
+
+      rationale <- paste0(
+        "Registration status: In progress\n",
+        "Registry: PROSPERO\n",
+        "External submission has been initiated; final registration ID is pending."
+      )
+
+      if (isTRUE(record_gate_group(
+        "protocol_registration",
+        "APPROVED",
+        rationale,
+        "PROSPERO submission recorded as in progress. Literature search can continue while the final registration ID is pending."
+      ))) {
+        shiny::updateRadioButtons(session, "protocol_registration_status", selected = character())
+        nav_section("studies")
+        shiny::updateTabsetPanel(session, "page", selected = "Search / Study Import")
+      }
+    }, ignoreInit = TRUE)
+
     shiny::observeEvent(input$confirm_protocol_registration, {
       status <- if (is.null(input$protocol_registration_status)) "" else as.character(input$protocol_registration_status)
       if (!identical(status, "REGISTERED")) {
@@ -1214,23 +1877,332 @@ web_app <- function(settings) {
         "protocol_registration",
         "APPROVED",
         rationale,
-        "Protocol registration confirmed for this saved version."
+        "Protocol registration confirmed for this saved version. Literature search can continue."
       ))) {
         shiny::updateRadioButtons(session, "protocol_registration_status", selected = character())
         shiny::updateSelectInput(session, "protocol_registry", selected = "PROSPERO")
         shiny::updateTextInput(session, "protocol_registration_reference", value = "")
         shiny::updateTextAreaInput(session, "protocol_registration_notes", value = "")
+        nav_section("studies")
+        shiny::updateTabsetPanel(session, "page", selected = "Search / Study Import")
       }
     })
+
+    shiny::observeEvent(input$prepare_prospero_registration, {
+      shiny::req(input$project, input$version)
+      id <- safe(request("submit", list(
+        project_id = input$project,
+        version_id = input$version,
+        operation = "prepare_prospero"
+      )))
+      if (!is.null(id)) {
+        refresh(refresh() + 1L)
+        notice("PROSPERO preparation requested. The background worker will create the registration draft; you may leave this page while it runs.")
+      }
+    })
+
+    output$prospero_preparation_ui <- shiny::renderUI({
+      shiny::invalidateLater(1800, session)
+      shiny::req(input$project, input$version)
+      x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
+      status <- if (is.list(x$prospero) && input$version %in% names(x$prospero)) x$prospero[[input$version]] else NULL
+      if (is.null(status) || identical(status$state, "NOT_STARTED")) return(NULL)
+
+      if (status$state %in% c("QUEUED", "RUNNING")) {
+        return(shiny::div(
+          class = "srma-prospero-panel",
+          shiny::h4("PROSPERO preparation"),
+          shiny::p(status$message),
+          shiny::div(class = "srma-prospero-metric", paste0("Progress: ", status$progress, "%"))
+        ))
+      }
+
+      if (identical(status$state, "FAILED")) {
+        return(shiny::div(
+          class = "srma-protocol-guidance srma-protocol-guidance-warn",
+          shiny::strong("PROSPERO draft was not created."),
+          shiny::br(),
+          "You can try Prepare PROSPERO registration again. If repeated attempts do not complete, ask the operator to check the processing service."
+        ))
+      }
+
+      counts <- status$counts
+      metric <- function(key, label) {
+        value <- if (is.list(counts) && !is.null(counts[[key]])) counts[[key]] else 0L
+        shiny::span(class = "srma-prospero-metric", paste0(label, ": ", value))
+      }
+      required <- status$user_required
+      required_items <- if (is.list(required) && length(required)) {
+        shiny::tags$ul(
+          class = "srma-prospero-required",
+          lapply(required, function(item) {
+            label <- if (!is.null(item$label) && nzchar(item$label)) item$label else item$key
+            section <- if (!is.null(item$section) && nzchar(item$section)) paste0(" — ", item$section) else ""
+            shiny::tags$li(paste0(label, section))
+          })
+        )
+      } else {
+        shiny::p("No USER REQUIRED fields were reported by the canonical draft generator.")
+      }
+
+      shiny::div(
+        class = "srma-prospero-panel",
+        shiny::h4("PROSPERO draft ready"),
+        shiny::p("The canonical toolkit prepared a near-complete registration workbook. Review every AUTO field and complete each USER REQUIRED item before external submission."),
+        shiny::div(
+          class = "srma-prospero-metrics",
+          metric("AUTO_POLICY", "AUTO policy"),
+          metric("AUTO_INFERRED", "AUTO inferred"),
+          metric("AUTO+EDITED", "AUTO + edited"),
+          metric("USER_REQUIRED", "USER REQUIRED"),
+          metric("SYSTEM_OUTPUT", "System output")
+        ),
+        shiny::strong("Items that still need human input"),
+        required_items,
+        shiny::p(
+          "Download the working workbook, complete/verify the marked fields, and submit the registration at PROSPERO. After submission is initiated, select Registration in progress to continue to search preparation; a completed registration can be recorded once the final ID is available."
+        ),
+        shiny::div(
+          class = "srma-prospero-actions",
+          if (is.character(status$draft_artifact_id) && length(status$draft_artifact_id) == 1L && nzchar(status$draft_artifact_id)) shiny::downloadButton("prospero_draft_download", "Download PROSPERO draft"),
+          shiny::tags$a(
+            class = "srma-prospero-link",
+            href = "https://www.crd.york.ac.uk/prospero/",
+            target = "_blank",
+            rel = "noopener noreferrer",
+            "Open PROSPERO registration"
+          )
+        )
+      )
+    })
+
+    output$prospero_draft_download <- shiny::downloadHandler(
+      filename = function() "prospero_autofilled.xlsx",
+      content = function(file) {
+        shiny::req(input$project, input$version)
+        x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
+        status <- if (is.list(x$prospero) && input$version %in% names(x$prospero)) x$prospero[[input$version]] else NULL
+        shiny::req(status, status$draft_artifact_id)
+        ok <- safe(request("download", list(
+          project_id = input$project,
+          artifact_id = status$draft_artifact_id,
+          destination = file
+        )))
+        if (is.null(ok)) stop("The PROSPERO draft is unavailable.", call. = FALSE)
+      }
+    )
 
     shiny::observeEvent(input$run, {
       shiny::req(input$project, input$version)
       id <- safe(request("submit", list(project_id = input$project, version_id = input$version)))
       if (!is.null(id)) notice("Request saved. Processing continues when you leave this page.")
     })
-    shiny::observe({x <- state(); shiny::req(x)
-      shiny::updateSelectInput(session, "artifact", choices = if (nrow(x$artifacts)) setNames(x$artifacts$id, paste(x$artifacts$logical_name, "— version", x$artifacts$version)) else character(), selected = shiny::isolate(input$artifact))
+    results_operation_label <- function(operation) {
+      labels <- c(
+        initialize_project = "Review setup",
+        prepare_prospero = "PROSPERO",
+        generate_search = "Search strategies",
+        retrieve_pubmed = "PubMed retrieval",
+        validate_database_inputs = "Database preflight",
+        merge_deduplicate = "Merge & deduplication",
+        prepare_screening = "Screening preparation",
+        finalize_screening = "Screening finalization",
+        register_fulltext = "Full-text review",
+        finalize_included_studies = "Included studies",
+        extract_data = "Data extraction",
+        assess_risk_of_bias = "Risk of bias",
+        run_meta_analysis = "Meta-analysis",
+        generate_figures = "Figures",
+        generate_tables = "Tables",
+        generate_manuscript = "Manuscript",
+        run_final_qc = "Final QC",
+        build_release_package = "Release package"
+      )
+      operation <- as.character(operation)
+      hit <- unname(labels[operation])
+      missing <- is.na(hit) | !nzchar(hit)
+      hit[missing] <- gsub("_", " ", operation[missing], fixed = TRUE)
+      hit
+    }
+
+    results_rows <- shiny::reactive({
+      x <- state()
+      shiny::req(x)
+      a <- x$artifacts
+      if (is.null(a) || !nrow(a)) return(data.frame())
+
+      if (!"job_id" %in% names(a)) a$job_id <- ""
+      if (!"version_id" %in% names(a)) a$version_id <- ""
+      if (!"type" %in% names(a)) a$type <- ""
+      if (!"status" %in% names(a)) a$status <- ""
+      if (!"created_at" %in% names(a)) a$created_at <- ""
+
+      operations <- rep("", nrow(a))
+      if (!is.null(x$jobs) && nrow(x$jobs) && all(c("id", "operation") %in% names(x$jobs))) {
+        idx <- match(a$job_id, x$jobs$id)
+        ok <- !is.na(idx)
+        operations[ok] <- as.character(x$jobs$operation[idx[ok]])
+      }
+
+      version_number <- rep("", nrow(a))
+      if (!is.null(x$versions) && nrow(x$versions) && all(c("id", "version") %in% names(x$versions))) {
+        idx <- match(a$version_id, x$versions$id)
+        ok <- !is.na(idx)
+        version_number[ok] <- as.character(x$versions$version[idx[ok]])
+      }
+
+      current <- if (srma_has_text(input$version)) {
+        as.character(a$version_id) == as.character(input$version[[1L]])
+      } else {
+        rep(FALSE, nrow(a))
+      }
+      current[is.na(current)] <- FALSE
+      created <- as.character(a$created_at)
+      created[is.na(created)] <- ""
+
+      data.frame(
+        artifact_id = as.character(a$id),
+        current = current,
+        stage = results_operation_label(operations),
+        file = basename(as.character(a$logical_name)),
+        type = as.character(a$type),
+        version = ifelse(nzchar(version_number), paste0("v", version_number), ""),
+        status = as.character(a$status),
+        created = created,
+        stringsAsFactors = FALSE
+      )
     })
+
+    shiny::observe({
+      rows <- results_rows()
+      choices <- if (nrow(rows)) {
+        order_idx <- order(!rows$current, -xtfrm(rows$created))
+        rows2 <- rows[order_idx, , drop = FALSE]
+        labels <- paste0(
+          ifelse(rows2$current, "CURRENT · ", ""),
+          rows2$stage, " · ", rows2$file,
+          ifelse(nzchar(rows2$version), paste0(" · ", rows2$version), "")
+        )
+        setNames(rows2$artifact_id, labels)
+      } else {
+        character()
+      }
+
+      current_selected <- shiny::isolate(input$artifact)
+      selected <- if (!is.null(current_selected) && current_selected %in% unname(choices)) {
+        current_selected
+      } else if (length(choices)) {
+        unname(choices[[1L]])
+      } else {
+        character()
+      }
+
+      shiny::updateSelectInput(
+        session,
+        "artifact",
+        choices = choices,
+        selected = selected
+      )
+    })
+    output$results_library_header <- shiny::renderUI({
+      x <- state()
+      shiny::req(x)
+
+      rows <- results_rows()
+      current_rows <- if (nrow(rows)) rows[rows$current, , drop = FALSE] else rows
+
+      version_label <- ""
+      if (!is.null(input$version) && nzchar(input$version) &&
+          !is.null(x$versions) && nrow(x$versions) &&
+          all(c("id", "version") %in% names(x$versions))) {
+        hit <- x$versions[x$versions$id == input$version, , drop = FALSE]
+        if (nrow(hit)) version_label <- paste0("Version ", hit$version[[1L]])
+      }
+
+      shiny::div(
+        class = "srma-results-header",
+        shiny::h3("Results Library"),
+        shiny::p(
+          "Review and download the files produced by the SR-MA workflow. Current-version outputs are shown first; prior-version outputs remain available for provenance."
+        ),
+        shiny::div(
+          class = "srma-results-summary",
+          shiny::div(
+            class = "srma-results-metric",
+            shiny::strong(nrow(rows)),
+            shiny::span("registered result files")
+          ),
+          shiny::div(
+            class = "srma-results-metric",
+            shiny::strong(nrow(current_rows)),
+            shiny::span("files in selected version")
+          )
+        ),
+        if (nzchar(version_label)) shiny::div(
+          class = "srma-results-current",
+          shiny::strong(paste0("Selected: ", version_label)),
+          " — files belonging to this immutable review version are marked CURRENT below."
+        ),
+        if (!nrow(rows)) shiny::div(
+          class = "srma-results-empty",
+          "No registered result files are available yet."
+        )
+      )
+    })
+
+    output$results_library_table <- shiny::renderTable({
+      rows <- results_rows()
+      if (!nrow(rows)) return(NULL)
+
+      rows <- rows[order(!rows$current, -xtfrm(rows$created)), , drop = FALSE]
+      data.frame(
+        Current = ifelse(rows$current, "CURRENT", ""),
+        Stage = rows$stage,
+        File = rows$file,
+        Type = rows$type,
+        Version = rows$version,
+        Status = rows$status,
+        Created = rows$created,
+        check.names = FALSE,
+        stringsAsFactors = FALSE
+      )
+    }, striped = TRUE, bordered = FALSE, hover = TRUE, spacing = "s")
+
+    shiny::observeEvent(input$view_pubmed_results, {
+      shiny::req(input$project, input$version)
+      x <- state()
+      shiny::req(x)
+
+      jobs <- x$jobs[
+        x$jobs$version_id == input$version &
+          x$jobs$operation == "retrieve_pubmed" &
+          x$jobs$state == "COMPLETE",
+        , drop = FALSE
+      ]
+
+      if (nrow(jobs)) {
+        if ("created_at" %in% names(jobs)) {
+          jobs <- jobs[order(jobs$created_at, decreasing = TRUE), , drop = FALSE]
+        }
+        pubmed_job_id <- as.character(jobs$id[[1L]])
+        hits <- x$artifacts[
+          x$artifacts$job_id == pubmed_job_id,
+          , drop = FALSE
+        ]
+        if (nrow(hits)) {
+          shiny::updateSelectInput(
+            session,
+            "artifact",
+            selected = as.character(hits$id[[1L]])
+          )
+        }
+      }
+
+      nav_section("review_export")
+      shiny::updateTabsetPanel(session, "page", selected = "Results / Artifacts")
+      notice("PubMed retrieval results are shown in Results & Artifacts.")
+    }, ignoreInit = TRUE)
+
     output$download <- shiny::downloadHandler(filename = function() {
       x <- state(); shiny::req(x); name <- x$artifacts$logical_name[x$artifacts$id == input$artifact]
       if (length(name)) basename(name[1]) else "result.txt"
@@ -1290,6 +2262,7 @@ web_app <- function(settings) {
       workspace <- if (isTRUE(keep_workspace)) wizard_values$workspace else NULL
       wizard_values$workspace <- workspace
       wizard_values$title <- ""
+      wizard_values$topic <- ""
       wizard_values$canonical_id <- paste0("review-", substr(web_id(), 1, 12))
       wizard_values$investigator <- ""
       wizard_values$framework <- "PICO"
@@ -1350,13 +2323,13 @@ web_app <- function(settings) {
         ))
       }
 
-      save_label <- if (is.null(editing())) "Create systematic review" else "Save as new version"
+      save_label <- if (is.null(editing())) "Create systematic review" else "Save changes"
       shiny::div(
         class = "srma-wizard-footer",
         shiny::actionButton("wizard_back", "Back", class = "btn-outline-secondary"),
         shiny::div(
           class = "srma-wizard-footer-right",
-          if (!is.null(editing())) shiny::actionButton("new_draft", "Start as a separate review", class = "btn-outline-secondary"),
+          if (!is.null(editing())) shiny::actionButton("new_draft", "Create as separate review", class = "btn-outline-secondary"),
           shiny::actionButton("save", save_label, class = "btn-primary")
         )
       )
@@ -1409,6 +2382,90 @@ web_app <- function(settings) {
             selected = wizard_values$workspace
           )
         )
+      }
+
+      if (is.null(editing())) {
+        return(shiny::div(
+          class = "srma-wizard-wrap",
+          shiny::div(
+            class = "srma-wizard-heading",
+            shiny::h2("New Systematic Review"),
+            shiny::p("Start with the research topic/question. The canonical Project Initialization Agent will infer the remaining review structure automatically.")
+          ),
+          shiny::div(
+            class = "srma-wizard-progress",
+            shiny::div(class = "srma-wizard-step active", "1. Research topic"),
+            shiny::div(class = "srma-wizard-step", "2. Toolkit prepares plan"),
+            shiny::div(class = "srma-wizard-step", "3. Human review"),
+            shiny::div(class = "srma-wizard-step", "4. Protocol registration")
+          ),
+          shiny::div(
+            class = "srma-wizard-card",
+            shiny::div(class = "srma-wizard-kicker", "Canonical project seed"),
+            shiny::h3("Tell the toolkit what review you want to conduct", class = "srma-wizard-title"),
+            shiny::p(
+              "Do not build PICO, eligibility criteria, outcomes, or search concepts manually here. The scientific engine will propose them from this project seed and will surface only genuinely unresolved choices for Human Review.",
+              class = "srma-wizard-subtitle"
+            ),
+            shiny::div(
+              class = "srma-form-grid",
+              shiny::div(class = "srma-form-full", workspace_ui),
+              shiny::div(
+                class = "srma-form-full",
+                shiny::textAreaInput(
+                  "topic",
+                  srma_required_label("Research topic / question"),
+                  value = wizard_values$topic,
+                  rows = 5,
+                  width = "100%",
+                  placeholder = "Describe the systematic review or meta-analysis you want to conduct."
+                ),
+                shiny::div(
+                  class = "srma-field-help",
+                  "This is the canonical project seed. The Initialization Agent will infer the structured framework, eligibility, screening rules, and generic search concepts."
+                ),
+                field_error("topic", "Enter the research topic or question.")
+              ),
+              shiny::div(
+                class = "srma-form-full",
+                shiny::textInput(
+                  "title",
+                  "Review title (optional)",
+                  value = wizard_values$title,
+                  width = "100%",
+                  placeholder = "Leave blank to use the research topic as the temporary display title."
+                )
+              ),
+              shiny::div(
+                class = "srma-form-full",
+                shiny::tags$details(
+                  shiny::tags$summary("Advanced options"),
+                  shiny::textInput(
+                    "canonical_id", "Project identifier",
+                    value = wizard_values$canonical_id, width = "100%"
+                  ),
+                  shiny::helpText(
+                    "Generated automatically. Use only letters, numbers, hyphens or underscores if you change it."
+                  ),
+                  field_error("canonical_id", "Enter a valid project identifier.")
+                )
+              )
+            ),
+            shiny::div(
+              class = "srma-review-note",
+              shiny::strong("What happens next: "),
+              "the toolkit saves an immutable project seed, runs the canonical Initialization Agent in the background, validates the generated drafts, and then asks you to review the proposed protocol and unresolved decisions."
+            ),
+            shiny::div(
+              class = "srma-wizard-footer",
+              shiny::actionButton("wizard_cancel", "Cancel", class = "btn-outline-secondary"),
+              shiny::div(
+                class = "srma-wizard-footer-right",
+                shiny::actionButton("save", "Create review & prepare plan", class = "btn-primary")
+              )
+            )
+          )
+        ))
       }
 
       step_body <- switch(
@@ -1632,7 +2689,7 @@ web_app <- function(settings) {
         class = "srma-wizard-wrap",
         shiny::div(
           class = "srma-wizard-heading",
-          shiny::h2(if (is.null(editing())) "New Systematic Review" else "Edit Review as a New Version"),
+          shiny::h2(if (is.null(editing())) "New Systematic Review" else "Edit Review"),
           shiny::p("Complete the setup in five short steps. Your entries are kept while you move between steps.")
         ),
         wizard_progress_ui(step),
@@ -1646,6 +2703,8 @@ web_app <- function(settings) {
 
     shiny::observeEvent(input$wizard_cancel, {
       wizard_capture(wizard_step())
+      editing(NULL)
+      reset_wizard(keep_workspace = TRUE)
       wizard_errors(character())
       shiny::updateTabsetPanel(session, "page", selected = "my_projects")
     }, ignoreInit = TRUE)
@@ -1705,12 +2764,69 @@ web_app <- function(settings) {
     lines <- function(value) as.list(Filter(nzchar, trimws(strsplit(if (is.null(value)) "" else value, "\n", fixed = TRUE)[[1]])))
 
     shiny::observeEvent(input$new_draft, {
+      # Creating a separate review returns to the canonical seed-first path.
+      # The prior configured review is not cloned as scientific truth; its
+      # question is used only as a convenient starting project seed.
+      wizard_capture(wizard_step())
+      seed_topic <- trimws(wizard_values$question)
+      if (!nzchar(seed_topic)) seed_topic <- trimws(wizard_values$title)
       editing(NULL)
-      reset_wizard(keep_workspace = TRUE)
-      notice("A separate review is ready to set up. Review every field before creating it.")
+      wizard_values$topic <- seed_topic
+      wizard_values$canonical_id <- paste0("review-", substr(web_id(), 1, 12))
+      wizard_errors(character())
+      wizard_step(1L)
+      notice("This will be a separate review. Confirm or revise the research topic; the canonical Initialization Agent will regenerate the review plan from that seed.")
     }, ignoreInit = TRUE)
 
     shiny::observeEvent(input$save, {
+      if (is.null(editing())) {
+        wizard_values$workspace <- if (is.null(input$workspace)) wizard_values$workspace else input$workspace
+        wizard_values$topic <- if (is.null(input$topic)) wizard_values$topic else input$topic
+        wizard_values$title <- if (is.null(input$title)) wizard_values$title else input$title
+        wizard_values$canonical_id <- if (is.null(input$canonical_id)) wizard_values$canonical_id else input$canonical_id
+
+        errors <- character()
+        if (!nzchar(trimws(wizard_values$topic))) errors <- c(errors, "topic")
+        if (!nzchar(trimws(wizard_values$canonical_id)) || !grepl("^[A-Za-z0-9_-]+$", wizard_values$canonical_id)) errors <- c(errors, "canonical_id")
+        wizard_errors(unique(errors))
+        if (length(errors)) {
+          notice("Enter the research topic/question and a valid project identifier before creating the review.")
+          return()
+        }
+
+        notice("Saving the project seed…")
+        saved <- safe(request("create_seed_review", list(
+          workspace_id = wizard_values$workspace,
+          topic = trimws(wizard_values$topic),
+          title = trimws(wizard_values$title),
+          canonical_id = trimws(wizard_values$canonical_id)
+        )))
+        if (is.null(saved)) return()
+
+        saved_project_id <- as.character(saved$project_id[[1L]])
+        saved_version_id <- as.character(saved$version_id[[1L]])
+        pending_project_selection(saved_project_id)
+        pending_version_selection(saved_version_id)
+        seed_handoff(list(project_id = saved_project_id, version_id = saved_version_id))
+        refresh(refresh() + 1L)
+
+        init_id <- safe(request("submit", list(
+          project_id = saved_project_id,
+          version_id = saved_version_id,
+          operation = "initialize_project"
+        )))
+        if (!is.null(init_id)) {
+          refresh(refresh() + 1L)
+          notice("Project seed saved. The canonical Project Initialization Agent is preparing the review plan in the background.")
+        }
+
+        # Navigation occurs only after the new project/version selectors have
+        # actually switched to this immutable seed.  If initialization cannot
+        # be queued (for example, missing provider credentials), the user's
+        # seed remains preserved until that handoff completes.
+        return()
+      }
+
       required_values <- c(
         title = wizard_values$title,
         question = wizard_values$question,
@@ -1784,10 +2900,10 @@ web_app <- function(settings) {
 
       if (!is.null(saved)) {
         was_new <- is.null(edit)
-        editing(saved)
         if (!is.null(saved$project_id) && srma_has_text(saved$project_id)) pending_project_selection(as.character(saved$project_id[[1L]]))
         refresh(refresh() + 1L)
-        wizard_step(1L)
+        editing(NULL)
+        reset_wizard(keep_workspace = TRUE)
         notice(if (was_new) {
           "Systematic review created as an immutable draft. Scientific choices still require Human Review before downstream workflow steps."
         } else {
@@ -1799,6 +2915,14 @@ web_app <- function(settings) {
     })
 
     shiny::observeEvent(input$edit, {
+      x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
+      version_row <- x$versions[x$versions$id == input$version, , drop = FALSE]
+      if (nrow(version_row) && "kind" %in% names(version_row) && identical(as.character(version_row$kind[[1L]]), "SEED")) {
+        nav_section("review_setup")
+        shiny::updateTabsetPanel(session, "page", selected = "Human Review Required")
+        notice("This version is a minimal project seed, not an activated review configuration. Prepare or review the toolkit-generated plan instead of editing scientific fields manually.")
+        return()
+      }
       cfg <- safe(request("configuration", list(project_id = input$project, version_id = input$version)))
       shiny::req(cfg)
       editing(list(project_id = input$project, version_id = input$version))
@@ -1849,23 +2973,93 @@ web_app <- function(settings) {
       nav_section("review_setup")
       shiny::updateTabsetPanel(session, "page", selected = "new_review")
     })
+    search_terminal_key <- shiny::reactiveVal("")
+    shiny::observe({
+      x <- state()
+      shiny::req(x, input$version)
+      jobs <- x$jobs[
+        x$jobs$version_id == input$version &
+          x$jobs$operation %in% c("initialize_project", "generate_search", "retrieve_pubmed", "validate_database_inputs"),
+        , drop = FALSE
+      ]
+      if (!nrow(jobs)) return()
+      if ("created_at" %in% names(jobs)) jobs <- jobs[order(jobs$created_at, decreasing = TRUE), , drop = FALSE]
+      terminal <- jobs[jobs$state %in% c("COMPLETE", "FAILED", "USER_ACTION_REQUIRED"), , drop = FALSE]
+      if (!nrow(terminal)) return()
+      key <- paste(as.character(terminal$id[[1L]]), as.character(terminal$state[[1L]]), sep = ":")
+      if (!identical(key, search_terminal_key())) {
+        search_terminal_key(key)
+        refresh(refresh() + 1L)
+      }
+    })
+
     database_info <- shiny::reactive({
-      shiny::invalidateLater(3000,session)
+      refresh()
       shiny::req(token(), input$project, input$version)
       safe(request("database_info", list(project_id = input$project, version_id = input$version)))
     })
     output$search_import <- shiny::renderUI({
+      x <- search_view(); shiny::req(x, input$version)
+      version_row <- x$versions[x$versions$id == input$version, , drop = FALSE]
+      version_kind <- if (nrow(version_row) && "kind" %in% names(version_row)) as.character(version_row$kind[[1L]]) else "CANONICAL"
+      origin_kind <- if (nrow(version_row) && "origin_kind" %in% names(version_row)) as.character(version_row$origin_kind[[1L]]) else ""
+
+      if (identical(version_kind, "SEED")) {
+        return(shiny::div(
+          class = "srma-review-record",
+          shiny::h3("Review setup is not complete yet"),
+          shiny::p("This saved version is still a minimal project seed. The canonical Initialization Agent and Human Review must finish before Studies can begin."),
+          shiny::actionButton("studies_return_human_review", "Return to Human Review", class = "btn-primary")
+        ))
+      }
+
       info <- database_info(); shiny::req(info)
+      activated <- identical(origin_kind, "ACTIVATED")
+
+      latest_job <- function(operation) {
+        rows <- x$jobs[
+          x$jobs$version_id == input$version &
+            x$jobs$operation == operation,
+          , drop = FALSE
+        ]
+        if (!nrow(rows)) return(NULL)
+        if ("created_at" %in% names(rows)) {
+          rows <- rows[order(rows$created_at, decreasing = TRUE), , drop = FALSE]
+        }
+        rows[1, , drop = FALSE]
+      }
+
+      search_job <- latest_job("generate_search")
+      search_ready <- !is.null(search_job) &&
+        identical(toupper(as.character(search_job$state[[1L]])), "COMPLETE")
+
+      all_inputs_ready <- length(info) > 0L && all(vapply(
+        info,
+        function(db) isTRUE(db$input_present),
+        logical(1)
+      ))
+
       shiny::tagList(
-        shiny::p("Prepare canonical concepts, review and activate a new version, record its required protocol decisions, then generate searches. PubMed retrieval requires canonical quality PASS for the exact saved query."),
-        shiny::actionButton("initialize_project", "Prepare canonical draft"),
-        shiny::p("If the operator has not configured the scientific runtime and provider credential, your saved work is retained. You may enter human-provided concepts below."),
-        shiny::textAreaInput("manual_terms", "Human-provided canonical search concepts (YAML)", rows=10),
-        shiny::p("Supply the canonical project, search concepts and validation fields. Terms and controlled vocabulary must be explicitly chosen by you; the application does not invent synonyms."),
-        shiny::actionButton("save_terms", "Save human-provided draft as new version"),
-        shiny::actionButton("generate_search", "Generate searches for approved version"),
-        shiny::actionButton("retrieve_pubmed", "Retrieve quality-approved PubMed query"),
-        shiny::textOutput("quality_status"),
+        if (activated) shiny::div(
+          class = "srma-info srma-info-blue",
+          shiny::strong("Canonical review plan activated."),
+          shiny::br(),
+          "The approved configuration and search concepts are bound to this immutable version. Generate and validate the database strategies next; protocol Human Gates still apply."
+        ) else shiny::p("This is a legacy or manually configured version. Prepare and explicitly review canonical concepts before search generation."),
+        if (!activated) shiny::actionButton("initialize_project", "Prepare canonical draft"),
+        if (!activated) shiny::p("A human-provided concept document remains available only as an explicit manual fallback; the toolkit does not infer synonyms from manual PICO entries."),
+        if (!activated) shiny::textAreaInput("manual_terms", "Human-provided canonical search concepts (YAML)", rows=10),
+        if (!activated) shiny::actionButton("save_terms", "Save human-provided draft as new version"),
+        shiny::actionButton("generate_search", "Generate database searches", class = if (activated) "btn-primary" else NULL),
+        shiny::actionButton(
+          "retrieve_pubmed",
+          "Retrieve quality-approved PubMed query",
+          class = "srma-search-action",
+          disabled = if (!search_ready) NA else NULL,
+          title = if (!search_ready) "Generate a search with canonical quality PASS first." else NULL
+        ),
+        shiny::uiOutput("quality_status"),
+        shiny::uiOutput("search_import_handoff"),
         lapply(info, function(db) shiny::tagList(
           shiny::h3(db$label),
           shiny::p(if (db$mode == "automated") "Request PubMed retrieval after the exact query passes canonical quality checks."
@@ -1873,7 +3067,7 @@ web_app <- function(settings) {
           shiny::p(if (db$input_present) "Input saved. Canonical preflight must confirm validity." else "Input still required."),
           shiny::tags$label("Canonical saved search strategy — copy for database use"),
           shiny::tags$textarea(readonly = NA, rows = 6, style = "width:100%", db$strategy),
-          if (!nzchar(db$strategy)) shiny::p("No canonical strategy is saved for this version. Complete search preparation before searching the database."))),
+          if (!nzchar(db$strategy)) shiny::p("No canonical strategy is saved for this version. Generate the approved database searches first."))),
         shiny::selectInput("strategy_database", "Search strategy to download", setNames(
           vapply(info, function(x) x$database, character(1)), vapply(info, function(x) x$label, character(1)))),
         shiny::downloadButton("strategy_download", "Download canonical search strategy"),
@@ -1882,19 +3076,180 @@ web_app <- function(settings) {
           vapply(Filter(function(x) x$mode == "guided_manual", info), function(x) x$label, character(1)))),
         if (!is.null(upload_root)) shiny::fileInput("export_file", "Database export (RIS; up to 20 MB)", accept = ".ris"),
         shiny::actionButton("upload_export", "Save export as new version"),
-        shiny::actionButton("preflight", "Check database inputs"),
+        shiny::actionButton(
+          "preflight",
+          "Check database inputs",
+          class = "srma-search-action",
+          disabled = if (!all_inputs_ready) NA else NULL,
+          title = if (!all_inputs_ready) "Complete PubMed retrieval and save all required manual database exports first." else NULL
+        ),
         shiny::tableOutput("database_validation"),
         shiny::p("Each upload creates a new immutable version. Preflight never starts merge, deduplication or screening."))
     })
+
+    shiny::observeEvent(input$studies_return_human_review, {
+      nav_section("review_setup")
+      shiny::updateTabsetPanel(session, "page", selected = "Human Review Required")
+    }, ignoreInit = TRUE)
+
     shiny::observeEvent(list(input$project,input$version), {draft_review(NULL)})
+    # When canonical initialization reaches COMPLETE, load the generated plan
+    # automatically on the current Human Review page. The existing manual button
+    # remains only as a fallback if artifact loading ever needs to be retried.
     shiny::observe({
-      x<-state();shiny::req(x,input$version)
-      jobs<-x$jobs[x$jobs$version_id==input$version & x$jobs$operation=="initialize_project" & x$jobs$state=="COMPLETE",,drop=FALSE]
-      shiny::updateSelectInput(session,"draft_job",choices=c("Saved review configuration"="",if(nrow(jobs))setNames(jobs$id,paste("Prepared canonical draft",jobs$created_at)) else character()),selected=shiny::isolate(input$draft_job))
+      status <- seed_initialization_status()
+      if (is.null(status) || !identical(status$state, "COMPLETE") || !nrow(status$job)) return()
+
+      job_id <- as.character(status$job$id[[1L]])
+      current <- draft_review()
+      if (!is.null(current) &&
+          identical(current$project_id, input$project) &&
+          identical(current$version_id, input$version) &&
+          identical(current$job_id, job_id)) {
+        return()
+      }
+
+      canonical <- safe(request("initialization_review", list(
+        project_id = input$project,
+        version_id = input$version,
+        job_id = job_id
+      )))
+      if (is.null(canonical)) return()
+
+      cfg <- tryCatch(
+        yaml::yaml.load(canonical$config, eval.expr = FALSE),
+        error = function(e) NULL
+      )
+      if (is.null(cfg)) {
+        notice("The generated review configuration could not be parsed. Ask the operator to inspect the initialization artifact.")
+        return()
+      }
+
+      draft_review(list(
+        project_id = input$project,
+        version_id = input$version,
+        job_id = job_id,
+        configuration = cfg,
+        canonical = canonical,
+        agent_driven = TRUE
+      ))
+      notice("Toolkit-generated review plan is ready and has been loaded for Human Review.")
     })
+
+    output$canonical_review_launcher <- shiny::renderUI({
+      shiny::req(input$project, input$version)
+      x <- search_view(); shiny::req(x)
+      version_row <- x$versions[x$versions$id == input$version, , drop = FALSE]
+      if (nrow(version_row) && "kind" %in% names(version_row) && identical(as.character(version_row$kind[[1L]]), "SEED")) return(NULL)
+      if (nrow(version_row) && "origin_kind" %in% names(version_row) && identical(as.character(version_row$origin_kind[[1L]]), "ACTIVATED")) return(NULL)
+      jobs <- x$jobs[
+        x$jobs$version_id == input$version &
+          x$jobs$operation == "initialize_project",
+        , drop = FALSE
+      ]
+      if (nrow(jobs) && "created_at" %in% names(jobs)) {
+        jobs <- jobs[order(jobs$created_at, decreasing = TRUE), , drop = FALSE]
+      }
+      complete <- jobs[jobs$state == "COMPLETE", , drop = FALSE]
+      active <- jobs[jobs$state %in% c("QUEUED", "RUNNING"), , drop = FALSE]
+
+      if (!nrow(complete)) {
+        status_ui <- if (nrow(active)) {
+          shiny::div(
+            class = "srma-info srma-info-blue",
+            shiny::strong("Canonical search concept preparation is in progress."),
+            shiny::br(),
+            if ("message" %in% names(active) && nzchar(active$message[[1]])) active$message[[1]] else "The background worker is preparing the draft.",
+            if ("progress" %in% names(active)) shiny::div(style = "margin-top:6px;", paste0("Progress: ", active$progress[[1]], "%"))
+          )
+        } else {
+          shiny::div(
+            class = "srma-info srma-info-amber",
+            shiny::strong("No canonical search concept draft has been prepared for this saved version yet."),
+            shiny::br(),
+            "Prepare the draft here. When it is ready, this card will switch to explicit concept review and activation."
+          )
+        }
+        return(shiny::div(
+          class = "srma-canonical-launcher",
+          shiny::div(
+            class = "srma-review-record",
+            shiny::h3("Canonical search concept preparation"),
+            shiny::p("This step follows protocol Human Review and uses the canonical scientific initialization workflow. It is intentionally handled under Studies rather than the completed Human Review record."),
+            status_ui,
+            if (!nrow(active)) shiny::actionButton(
+              "prepare_canonical_from_launcher",
+              "Prepare canonical search concepts",
+              class = "btn-primary"
+            )
+          )
+        ))
+      }
+
+      shiny::div(
+        class = "srma-canonical-launcher",
+        shiny::div(
+          class = "srma-review-record",
+          shiny::h3("Canonical search concept review"),
+          shiny::p("A prepared canonical draft is available. Review the proposed configuration, concepts, and unresolved choices before activating a new immutable version."),
+          shiny::selectInput("draft_job", "Prepared canonical draft", character()),
+          shiny::actionButton("load_draft", "Review prepared canonical draft", class = "btn-primary"),
+          shiny::uiOutput("canonical_review")
+        )
+      )
+    })
+
+    shiny::observeEvent(input$prepare_canonical_from_launcher, {
+      shiny::req(input$project, input$version)
+      id <- safe(request("submit", list(
+        project_id = input$project,
+        version_id = input$version,
+        operation = "initialize_project"
+      )))
+      if (!is.null(id)) {
+        refresh(refresh() + 1L)
+        notice("Canonical search concept preparation requested. The background worker will prepare the draft; you may remain on this page or return later.")
+      }
+    }, ignoreInit = TRUE)
+
+    shiny::observe({
+      x <- search_view(); shiny::req(x,input$version)
+      jobs <- x$jobs[
+        x$jobs$version_id == input$version &
+          x$jobs$operation == "initialize_project" &
+          x$jobs$state == "COMPLETE",
+        , drop = FALSE
+      ]
+      if (nrow(jobs) && "created_at" %in% names(jobs)) {
+        jobs <- jobs[order(jobs$created_at, decreasing = TRUE), , drop = FALSE]
+      }
+      choices <- if(nrow(jobs)) setNames(jobs$id,paste("Prepared canonical draft",jobs$created_at)) else character()
+      current <- shiny::isolate(input$draft_job)
+      selected <- if (length(choices)) {
+        if (!is.null(current) && current %in% unname(choices)) current else unname(choices[[1]])
+      } else character()
+      shiny::updateSelectInput(session,"draft_job",choices=choices,selected=selected)
+    })
+
     shiny::observeEvent(input$load_draft, {
       shiny::req(input$project,input$version)
-      shiny::withProgress(message = "Loading review details...", value = 0.2, {
+      job_id <- if (is.null(input$draft_job)) "" else as.character(input$draft_job)
+      if (!nzchar(job_id)) {
+        x <- state(); shiny::req(x)
+        jobs <- x$jobs[
+          x$jobs$version_id == input$version &
+            x$jobs$operation == "initialize_project" &
+            x$jobs$state == "COMPLETE",
+          , drop = FALSE
+        ]
+        if (nrow(jobs) && "created_at" %in% names(jobs)) jobs <- jobs[order(jobs$created_at, decreasing = TRUE), , drop = FALSE]
+        if (nrow(jobs)) job_id <- as.character(jobs$id[[1]])
+      }
+      if (!nzchar(job_id)) {
+        notice("No prepared canonical draft is available yet. Use ‘Prepare canonical search concepts’ first.")
+        return()
+      }
+      shiny::withProgress(message = "Loading canonical draft...", value = 0.2, {
         cfg <- safe(request("configuration", list(project_id = input$project, version_id = input$version)))
         if (is.null(cfg)) {
           draft_review(NULL)
@@ -1902,12 +3257,13 @@ web_app <- function(settings) {
           return()
         }
         shiny::incProgress(0.45)
-        job_id <- if (is.null(input$draft_job) || !nzchar(input$draft_job)) NULL else input$draft_job
-        canonical <- NULL
-        if (!is.null(job_id)) {
-          canonical <- safe(request("initialization_review", list(
-            project_id = input$project, version_id = input$version, job_id = job_id
-          )))
+        canonical <- safe(request("initialization_review", list(
+          project_id = input$project, version_id = input$version, job_id = job_id
+        )))
+        if (is.null(canonical)) {
+          draft_review(NULL)
+          shiny::showNotification("The prepared canonical draft could not be loaded. Check the background job status and try again.", type = "error", duration = 6)
+          return()
         }
         draft_review(list(
           project_id = input$project,
@@ -1919,8 +3275,262 @@ web_app <- function(settings) {
         shiny::incProgress(0.35)
       })
     })
-    output$canonical_review<-shiny::renderUI({
-      r<-draft_review();shiny::req(r)
+    plan_edit_target <- shiny::reactiveVal(NULL)
+
+    plan_edit_labels <- c(
+      review_title = "Review title",
+      framework = "Framework",
+      review_question = "Review question",
+      population = "Population",
+      intervention = "Intervention / exposure",
+      comparator = "Comparator",
+      primary_outcomes = "Primary outcomes",
+      secondary_outcomes = "Secondary outcomes",
+      study_designs = "Study designs",
+      inclusion_criteria = "Inclusion criteria",
+      exclusion_criteria = "Exclusion criteria",
+      language_restriction = "Language",
+      databases = "Databases",
+      search_period = "Search period",
+      search_terms = "Prepared canonical search concepts"
+    )
+
+    plan_value_text <- function(x, collapse = "\n") {
+      if (is.null(x) || !length(x)) return("")
+      if (is.list(x) && !is.null(x$description)) x <- x$description
+      paste(as.character(unlist(x, use.names = FALSE)), collapse = collapse)
+    }
+
+    plan_current_value <- function(r, key) {
+      cfg <- r$configuration
+      switch(
+        key,
+        review_title = plan_value_text(cfg$project$title),
+        framework = plan_value_text(cfg$research_question$framework),
+        review_question = plan_value_text(cfg$research_question$question),
+        population = plan_value_text(cfg$research_question$population),
+        intervention = plan_value_text(cfg$research_question$intervention),
+        comparator = plan_value_text(cfg$research_question$comparator),
+        primary_outcomes = plan_value_text(cfg$research_question$outcomes$primary),
+        secondary_outcomes = plan_value_text(cfg$research_question$outcomes$secondary),
+        study_designs = plan_value_text(cfg$eligibility$study_designs$include),
+        inclusion_criteria = plan_value_text(cfg$eligibility$inclusion),
+        exclusion_criteria = plan_value_text(cfg$eligibility$exclusion),
+        language_restriction = plan_value_text(cfg$eligibility$language_restriction),
+        databases = names(Filter(
+          function(x) if (is.list(x)) isTRUE(x$enabled) else isTRUE(x),
+          cfg$search$databases
+        )),
+        search_period = list(
+          start_date = plan_value_text(cfg$search$search_start_date),
+          end_date = plan_value_text(cfg$search$search_end_date)
+        ),
+        search_terms = if (!is.null(r$canonical)) r$canonical$terms else "",
+        ""
+      )
+    }
+
+    plan_lines <- function(value) {
+      if (is.null(value) || !length(value)) return(list())
+      values <- trimws(strsplit(as.character(value), "\n", fixed = TRUE)[[1L]])
+      as.list(values[nzchar(values)])
+    }
+
+    plan_set_description <- function(current, value) {
+      if (is.list(current)) {
+        current$description <- value
+        current
+      } else {
+        value
+      }
+    }
+
+    capture_plan_decisions <- function(r) {
+      if (is.null(r$canonical) || !length(r$canonical$decisions)) return(r)
+      decisions <- r$canonical$decisions
+      selections <- lapply(seq_along(decisions), function(i) {
+        value <- input[[paste0("canonical_decision_", i)]]
+        if (is.null(value)) "" else as.character(value)
+      })
+      names(selections) <- vapply(decisions, `[[`, character(1), "decision_id")
+      r$decision_selections <- selections
+      r
+    }
+
+    apply_plan_edit_to_review <- function(r, key, value) {
+      cfg <- r$configuration
+      edits <- if (is.list(r$edits)) r$edits else list()
+
+      if (identical(key, "review_title")) cfg$project$title <- value
+      if (identical(key, "framework")) cfg$research_question$framework <- value
+      if (identical(key, "review_question")) cfg$research_question$question <- value
+      if (identical(key, "population"))
+        cfg$research_question$population <- plan_set_description(cfg$research_question$population, value)
+      if (identical(key, "intervention"))
+        cfg$research_question$intervention <- plan_set_description(cfg$research_question$intervention, value)
+      if (identical(key, "comparator"))
+        cfg$research_question$comparator <- plan_set_description(cfg$research_question$comparator, value)
+      if (identical(key, "primary_outcomes")) cfg$research_question$outcomes$primary <- plan_lines(value)
+      if (identical(key, "secondary_outcomes")) cfg$research_question$outcomes$secondary <- plan_lines(value)
+      if (identical(key, "study_designs")) cfg$eligibility$study_designs$include <- plan_lines(value)
+      if (identical(key, "inclusion_criteria")) cfg$eligibility$inclusion <- plan_lines(value)
+      if (identical(key, "exclusion_criteria")) cfg$eligibility$exclusion <- plan_lines(value)
+      if (identical(key, "language_restriction")) cfg$eligibility$language_restriction <- value
+
+      if (identical(key, "databases")) {
+        selected <- as.character(value)
+        for (db in names(cfg$search$databases)) {
+          current <- cfg$search$databases[[db]]
+          if (is.list(current)) {
+            current$enabled <- db %in% selected
+            cfg$search$databases[[db]] <- current
+          } else {
+            cfg$search$databases[[db]] <- db %in% selected
+          }
+        }
+      }
+
+      if (identical(key, "search_period")) {
+        cfg$search$search_start_date <- value$start_date
+        cfg$search$search_end_date <- value$end_date
+      }
+
+      if (identical(key, "search_terms") && !is.null(r$canonical)) {
+        r$canonical$terms <- value
+      }
+
+      r$configuration <- cfg
+      edits[[key]] <- if (key %in% c("primary_outcomes", "secondary_outcomes", "study_designs", "inclusion_criteria", "exclusion_criteria")) {
+        plan_lines(value)
+      } else {
+        value
+      }
+      r$edits <- edits
+      r
+    }
+
+    editable_summary_item <- function(label, value, key, full = FALSE) {
+      shiny::div(
+        class = paste("srma-summary-item", if (isTRUE(full)) "full" else ""),
+        shiny::div(
+          class = "srma-summary-label-row",
+          shiny::span(class = "srma-summary-label", label),
+          shiny::actionButton(
+            paste0("edit_plan_", key),
+            "Edit",
+            class = "btn-outline-secondary srma-inline-edit"
+          )
+        ),
+        shiny::div(class = "srma-summary-value", value)
+      )
+    }
+
+    open_plan_edit <- function(key) {
+      r <- draft_review()
+      shiny::req(r, key %in% names(plan_edit_labels))
+      plan_edit_target(key)
+      label <- unname(plan_edit_labels[[key]])
+      current <- plan_current_value(r, key)
+
+      control <- if (identical(key, "framework")) {
+        choices <- unique(c(as.character(current), "PICO", "PICOS"))
+        shiny::selectInput("plan_edit_value", label, choices = choices, selected = as.character(current), width = "100%")
+      } else if (identical(key, "databases")) {
+        available <- names(r$configuration$search$databases)
+        shiny::checkboxGroupInput(
+          "plan_edit_databases",
+          label,
+          choices = setNames(available, available),
+          selected = as.character(current)
+        )
+      } else if (identical(key, "search_period")) {
+        shiny::tagList(
+          shiny::textInput(
+            "plan_edit_start_date",
+            "Search start date",
+            value = current$start_date,
+            placeholder = "Leave blank for database inception"
+          ),
+          shiny::textInput(
+            "plan_edit_end_date",
+            "Search end date",
+            value = current$end_date,
+            placeholder = "Leave blank for current / unspecified"
+          )
+        )
+      } else {
+        rows <- if (key %in% c(
+          "review_question", "population", "intervention", "comparator",
+          "primary_outcomes", "secondary_outcomes", "study_designs",
+          "inclusion_criteria", "exclusion_criteria", "search_terms"
+        )) 8 else 4
+        shiny::textAreaInput(
+          "plan_edit_value",
+          label,
+          value = as.character(current),
+          rows = rows,
+          width = "100%"
+        )
+      }
+
+      shiny::showModal(shiny::modalDialog(
+        title = paste("Edit", label),
+        control,
+        footer = shiny::tagList(
+          shiny::modalButton("Cancel"),
+          shiny::actionButton("save_plan_edit", "Save", class = "btn-primary")
+        ),
+        easyClose = FALSE
+      ))
+    }
+
+    for (field in names(plan_edit_labels)) local({
+      key <- field
+      shiny::observeEvent(input[[paste0("edit_plan_", key)]], {
+        open_plan_edit(key)
+      }, ignoreInit = TRUE)
+    })
+
+    shiny::observeEvent(input$save_plan_edit, {
+      key <- plan_edit_target()
+      r <- draft_review()
+      shiny::req(r, key %in% names(plan_edit_labels))
+
+      value <- if (identical(key, "databases")) {
+        if (is.null(input$plan_edit_databases)) character() else as.character(input$plan_edit_databases)
+      } else if (identical(key, "search_period")) {
+        list(
+          start_date = if (is.null(input$plan_edit_start_date)) "" else trimws(input$plan_edit_start_date),
+          end_date = if (is.null(input$plan_edit_end_date)) "" else trimws(input$plan_edit_end_date)
+        )
+      } else {
+        if (is.null(input$plan_edit_value)) "" else trimws(as.character(input$plan_edit_value))
+      }
+
+      required_text <- c(
+        "review_title", "framework", "review_question", "population",
+        "intervention", "comparator", "primary_outcomes", "study_designs",
+        "inclusion_criteria", "exclusion_criteria", "search_terms"
+      )
+      if (key %in% required_text && (!is.character(value) || length(value) != 1L || !nzchar(value))) {
+        notice("This review field cannot be blank.")
+        return()
+      }
+      if (identical(key, "databases") && !length(value)) {
+        notice("Select at least one database.")
+        return()
+      }
+
+      r <- capture_plan_decisions(r)
+      r <- apply_plan_edit_to_review(r, key, value)
+      draft_review(r)
+      plan_edit_target(NULL)
+      shiny::removeModal()
+      notice(paste0(unname(plan_edit_labels[[key]]), " updated for this Human Review."))
+    }, ignoreInit = TRUE)
+
+    canonical_review_ui <- function(r) {
+      shiny::req(r)
       cfg <- r$configuration
       value_text <- function(x) {
         if (is.null(x) || !length(x)) return("Not specified")
@@ -1945,7 +3555,15 @@ web_app <- function(settings) {
         c <- r$canonical
         shiny::tagList(
           shiny::div(class = "srma-summary-section",
-            shiny::h4("Prepared canonical search concepts"),
+            shiny::div(
+              style = "display:flex;align-items:center;justify-content:space-between;gap:12px;",
+              shiny::h4("Prepared canonical search concepts"),
+              shiny::actionButton(
+                "edit_plan_search_terms",
+                "Edit",
+                class = "btn-outline-secondary srma-inline-edit"
+              )
+            ),
             shiny::tags$pre(c$terms)
           ),
           lapply(seq_along(c$decisions), function(i) {
@@ -1957,11 +3575,15 @@ web_app <- function(settings) {
               shiny::p(d$recommendation_rationale),
               shiny::selectInput(
                 paste0("canonical_decision_", i), "Your explicit choice",
-                c("Choose an option" = "", unlist(d$suggested_options))
+                c("Choose an option" = "", unlist(d$suggested_options)),
+                selected = if (
+                  is.list(r$decision_selections) &&
+                  d$decision_id %in% names(r$decision_selections) &&
+                  length(r$decision_selections[[d$decision_id]])
+                ) r$decision_selections[[d$decision_id]] else ""
               )
             )
           }),
-          shiny::textAreaInput("activation_rationale", "Review rationale"),
           shiny::checkboxInput(
             "approve_canonical",
             "I reviewed this configuration, these concepts and all listed decisions",
@@ -1972,49 +3594,85 @@ web_app <- function(settings) {
       }
 
       shiny::tagList(
+        if (isTRUE(r$agent_driven)) shiny::div(
+          class = "srma-info srma-info-blue",
+          shiny::strong("Toolkit-generated proposal"),
+          shiny::br(),
+          "AUTO_POLICY and AUTO_INFERRED items are proposed by the canonical scientific engine. USER_REQUIRED choices appear below as explicit Human Decisions; nothing is silently approved."
+        ),
         shiny::div(class = "srma-summary-section",
-          shiny::h4("Saved review configuration"),
+          shiny::h4(if (isTRUE(r$agent_driven)) "Toolkit-generated review configuration" else "Saved review configuration"),
           shiny::div(class = "srma-summary-grid",
-            summary_item("Review title", value_text(cfg$project$title), TRUE),
-            summary_item("Framework", value_text(cfg$research_question$framework)),
+            editable_summary_item("Review title", value_text(cfg$project$title), "review_title", TRUE),
+            editable_summary_item("Framework", value_text(cfg$research_question$framework), "framework"),
             summary_item("Project identifier", value_text(cfg$project$project_id)),
-            summary_item("Review question", value_text(cfg$research_question$question), TRUE),
-            summary_item("Population", value_text(cfg$research_question$population), TRUE),
-            summary_item("Intervention / exposure", value_text(cfg$research_question$intervention), TRUE),
-            summary_item("Comparator", value_text(cfg$research_question$comparator), TRUE),
-            summary_item("Primary outcomes", value_text(cfg$research_question$outcomes$primary), TRUE),
-            summary_item("Secondary outcomes", value_text(cfg$research_question$outcomes$secondary), TRUE)
+            editable_summary_item("Review question", value_text(cfg$research_question$question), "review_question", TRUE),
+            editable_summary_item("Population", value_text(cfg$research_question$population), "population", TRUE),
+            editable_summary_item("Intervention / exposure", value_text(cfg$research_question$intervention), "intervention", TRUE),
+            editable_summary_item("Comparator", value_text(cfg$research_question$comparator), "comparator", TRUE),
+            editable_summary_item("Primary outcomes", value_text(cfg$research_question$outcomes$primary), "primary_outcomes", TRUE),
+            editable_summary_item("Secondary outcomes", value_text(cfg$research_question$outcomes$secondary), "secondary_outcomes", TRUE)
           )
         ),
         shiny::div(class = "srma-summary-section",
           shiny::h4("Eligibility"),
           shiny::div(class = "srma-summary-grid",
-            summary_item("Study designs", value_text(cfg$eligibility$study_designs$include), TRUE),
-            summary_item("Inclusion criteria", value_text(cfg$eligibility$inclusion), TRUE),
-            summary_item("Exclusion criteria", value_text(cfg$eligibility$exclusion), TRUE),
-            summary_item("Language", value_text(cfg$eligibility$language_restriction), TRUE)
+            editable_summary_item("Study designs", value_text(cfg$eligibility$study_designs$include), "study_designs", TRUE),
+            editable_summary_item("Inclusion criteria", value_text(cfg$eligibility$inclusion), "inclusion_criteria", TRUE),
+            editable_summary_item("Exclusion criteria", value_text(cfg$eligibility$exclusion), "exclusion_criteria", TRUE),
+            editable_summary_item("Language", value_text(cfg$eligibility$language_restriction), "language_restriction", TRUE)
           )
         ),
         shiny::div(class = "srma-summary-section",
           shiny::h4("Search scope"),
           shiny::div(class = "srma-summary-grid",
-            summary_item("Databases", if (length(enabled_db)) paste(enabled_db, collapse = ", ") else "Not specified"),
-            summary_item("Search period", paste(search_start, "to", search_end))
+            editable_summary_item("Databases", if (length(enabled_db)) paste(enabled_db, collapse = ", ") else "Not specified", "databases"),
+            editable_summary_item("Search period", paste(search_start, "to", search_end), "search_period")
           )
         ),
         canonical_block
       )
+    }
+
+    output$canonical_review <- shiny::renderUI({
+      canonical_review_ui(draft_review())
     })
+
+    output$seed_canonical_review <- shiny::renderUI({
+      shiny::req(input$project, input$version)
+      x <- safe(request("view", list(project_id = input$project))); shiny::req(x)
+      row <- x$versions[x$versions$id == input$version, , drop = FALSE]
+      if (!nrow(row) || !"kind" %in% names(row) || !identical(as.character(row$kind[[1L]]), "SEED")) return(NULL)
+      r <- draft_review()
+      if (is.null(r) || !identical(r$project_id, input$project) || !identical(r$version_id, input$version)) return(NULL)
+      canonical_review_ui(r)
+    })
+
     shiny::observeEvent(input$activate_canonical, {
       r<-draft_review();shiny::req(r,input$project,input$version,r$canonical)
       c <- r$canonical
       if(!identical(r$project_id,input$project)||!identical(r$version_id,input$version)) {notice("Reload the draft for this selected version.");return()}
       selections<-setNames(lapply(seq_along(c$decisions),function(i)input[[paste0("canonical_decision_",i)]]),
         vapply(c$decisions,`[[`,character(1),"decision_id"))
-      saved<-safe(request("activate_draft",list(project_id=r$project_id,version_id=r$version_id,job_id=r$job_id,
-        selections=selections,rationale=input$activation_rationale,human_approved=isTRUE(input$approve_canonical))))
-      if(!is.null(saved)){draft_review(NULL);refresh(refresh()+1L);notice("Approved canonical inputs saved as a new immutable version. Select it and record its protocol decisions before search generation.")}
+      saved<-safe(request("activate_draft",list(
+        project_id=r$project_id,
+        version_id=r$version_id,
+        job_id=r$job_id,
+        selections=selections,
+        edits=if (is.list(r$edits)) r$edits else list(),
+        human_approved=isTRUE(input$approve_canonical)
+      )))
+      if(!is.null(saved)){
+        draft_review(NULL)
+        if (!is.null(saved$project_id) && srma_has_text(saved$project_id)) pending_project_selection(as.character(saved$project_id[[1L]]))
+        if (!is.null(saved$version_id) && srma_has_text(saved$version_id)) pending_version_selection(as.character(saved$version_id[[1L]]))
+        refresh(refresh()+1L)
+        notice("Approved toolkit-generated inputs were activated as a new immutable version. Review configuration is now recorded; complete protocol registration next.")
+        nav_section("review_setup")
+        shiny::updateTabsetPanel(session, "page", selected = "Human Review Required")
+      }
     })
+
     shiny::observeEvent(input$save_terms, {
       shiny::req(input$project,input$version,input$manual_terms)
       saved<-safe(request("manual_concepts",list(project_id=input$project,version_id=input$version,terms_yaml=input$manual_terms)))
@@ -2025,13 +3683,262 @@ web_app <- function(settings) {
       shiny::observeEvent(input[[operation]],{
         shiny::req(input$project,input$version)
         id<-safe(request("submit",list(project_id=input$project,version_id=input$version,operation=operation)))
-        if(!is.null(id))notice("Version-bound request saved. Review its status and registered outputs.")
+        if(!is.null(id)){
+          refresh(refresh()+1L)
+          notice("Version-bound request saved. Review its status and registered outputs.")
+        }
       })
     })
-    output$quality_status<-shiny::renderText({
+    output$search_import_handoff <- shiny::renderUI({
+      x <- state()
+      shiny::req(x, input$version)
+
+      info <- database_info()
+      shiny::req(info)
+
+      latest_job <- function(operation) {
+        rows <- x$jobs[
+          x$jobs$version_id == input$version &
+            x$jobs$operation == operation,
+          , drop = FALSE
+        ]
+        if (!nrow(rows)) return(NULL)
+        if ("created_at" %in% names(rows)) {
+          rows <- rows[order(rows$created_at, decreasing = TRUE), , drop = FALSE]
+        }
+        rows[1, , drop = FALSE]
+      }
+
+      state_of <- function(job) {
+        if (is.null(job) || !nrow(job)) return("")
+        value <- as.character(job$state[[1L]])
+        if (is.na(value)) "" else toupper(value)
+      }
+
+      message_of <- function(job, fallback = "") {
+        if (is.null(job) || !nrow(job) || !"message" %in% names(job)) return(fallback)
+        value <- as.character(job$message[[1L]])
+        if (is.na(value) || !nzchar(trimws(value))) fallback else value
+      }
+
+      step_class <- function(state, complete = FALSE, action = FALSE) {
+        if (isTRUE(complete)) return("complete")
+        if (state %in% c("QUEUED", "RUNNING")) return("running")
+        if (identical(state, "FAILED")) return("failed")
+        if (identical(state, "USER_ACTION_REQUIRED") || isTRUE(action)) return("action")
+        "pending"
+      }
+
+      step_badge <- function(state, complete = FALSE, action = FALSE) {
+        if (isTRUE(complete)) return("COMPLETE")
+        if (state %in% c("QUEUED", "RUNNING")) return(state)
+        if (identical(state, "FAILED")) return("FAILED")
+        if (identical(state, "USER_ACTION_REQUIRED") || isTRUE(action)) return("ACTION")
+        "PENDING"
+      }
+
+      step_ui <- function(title, state, detail, complete = FALSE, action = FALSE) {
+        cls <- step_class(state, complete, action)
+        shiny::div(
+          class = paste("srma-handoff-step", cls),
+          shiny::div(
+            class = "srma-handoff-step-head",
+            shiny::span(title, class = "srma-handoff-step-title"),
+            shiny::span(step_badge(state, complete, action), class = "srma-handoff-badge")
+          ),
+          shiny::p(detail)
+        )
+      }
+
+      search_job <- latest_job("generate_search")
+      pubmed_job <- latest_job("retrieve_pubmed")
+      preflight_job <- latest_job("validate_database_inputs")
+
+      search_state <- state_of(search_job)
+      pubmed_state <- state_of(pubmed_job)
+      preflight_state <- state_of(preflight_job)
+
+      search_ready <- identical(search_state, "COMPLETE")
+      pubmed_ready <- identical(pubmed_state, "COMPLETE")
+      preflight_ready <- identical(preflight_state, "COMPLETE")
+
+      manual <- Filter(function(db) identical(db$mode, "guided_manual"), info)
+      manual_ready <- length(manual) == 0L || all(vapply(
+        manual,
+        function(db) isTRUE(db$input_present),
+        logical(1)
+      ))
+      all_inputs_ready <- length(info) > 0L && all(vapply(
+        info,
+        function(db) isTRUE(db$input_present),
+        logical(1)
+      ))
+
+      manual_detail <- if (!length(manual)) {
+        "No manual database export is required for this review."
+      } else {
+        paste(
+          vapply(
+            manual,
+            function(db) paste0(
+              db$label,
+              ": ",
+              if (isTRUE(db$input_present)) "saved" else "export required"
+            ),
+            character(1)
+          ),
+          collapse = " · "
+        )
+      }
+
+      search_detail <- if (search_ready) {
+        "Canonical database search strategies passed search-quality checks."
+      } else if (search_state %in% c("QUEUED", "RUNNING")) {
+        message_of(search_job, "Generating and validating database search strategies.")
+      } else if (identical(search_state, "FAILED")) {
+        message_of(search_job, "Search generation did not complete.")
+      } else if (identical(search_state, "USER_ACTION_REQUIRED")) {
+        message_of(search_job, "Search quality needs review before retrieval.")
+      } else {
+        "Generate and validate the approved database search strategies first."
+      }
+
+      pubmed_detail <- if (pubmed_ready) {
+        "PubMed records were retrieved automatically from the exact quality-approved query."
+      } else if (pubmed_state %in% c("QUEUED", "RUNNING")) {
+        message_of(pubmed_job, "Retrieving PubMed records.")
+      } else if (identical(pubmed_state, "FAILED")) {
+        message_of(pubmed_job, "PubMed retrieval did not complete.")
+      } else if (identical(pubmed_state, "USER_ACTION_REQUIRED")) {
+        message_of(pubmed_job, "PubMed retrieval needs attention.")
+      } else if (search_ready) {
+        "Search quality passed. Run PubMed retrieval next."
+      } else {
+        "Available after canonical search quality PASS."
+      }
+
+      manual_action <- pubmed_ready && !manual_ready
+      manual_state <- if (manual_ready) "COMPLETE" else if (manual_action) "USER_ACTION_REQUIRED" else ""
+
+      preflight_detail <- if (preflight_ready) {
+        "All enabled database inputs passed canonical preflight."
+      } else if (preflight_state %in% c("QUEUED", "RUNNING")) {
+        message_of(preflight_job, "Checking enabled database inputs.")
+      } else if (identical(preflight_state, "FAILED")) {
+        message_of(preflight_job, "Database preflight did not complete.")
+      } else if (identical(preflight_state, "USER_ACTION_REQUIRED")) {
+        message_of(preflight_job, "One or more enabled database inputs still need attention.")
+      } else if (all_inputs_ready) {
+        "All enabled inputs are present. Run Check database inputs."
+      } else {
+        "Complete PubMed retrieval and save every required manual database export first."
+      }
+
+      next_guidance <- if (!search_ready) {
+        "Next: generate the database searches and wait for canonical search quality PASS."
+      } else if (!pubmed_ready) {
+        "Next: retrieve the quality-approved PubMed query. PubMed records will be collected automatically."
+      } else if (!manual_ready) {
+        "Next: run the displayed Embase/CENTRAL strategies in those databases, export all results as RIS, and save each export here."
+      } else if (!preflight_ready) {
+        "Next: all enabled database inputs are present. Run Check database inputs."
+      } else {
+        "Search/import is complete for this saved version. Continue to Screening & Evidence."
+      }
+
+      shiny::div(
+        class = "srma-handoff",
+        shiny::h4("Search & import handoff"),
+        shiny::p(
+          "Follow these four checkpoints. PubMed is retrieved automatically; licensed/manual databases remain user-export steps.",
+          class = "srma-handoff-intro"
+        ),
+        shiny::div(
+          class = "srma-handoff-grid",
+          step_ui("1. Search quality", search_state, search_detail, complete = search_ready),
+          step_ui(
+            "2. PubMed retrieval",
+            pubmed_state,
+            pubmed_detail,
+            complete = pubmed_ready,
+            action = search_ready && !pubmed_ready &&
+              !pubmed_state %in% c("QUEUED", "RUNNING", "FAILED")
+          ),
+          step_ui("3. Manual databases", manual_state, manual_detail, complete = manual_ready, action = manual_action),
+          step_ui(
+            "4. Database preflight",
+            preflight_state,
+            preflight_detail,
+            complete = preflight_ready,
+            action = all_inputs_ready && !preflight_ready &&
+              !preflight_state %in% c("QUEUED", "RUNNING", "FAILED")
+          )
+        ),
+        if (pubmed_ready) {
+          shiny::div(
+            class = "srma-pubmed-files-note",
+            shiny::strong("PubMed retrieval results are available."),
+            shiny::br(),
+            "The retrieved records and retrieval report are registered in Results & Artifacts for review and download.",
+            shiny::br(),
+            shiny::actionButton(
+              "view_pubmed_results",
+              "View PubMed result files"
+            )
+          )
+        },
+        if (preflight_ready) {
+          shiny::div(
+            class = "srma-handoff-next",
+            shiny::strong("All database inputs are ready."),
+            "PubMed and all required manual database inputs passed the version-bound preflight. The next stage will prepare the screening evidence set, merge and deduplicate records, and begin title/abstract screening.",
+            shiny::br(),
+            shiny::actionButton(
+              "continue_to_screening_evidence",
+              "Continue to Screening & Evidence",
+              class = "btn-primary"
+            )
+          )
+        } else {
+          shiny::div(
+            class = "srma-handoff-guidance",
+            shiny::strong("Recommended next action: "),
+            next_guidance
+          )
+        }
+      )
+    })
+
+    output$quality_status<-shiny::renderUI({
       x<-state();shiny::req(x,input$version)
       j<-x$jobs[x$jobs$version_id==input$version & x$jobs$operation=="generate_search",,drop=FALSE]
-      if(!nrow(j))"No generated search quality result for this version." else paste(j$state[1],j$message[1])
+
+      if(!nrow(j)) {
+        return(shiny::div(
+          class="srma-search-status status-idle",
+          "No generated search quality result for this version."
+        ))
+      }
+
+      state_value <- toupper(as.character(j$state[[1L]]))
+      message_value <- as.character(j$message[[1L]])
+      if (is.na(message_value) || !nzchar(trimws(message_value))) message_value <- "Search processing status updated."
+
+      status_class <- switch(
+        state_value,
+        "QUEUED" = "status-running",
+        "RUNNING" = "status-running",
+        "COMPLETE" = "status-complete",
+        "USER_ACTION_REQUIRED" = "status-action",
+        "FAILED" = "status-failed",
+        "status-idle"
+      )
+
+      shiny::div(
+        class=paste("srma-search-status", status_class),
+        shiny::strong(state_value),
+        shiny::span(message_value)
+      )
     })
     output$database_validation <- shiny::renderTable({
       shiny::invalidateLater(2000, session); shiny::req(token(), input$project, input$version)
@@ -2047,13 +3954,44 @@ web_app <- function(settings) {
       shiny::req(input$export_file, input$project, input$version, upload_root)
       saved <- safe(request("upload_database", list(project_id = input$project, version_id = input$version,
         database = input$upload_database, upload = input$export_file)))
-      if (!is.null(saved)) {refresh(refresh() + 1L); notice("Export saved in a new version. Run canonical database preflight to check it.")}
+      if (!is.null(saved)) {
+        if (!is.null(saved$project_id) && srma_has_text(saved$project_id)) {
+          pending_project_selection(as.character(saved$project_id[[1L]]))
+        }
+        if (!is.null(saved$version_id) && srma_has_text(saved$version_id)) {
+          pending_version_selection(as.character(saved$version_id[[1L]]))
+        }
+        refresh(refresh() + 1L)
+        notice("Export saved in a new immutable version. The new version is selected automatically; continue the remaining database import steps there.")
+      }
     })
     shiny::observeEvent(input$preflight, {
       shiny::req(input$project, input$version)
       id <- safe(request("submit", list(project_id = input$project, version_id = input$version, operation = "validate_database_inputs")))
-      if (!is.null(id)) notice("Database preflight queued. Review its report when processing finishes.")
+      if (!is.null(id)) {
+        refresh(refresh() + 1L)
+        notice("Database preflight queued. When it passes, continue to Screening & Evidence.")
+      }
     })
+
+    shiny::observeEvent(input$continue_to_screening_evidence, {
+      shiny::req(input$project, input$version)
+      x <- state()
+      shiny::req(x)
+      rows <- x$jobs[
+        x$jobs$version_id == input$version &
+          x$jobs$operation == "validate_database_inputs" &
+          x$jobs$state == "COMPLETE",
+        , drop = FALSE
+      ]
+      if (!nrow(rows)) {
+        notice("Database preflight must pass for this saved version before screening can begin.")
+        return()
+      }
+      nav_section("studies")
+      shiny::updateTabsetPanel(session, "page", selected = "Screening / Evidence")
+      notice("Search and database import are complete. Continue with screening-set preparation and evidence review.")
+    }, ignoreInit = TRUE)
   }
   shiny::shinyApp(ui, server)
 }

@@ -53,7 +53,7 @@ web_migrate_core <- function(con, settings) {
   })
 }
 web_authorize <- function(con, actor, project_id) {
-  x <- web_query(con, "SELECT p.* FROM projects p JOIN workspace_members m ON p.workspace_id=m.workspace_id WHERE p.id=?p AND m.user_id=?u",
+  x <- web_query(con, "SELECT p.* FROM projects p JOIN workspace_members m ON p.workspace_id=m.workspace_id WHERE p.id=?p AND m.user_id=?u AND p.deleted_at IS NULL",
     p = project_id, u = actor)
   web_assert(nrow(x) == 1L, "This project is not accessible.")
   x
@@ -87,9 +87,10 @@ web_migrate <- function(con, settings) {
     list(version=14L,files="014_release.sql",delimiter=";"),
     list(version=15L,files=c("015_release_immutability.sqlite.sql","015_release_immutability.postgres.sql"),delimiter="-- NEXT"),
     list(version=16L,files="016_security_audit.sql",delimiter=";"),
-    list(version=17L,files=c("017_security_audit_immutability.sqlite.sql","017_security_audit_immutability.postgres.sql"),delimiter="-- NEXT"))
+    list(version=17L,files=c("017_security_audit_immutability.sqlite.sql","017_security_audit_immutability.postgres.sql"),delimiter="-- NEXT"),
+    list(version=18L,files="018_review_soft_delete.sql",delimiter=";"))
   history <- DBI::dbGetQuery(con, "SELECT * FROM schema_migrations WHERE version<>1")
-  web_assert(all(history$version %in% c(2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L)), "Database migration history needs operator review.", "SYSTEM_FAILED")
+  web_assert(all(history$version %in% c(2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L)), "Database migration history needs operator review.", "SYSTEM_FAILED")
   for (migration in migrations) {
     paths <- file.path(dir, migration$files)
     hashes <- vapply(paths, web_sha, character(1))

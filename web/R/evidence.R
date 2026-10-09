@@ -32,6 +32,8 @@ web_b2_start <- function(con,settings,actor,project_id,version_id) {
  web_version_root(con,settings,actor,project_id,version_id)
  j<-web_query(con,"SELECT id,state FROM jobs WHERE project_id=?p AND version_id=?v AND operation='validate_database_inputs' ORDER BY created_at DESC LIMIT 1",p=project_id,v=version_id)
  web_assert(nrow(j)==1L&&j$state=="COMPLETE","Complete database preflight for this exact input version first.","USER_ACTION_REQUIRED")
+ existing<-web_query(con,"SELECT version_id FROM evidence_versions WHERE project_id=?p AND parent_version_id=?v AND stage='INPUT' AND source_job_id IS NULL ORDER BY created_at DESC LIMIT 1",p=project_id,v=version_id)
+ if(nrow(existing))return(list(project_id=project_id,version_id=existing$version_id[[1L]]))
  root<-tempfile("evidence-start-",settings$data_root);dir.create(root);on.exit(unlink(root,recursive=TRUE))
  web_copy_version(con,settings,actor,project_id,version_id,root)
  for(id in web_pipeline_sources(con,project_id,version_id,"validate_database_inputs"))web_overlay_job(con,settings,actor,project_id,version_id,id,root)

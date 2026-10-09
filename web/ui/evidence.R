@@ -2,6 +2,7 @@
 web_b2_ui <- function() shiny::tabPanel("Screening / Evidence",shiny::p("Review the selected saved version. Each edit creates a new version; approval is never copied."),
  shiny::actionButton("evidence_start","Start screening from checked database inputs"),
  shiny::actionButton("evidence_refresh","Load selected evidence version"),shiny::textOutput("evidence_stage"),
+ shiny::uiOutput("evidence_gate_ui"),
  shiny::tableOutput("evidence_progress"),
  shiny::selectInput("evidence_operation","Next processing step",character()),shiny::actionButton("evidence_run","Queue processing"),
  shiny::selectInput("evidence_job","Completed processing result",character()),shiny::actionButton("evidence_accept","Save result as new evidence version"),
@@ -19,15 +20,119 @@ web_b2_server <- function(input,output,session,request,safe,notice,refresh) {
  packet<-shiny::reactiveVal(NULL)
  labels<-c(recommend_screening="Request AI screening recommendations",recommend_eligibility="Request AI full-text recommendations",recommend_extraction="Request AI extraction proposals",recommend_risk_of_bias="Request AI bias-assessment proposals",prepare_screening="Prepare deduplicated screening set",finalize_screening="Finalize title/abstract review and prepare full text",register_fulltext="Register uploaded full-text PDFs",finalize_included_studies="Finalize Human inclusion decisions",prepare_extraction="Prepare structured human extraction",finalize_extraction="Validate Human-verified extraction",prepare_risk_of_bias="Prepare design-specific bias review",finalize_evidence="Finalize Human-approved evidence package")
  names_table<-c(Reviewer_1="Independent reviewer 1",Reviewer_2="Independent reviewer 2",Conflict_Resolution="Conflict resolution",Author_Final_Review="Full-text eligibility and study mapping",Target_Study_Verification="Study characteristics",Target_Outcome_Verification="Outcome values",Signalling_Questions="RoB signalling questions",Domain_Review="RoB domain judgments",Overall_Review="Overall RoB judgments")
+ output$evidence_gate_ui<-shiny::renderUI({
+  refresh()
+  shiny::req(input$project,input$version)
+  x<-safe(request("view",list(project_id=input$project)))
+  if(is.null(x)||is.null(x$gates)||!nrow(x$gates))return(NULL)
+  g<-x$gates[
+    x$gates$version_id==input$version &
+    x$gates$status=="PENDING" &
+    grepl("^b2_",x$gates$gate_type),
+    ,drop=FALSE
+  ]
+  if(!nrow(g))return(
+    shiny::div(
+      style="border-left:4px solid #15803d;background:#f0fdf4;padding:10px 14px;margin:10px 0 14px;border-radius:6px;",
+      shiny::strong("✓ Ready to continue"),
+      shiny::span(" — No human approval is pending for this saved version.")
+    )
+  )
+  gate_labels<-c(
+    b2_protocol="Approve screening start",
+    b2_screening="Approve title/abstract screening",
+    b2_inclusion="Approve final included studies",
+    b2_extraction="Approve verified data extraction",
+    b2_rob="Approve risk-of-bias assessment"
+  )
+  labs<-unname(gate_labels[g$gate_type])
+  miss<-is.na(labs)
+  if(any(miss))labs[miss]<-gsub("_"," ",g$gate_type[miss])
+  shiny::div(
+    style="border-left:4px solid #d97706;background:#fff7ed;padding:12px 14px;margin:10px 0 14px;border-radius:6px;",
+    shiny::strong("! ACTION REQUIRED — Human approval needed"),
+    shiny::p("This saved version requires your approval before the next scientific processing step."),
+    shiny::selectInput(
+      "evidence_gate","Pending human review",
+      choices=stats::setNames(g$id,labs),
+      selected=if(nrow(g))g$id[[1L]] else character()
+    ),
+    shiny::selectInput(
+      "evidence_gate_decision","Your decision",
+      c("Choose a decision"="","Approve"="APPROVED","Reject"="REJECTED")
+    ),
+    shiny::textAreaInput("evidence_gate_rationale","Reason / rationale",rows=2),
+    shiny::actionButton("evidence_gate_record","Record Human decision",class="btn-primary")
+  )
+ })
+ shiny::observeEvent(input$evidence_gate_record,{
+  shiny::req(input$project,input$version,input$evidence_gate)
+  decision<-input$evidence_gate_decision %||b2% ""
+  rationale<-trimws(input$evidence_gate_rationale %||b2% "")
+  if(!decision %in% c("APPROVED","REJECTED")||!nzchar(rationale)){
+    notice("Choose Approve or Reject and provide a rationale.")
+    return()
+  }
+  x<-safe(request("view",list(project_id=input$project)))
+  if(is.null(x)||is.null(x$gates)||!nrow(x$gates))return()
+  valid<-x$gates$id==input$evidence_gate &
+    x$gates$version_id==input$version &
+    x$gates$status=="PENDING" &
+    grepl("^b2_",x$gates$gate_type)
+  if(!any(valid)){
+    notice("That Human Gate is no longer pending for this exact evidence version. Reload the selected evidence version.")
+    return()
+  }
+  done<-safe({
+    request("decide_gate",list(
+      project_id=input$project,
+      gate_id=input$evidence_gate,
+      decision=decision,
+      rationale=rationale
+    ))
+    TRUE
+  })
+  if(isTRUE(done)){
+    refresh(refresh()+1L)
+    shiny::updateSelectInput(session,"evidence_gate_decision",selected="")
+    shiny::updateTextAreaInput(session,"evidence_gate_rationale",value="")
+    notice("Human decision recorded for this exact evidence version.")
+  }
+ })
+
  load<-function(){x<-safe(request("evidence_view",list(project_id=input$project,version_id=input$version)));packet(x);x}
  selected<-shiny::reactive({x<-packet();shiny::req(x,input$evidence_table,input$evidence_row);rows<-x$tables[[input$evidence_table]];hits<-Filter(function(a)identical(a$.row_id,input$evidence_row),rows);shiny::req(length(hits)==1);hits[[1]]})
- saved<-function(v){if(!is.null(v)){packet(NULL);refresh(refresh()+1L);all<-safe(request("view",list(project_id=v$project_id)));shiny::updateSelectInput(session,"version",choices=stats::setNames(all$versions$id,paste("Version",all$versions$version)),selected=v$version_id);notice("Saved a new evidence version. Load it to continue; pending approvals must be decided explicitly.")}}
+ saved<-function(v){if(!is.null(v)){
+  packet(NULL)
+  refresh(refresh()+1L)
+  all<-safe(request("view",list(project_id=v$project_id)))
+  if(!is.null(all)&&nrow(all$versions)){
+   choices<-stats::setNames(all$versions$id,paste("Version",all$versions$version))
+   session$onFlushed(function(){
+    shiny::updateSelectInput(session,"version",choices=choices,selected=v$version_id)
+   },once=TRUE)
+  }
+  notice("Saved a new evidence version. The new version is selected automatically; load it to continue. Pending approvals must be decided explicitly.")
+ }}
  shiny::observeEvent(list(input$project,input$version),packet(NULL))
  shiny::observeEvent(input$evidence_refresh,{load()})
  shiny::observeEvent(input$evidence_start,saved(safe(request("evidence_start",list(project_id=input$project,version_id=input$version)))))
  output$evidence_stage<-shiny::renderText({x<-packet();if(is.null(x))return("Load this version to review its evidence. Start a new screening set only from checked database inputs.");paste("Selected stage:",if(x$stage=="READY")"FINAL / APPROVED evidence — no meta-analysis performed" else x$stage,"— review the source, save your decision, then request the next processing step.")})
  output$evidence_progress<-shiny::renderTable({x<-packet();shiny::req(x);do.call(rbind,lapply(names(x$tables),function(t){rows<-x$tables[[t]];data.frame(Section=unname(names_table[t]) %||b2% t,Rows=length(rows),Human_entries=sum(vapply(rows,function(a)!is.null(a$.actor),logical(1))),Verified=sum(vapply(rows,function(a)identical(a$verification_status,"Verified"),logical(1))))}))})
- shiny::observe({x<-packet();shiny::req(x);tables<-names(x$tables);labs<-unname(names_table[tables]);labs[is.na(labs)]<-tables[is.na(labs)];shiny::updateSelectInput(session,"evidence_table",choices=stats::setNames(tables,labs),selected=shiny::isolate(input$evidence_table));ops<-names(web_b2_operations())[web_b2_operations()==x$stage];shiny::updateSelectInput(session,"evidence_operation",choices=stats::setNames(ops,unname(labels[ops])))})
+ shiny::observe({x<-packet();shiny::req(x)
+  tables<-names(x$tables)
+  if(is.null(tables))tables<-character()
+  labs<-unname(names_table[tables])
+  if(length(labs)){miss<-is.na(labs);labs[miss]<-tables[miss]}
+  shiny::updateSelectInput(session,"evidence_table",
+    choices=if(length(tables))stats::setNames(tables,labs) else character(),
+    selected=shiny::isolate(input$evidence_table))
+  ops<-names(web_b2_operations())[web_b2_operations()==x$stage]
+  if(is.null(ops))ops<-character()
+  op_labs<-unname(labels[ops])
+  shiny::updateSelectInput(session,"evidence_operation",
+    choices=if(length(ops))stats::setNames(ops,op_labs) else character())
+ })
  shiny::observe({shiny::invalidateLater(2000,session);shiny::req(packet(),input$project,input$version);x<-safe(request("view",list(project_id=input$project)));shiny::req(x);j<-x$jobs[x$jobs$version_id==input$version&x$jobs$operation %in% names(web_b2_operations())&x$jobs$state=="COMPLETE",,drop=FALSE];shiny::updateSelectInput(session,"evidence_job",choices=if(nrow(j))stats::setNames(j$id,paste(unname(labels[j$operation]),j$created_at)) else character(),selected=shiny::isolate(input$evidence_job))})
  shiny::observe({x<-packet();shiny::req(x,input$evidence_table);rows<-x$tables[[input$evidence_table]];queue<-input$evidence_queue %||b2% "all"
   if(queue=="pending")rows<-Filter(function(a)is.null(a$.actor),rows)
