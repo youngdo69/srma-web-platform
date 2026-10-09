@@ -5,7 +5,7 @@
 # v0.8.2 purpose
 # ------------------------------------------------------------
 # 1. Read canonical concept-based search terms
-# 2. Generate PubMed / Embase / CENTRAL strategies
+# 2. Generate PubMed / Embase strategies and a CENTRAL guided UI search plan
 # 3. Detect logical-overlap / ambiguous-acronym risks
 # 4. Obtain a PubMed count BEFORE download
 # 5. Use the existing LLM provider to judge whether the search
@@ -156,8 +156,16 @@ format_embase_emtree <- function(term) {
   )
 }
 
-# CENTRAL does not accept '/' in the generated query.
-# For free text, replace slash characters with spaces.
+# CENTRAL is executed through the Cochrane Library Advanced Search UI.
+# The current interface is safest when MeSH concepts are added through
+# Medical terms (MeSH), free text is sent from Search with the field
+# dropdown set to Title Abstract Keyword, and Search Manager combines
+# the resulting numbered lines. R/11 therefore emits a guided search
+# plan rather than a single paste-ready query string.
+#
+# CENTRAL does not accept PubMed slash-qualified MeSH headings as a
+# direct translation target. Free-text slashes are converted to spaces;
+# qualified MeSH candidates are omitted rather than silently broadened.
 sanitize_central_free_text <- function(term) {
   term <- trimws(term)
   term <- gsub("/", " ", term, fixed = TRUE)
@@ -165,12 +173,6 @@ sanitize_central_free_text <- function(term) {
   trimws(term)
 }
 
-# PubMed MeSH qualifiers such as "Aortic Valve/surgery" cannot be
-# translated safely into CENTRAL by simply retaining '/'.
-# To avoid invalid syntax AND avoid broadening the concept by silently
-# converting a qualified heading into its broad parent heading, omit
-# qualified descriptors from CENTRAL. Existing concept free-text terms
-# remain available in the same OR block.
 sanitize_central_mesh_term <- function(term) {
   term <- trimws(term)
 
@@ -181,28 +183,170 @@ sanitize_central_mesh_term <- function(term) {
   term
 }
 
+# Free-text terms are intentionally emitted WITHOUT :ti,ab,kw.
+# The user selects Title Abstract Keyword in the Cochrane Search UI.
 format_central_free_text <- function(term) {
   term <- sanitize_central_free_text(term)
 
   if (!nzchar(term)) return("")
 
   if (is_single_word(term)) {
-    paste0(term, ":ti,ab,kw")
+    term
   } else {
-    paste0(quote_term(term), ":ti,ab,kw")
+    quote_term(term)
   }
 }
 
+# MeSH is emitted as a candidate label only. The user resolves it in
+# Medical terms (MeSH) and adds the accepted descriptor to Search Manager.
 format_central_mesh <- function(term) {
   term <- sanitize_central_mesh_term(term)
 
   if (!nzchar(term)) return("")
 
-  paste0(
-    '[mh "',
-    escape_quotes(term),
-    '"]'
+  term
+}
+
+build_central_guided_plan <- function(concepts) {
+  lines <- c(
+    "CENTRAL GUIDED SEARCH PLAN",
+    "PLAN_VERSION: 1",
+    "EXECUTION_MODE: COCHRANE_LIBRARY_ADVANCED_SEARCH_UI",
+    "",
+    "IMPORTANT:",
+    "- Do not paste PubMed-style [mh ...] syntax into Search Manager.",
+    "- Do not type :ti,ab,kw directly into the query text.",
+    "- Add MeSH through Medical terms (MeSH).",
+    "- Add free text through Search with Field = Title Abstract Keyword, then Send to search manager.",
+    "- Use Search Manager only to combine the numbered lines.",
+    "- The line numbers below assume each action is added in order. If Cochrane assigns different numbers or a MeSH candidate is unavailable, use the actual Search Manager line numbers."
   )
+
+  next_line <- 1L
+  concept_refs <- character(0)
+  concept_index <- 0L
+
+  for (concept in concepts) {
+    concept_index <- concept_index + 1L
+
+    concept_id <- as.character(
+      concept$concept_id %||% paste0("concept_", concept_index)
+    )
+    concept_label <- as.character(
+      concept$label %||% concept_id
+    )
+
+    lines <- c(
+      lines,
+      "",
+      paste0("CONCEPT ", concept_index, ": ", concept_label),
+      paste0("CONCEPT_ID: ", concept_id)
+    )
+
+    component_refs <- character(0)
+
+    mesh_terms <- remove_empty(
+      vapply(
+        concept$pubmed_mesh,
+        format_central_mesh,
+        character(1)
+      )
+    )
+
+    if (length(mesh_terms) > 0L) {
+      for (mesh_term in mesh_terms) {
+        ref <- paste0("#", next_line)
+        lines <- c(
+          lines,
+          paste0("SEARCH_MANAGER_LINE: ", ref),
+          "SOURCE_TAB: Medical terms (MeSH)",
+          paste0("MESH_CANDIDATE: ", mesh_term),
+          "ACTION: Find the descriptor in Medical terms (MeSH), keep explode enabled when appropriate, and Add to search manager."
+        )
+        component_refs <- c(component_refs, ref)
+        next_line <- next_line + 1L
+      }
+    } else {
+      lines <- c(lines, "MESH_CANDIDATE: NONE")
+    }
+
+    free_terms <- remove_empty(
+      vapply(
+        concept$free_text_terms,
+        format_central_free_text,
+        character(1)
+      )
+    )
+
+    if (length(free_terms) > 0L) {
+      ref <- paste0("#", next_line)
+      free_query <- paste0(
+        "(",
+        paste(free_terms, collapse = " OR "),
+        ")"
+      )
+
+      lines <- c(
+        lines,
+        paste0("SEARCH_MANAGER_LINE: ", ref),
+        "SOURCE_TAB: Search",
+        paste0("SEARCH_TEXT: ", free_query),
+        "FIELD_SELECTION: Title Abstract Keyword",
+        "ACTION: Send to search manager."
+      )
+      component_refs <- c(component_refs, ref)
+      next_line <- next_line + 1L
+    } else {
+      lines <- c(lines, "SEARCH_TEXT: NONE")
+    }
+
+    if (length(component_refs) == 0L) {
+      stop(
+        "CENTRAL guided-plan generation found a concept with no usable MeSH or free-text terms: ",
+        concept_id,
+        call. = FALSE
+      )
+    }
+
+    if (length(component_refs) > 1L) {
+      ref <- paste0("#", next_line)
+      combine_expression <- paste(component_refs, collapse = " OR ")
+
+      lines <- c(
+        lines,
+        paste0("SEARCH_MANAGER_LINE: ", ref),
+        "SOURCE_TAB: Search manager",
+        paste0("COMBINE: ", combine_expression),
+        "ACTION: Enter this OR combination on the next Search Manager line."
+      )
+      concept_refs <- c(concept_refs, ref)
+      next_line <- next_line + 1L
+    } else {
+      concept_refs <- c(concept_refs, component_refs[[1L]])
+    }
+  }
+
+  if (length(concept_refs) < 2L) {
+    stop(
+      "CENTRAL guided-plan generation requires at least two concept result lines.",
+      call. = FALSE
+    )
+  }
+
+  final_ref <- paste0("#", next_line)
+  final_expression <- paste(concept_refs, collapse = " AND ")
+
+  lines <- c(
+    lines,
+    "",
+    "FINAL_SEARCH_MANAGER_COMBINATION",
+    paste0("SEARCH_MANAGER_LINE: ", final_ref),
+    "SOURCE_TAB: Search manager",
+    paste0("COMBINE: ", final_expression),
+    "ACTION: Run this final line, record the result count and search date, then export all CENTRAL records as RIS."
+  )
+
+  paste(lines, collapse = "\n")
 }
 
 collect_concept_terms <- function(concept) {
@@ -448,36 +592,13 @@ build_database_searches <- function(concepts) {
     character(1)
   )
 
-  central_blocks <- vapply(
-    included,
-    function(concept) {
-      combine_or_block(
-        c(
-          vapply(
-            concept$pubmed_mesh,
-            format_central_mesh,
-            character(1)
-          ),
-          vapply(
-            concept$free_text_terms,
-            format_central_free_text,
-            character(1)
-          )
-        )
-      )
-    },
-    character(1)
-  )
+  central_query <- build_central_guided_plan(included)
 
-  central_query <- paste(
-    central_blocks[nzchar(central_blocks)],
-    collapse = "\nAND\n"
-  )
-
-  # CENTRAL generation guard: '/' must never reach the output query.
+  # CENTRAL generation guard: PubMed/Embase slash-qualified syntax must
+  # never reach the guided plan.
   if (grepl("/", central_query, fixed = TRUE)) {
     stop(
-      "CENTRAL search generation produced an unsupported '/' character.",
+      "CENTRAL guided search plan produced an unsupported '/' character.",
       call. = FALSE
     )
   }
@@ -2519,7 +2640,7 @@ cat("\nEMBASE SEARCH\n")
 cat("----------------------------------------------------\n")
 cat(final_strategy$embase, "\n")
 
-cat("\nCENTRAL SEARCH\n")
+cat("\nCENTRAL GUIDED SEARCH PLAN\n")
 cat("----------------------------------------------------\n")
 cat(final_strategy$central, "\n")
 

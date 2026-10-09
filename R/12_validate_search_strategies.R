@@ -7,7 +7,7 @@
 # 1. Load the active canonical project configuration
 # 2. Resolve search-strategy and log paths through path_utils.R
 # 3. Validate only databases enabled in project_config.yml
-# 4. Preserve the established structural and syntax checks
+# 4. Preserve established checks and validate CENTRAL as a guided Cochrane UI plan
 #
 # IMPORTANT
 # ------------------------------------------------------------
@@ -544,34 +544,212 @@ validate_embase <- function(text) {
 # CENTRAL-specific checks
 # ---------------------------------------------------------
 
+check_central_line_references <- function(text) {
+  lines <- trimws(
+    unlist(
+      strsplit(text, "\n", fixed = TRUE)
+    )
+  )
+
+  defined <- integer(0)
+  current_line <- NA_integer_
+  errors <- character(0)
+
+  for (line in lines) {
+    if (grepl("^SEARCH_MANAGER_LINE: #[0-9]+$", line, perl = TRUE)) {
+      current_line <- suppressWarnings(
+        as.integer(
+          sub("^SEARCH_MANAGER_LINE: #", "", line)
+        )
+      )
+
+      if (is.na(current_line)) {
+        errors <- c(errors, paste0("Invalid Search Manager line: ", line))
+        next
+      }
+
+      if (current_line %in% defined) {
+        errors <- c(
+          errors,
+          paste0("Search Manager line is defined more than once: #", current_line)
+        )
+      }
+
+      if (length(defined) > 0L && current_line <= max(defined)) {
+        errors <- c(
+          errors,
+          paste0("Search Manager lines are not strictly increasing at #", current_line)
+        )
+      }
+
+      defined <- c(defined, current_line)
+      next
+    }
+
+    if (grepl("^COMBINE:", line, perl = TRUE)) {
+      refs <- regmatches(
+        line,
+        gregexpr("#[0-9]+", line, perl = TRUE)
+      )[[1]]
+
+      if (identical(refs, character(0)) || identical(refs, "")) {
+        errors <- c(errors, paste0("Combination has no line references: ", line))
+        next
+      }
+
+      ref_numbers <- suppressWarnings(
+        as.integer(sub("^#", "", refs))
+      )
+
+      if (is.na(current_line)) {
+        errors <- c(errors, paste0("Combination has no assigned output line: ", line))
+        next
+      }
+
+      bad_refs <- ref_numbers[
+        is.na(ref_numbers) |
+          !(ref_numbers %in% defined) |
+          ref_numbers >= current_line
+      ]
+
+      if (length(bad_refs) > 0L) {
+        errors <- c(
+          errors,
+          paste0(
+            "Combination references undefined or non-prior lines: ",
+            paste(unique(bad_refs), collapse = ", ")
+          )
+        )
+      }
+    }
+  }
+
+  list(
+    passed = length(errors) == 0L && length(defined) >= 2L,
+    message = if (length(errors) == 0L && length(defined) >= 2L) {
+      paste0(
+        "Search Manager line references are ordered and internally consistent; ",
+        length(defined),
+        " line(s) defined."
+      )
+    } else if (length(errors) > 0L) {
+      paste(errors, collapse = " ")
+    } else {
+      "At least two Search Manager lines must be defined."
+    }
+  )
+}
+
 validate_central <- function(text) {
 
   checks <- list()
 
-  checks$no_slash <- list(
-    passed = !grepl("/", text, fixed = TRUE),
+  checks$guided_plan_marker <- list(
+    passed = grepl(
+      "CENTRAL GUIDED SEARCH PLAN",
+      text,
+      fixed = TRUE
+    ),
     message = paste(
-      "CENTRAL strategy must not contain '/'.",
-      "Remove unsupported slash-qualified syntax before database testing."
+      "CENTRAL must use the guided Advanced Search UI plan emitted by R/11,",
+      "not a single paste-ready query string."
     )
   )
 
-  checks$text_fields <- list(
-    passed = has_regex(
+  checks$execution_mode <- list(
+    passed = grepl(
+      "EXECUTION_MODE: COCHRANE_LIBRARY_ADVANCED_SEARCH_UI",
+      text,
+      fixed = TRUE
+    ),
+    message = "CENTRAL execution mode must be COCHRANE_LIBRARY_ADVANCED_SEARCH_UI."
+  )
+
+  checks$no_slash <- list(
+    passed = !grepl("/", text, fixed = TRUE),
+    message = paste(
+      "CENTRAL guided plan must not contain '/'.",
+      "Qualified PubMed/Embase syntax must not be carried into CENTRAL."
+    )
+  )
+
+  checks$no_direct_field_suffix <- list(
+    passed = !has_regex(
       text,
       ":ti,ab,kw"
     ),
-    message = "At least one :ti,ab,kw field restriction is required."
+    message = paste(
+      "Do not type :ti,ab,kw directly into CENTRAL query text.",
+      "Use Field = Title Abstract Keyword in the Search UI."
+    )
   )
 
-  checks$mesh_descriptor <- list(
-    passed = has_regex(
+  checks$no_direct_mesh_syntax <- list(
+    passed = !has_regex(
       text,
-      '\\[mh\\s+(?:\\^\\s*)?"[^"]+"\\]'
+      '\\[mh\\s+|MeSH\\s+descriptor\\s*:'
     ),
     message = paste(
-      'No CENTRAL MeSH syntax [mh "Term"] or [mh ^"Term"] was detected.',
-      "This may be acceptable only if intentionally omitted."
+      "Do not paste [mh ...] or MeSH descriptor: syntax into Search Manager.",
+      "Resolve MeSH through Medical terms (MeSH) and add it to Search Manager."
+    )
+  )
+
+  checks$mesh_guidance <- list(
+    passed = grepl(
+      "MESH_CANDIDATE:",
+      text,
+      fixed = TRUE
+    ),
+    message = "CENTRAL plan must explicitly record MeSH candidate handling."
+  )
+
+  has_free_text_query <- has_regex(
+    text,
+    "SEARCH_TEXT:\s*\("
+  )
+
+  checks$free_text_guidance <- list(
+    passed = grepl(
+      "SEARCH_TEXT:",
+      text,
+      fixed = TRUE
+    ),
+    message = "CENTRAL plan must explicitly record free-text handling."
+  )
+
+  checks$field_selection <- list(
+    passed = (
+      !has_free_text_query ||
+        grepl(
+          "FIELD_SELECTION: Title Abstract Keyword",
+          text,
+          fixed = TRUE
+        )
+    ),
+    message = paste(
+      "Every CENTRAL free-text query must be sent from Search with",
+      "Field = Title Abstract Keyword."
+    )
+  )
+
+  checks$search_manager_lines <- check_central_line_references(text)
+
+  checks$final_combination <- list(
+    passed = (
+      grepl(
+        "FINAL_SEARCH_MANAGER_COMBINATION",
+        text,
+        fixed = TRUE
+      ) &&
+        has_regex(
+          text,
+          "COMBINE:\s*#[0-9]+(?:\s+AND\s+#[0-9]+)+"
+        )
+    ),
+    message = paste(
+      "CENTRAL plan must end with a Search Manager combination",
+      "that joins concept-result lines with AND."
     )
   )
 
@@ -586,9 +764,9 @@ validate_central <- function(text) {
   checks$no_embase_explosion <- list(
     passed = !has_regex(
       text,
-      "'/exp"
+      "'/exp|'/de"
     ),
-    message = "Embase '/exp syntax was detected in CENTRAL."
+    message = "Embase descriptor syntax was detected in CENTRAL."
   )
 
   checks
@@ -652,7 +830,7 @@ validate_strategy <- function(
 
   text <- read_strategy(file_path)
 
-  general_checks <- list(
+  common_general_checks <- list(
 
     file_not_empty = list(
       passed = (
@@ -674,14 +852,28 @@ validate_strategy <- function(
       )
     ),
 
-    parentheses = check_parentheses(text),
-    
-    boolean_placement = check_boolean_placement(text),
-
-    boolean_presence = check_boolean_presence(text),
-
-    duplicate_lines = check_duplicate_lines(text)
+    parentheses = check_parentheses(text)
   )
+
+  # CENTRAL is now a guided UI execution plan rather than a single
+  # database query. Generic Boolean-placement and duplicate-line checks
+  # would incorrectly treat repeated instruction labels as query terms.
+  # CENTRAL-specific structure is validated below instead.
+  general_checks <- if (
+    identical(database, "CENTRAL") &&
+      grepl("CENTRAL GUIDED SEARCH PLAN", text, fixed = TRUE)
+  ) {
+    common_general_checks
+  } else {
+    c(
+      common_general_checks,
+      list(
+        boolean_placement = check_boolean_placement(text),
+        boolean_presence = check_boolean_presence(text),
+        duplicate_lines = check_duplicate_lines(text)
+      )
+    )
+  }
 
   general_report <- checks_to_dataframe(
     database = database,
@@ -821,7 +1013,7 @@ report_lines <- c(
   paste(
     "This report performs local structural checks only.",
     "It does not guarantee acceptance by PubMed, Embase,",
-    "or the Cochrane Library search interface."
+    "or successful execution in the Cochrane Library search interface."
   )
 )
 
