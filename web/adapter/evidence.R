@@ -37,6 +37,17 @@ web_b2_canonical <- function(request,config,paths,root,input_manifest) {
  strip<-function(p)sub(paste0(root,"/"),"",p,fixed=TRUE)
  csv<-function(p)readr::read_csv(p,col_types=readr::cols(.default=readr::col_character()),show_col_types=FALSE)
  if(op %in% names(web_b2_ai_operations())) {
+  # Canonical AI scripts call load_project_env(".env"). In Web execution the
+  # operator credential is already inherited through the process environment;
+  # secrets must never be copied into an immutable snapshot or job workspace.
+  # Create an empty private compatibility file so the canonical loader keeps
+  # using the inherited environment variable without persisting the secret.
+  env_bridge<-file.path(root,".env")
+  if(!file.exists(env_bridge)){
+   web_assert(file.create(env_bridge),"Could not prepare the private provider environment bridge.","SYSTEM_FAILED")
+   try(Sys.chmod(env_bridge,mode="0600"),silent=TRUE)
+  }
+  on.exit(unlink(env_bridge),add=TRUE)
   source(file.path(engine,"web/adapter/evidence_ai.R"))
   x<-web_b2_ai(op,engine,root,paths,x,run)
  } else if(op=="prepare_screening") {

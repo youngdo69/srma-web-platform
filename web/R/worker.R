@@ -18,6 +18,54 @@ web_claim <- function(con) {
     web_query(con, "SELECT * FROM jobs WHERE id=?id", id = j$id)
   })
 }
+
+web_screening_checkpoint_count <- function(path) {
+  if (!is.character(path) || length(path) != 1L || !file.exists(path)) return(0L)
+  x <- tryCatch(utils::read.csv(path, stringsAsFactors = FALSE, check.names = FALSE), error = function(e) NULL)
+  if (is.null(x) || !nrow(x)) return(0L)
+  if (all(c("screening_id", "validation_status") %in% names(x))) {
+    ok <- !is.na(x$screening_id) & nzchar(trimws(as.character(x$screening_id))) &
+      as.character(x$validation_status) == "valid"
+    return(length(unique(as.character(x$screening_id[ok]))))
+  }
+  nrow(x)
+}
+
+web_seed_prior_screening_checkpoint <- function(con, settings, j, work) {
+  if (!identical(as.character(j$operation), "recommend_screening")) return(0L)
+  prior <- web_query(con,
+    "SELECT id,diagnostic_locator,created_at FROM jobs WHERE project_id=?p AND version_id=?v AND operation='recommend_screening' AND state='FAILED' AND id<>?id AND diagnostic_locator IS NOT NULL ORDER BY created_at DESC",
+    p=j$project_id,v=j$version_id,id=j$id)
+  if (!nrow(prior)) return(0L)
+  for (i in seq_len(nrow(prior))) {
+    loc <- as.character(prior$diagnostic_locator[[i]])
+    if (!nzchar(loc)) next
+    old_project <- file.path(settings$data_root, loc, "project")
+    if (!dir.exists(old_project)) next
+    hits <- list.files(old_project, pattern="^agent_screening_checkpoint[.]csv$", recursive=TRUE, full.names=TRUE)
+    if (!length(hits)) next
+    src <- hits[[1L]]
+    n <- web_screening_checkpoint_count(src)
+    if (n <= 0L) next
+    old_norm <- normalizePath(old_project, winslash="/", mustWork=TRUE)
+    src_norm <- normalizePath(src, winslash="/", mustWork=TRUE)
+    rel <- substring(src_norm, nchar(old_norm)+2L)
+    dest <- file.path(work, rel)
+    dir.create(dirname(dest), recursive=TRUE, showWarnings=FALSE)
+    if (isTRUE(file.copy(src, dest, overwrite=TRUE))) return(n)
+  }
+  0L
+}
+
+web_operation_stale_seconds <- function(operation, settings) {
+  if (identical(as.character(operation), "recommend_screening")) {
+    x <- suppressWarnings(as.numeric(Sys.getenv("SRMA_WEB_AI_SCREENING_TIMEOUT", "43200")))
+    if (!is.finite(x) || x < 3600) x <- 43200
+    return(x + 60)
+  }
+  as.numeric(settings$timeout) + 60
+}
+
 web_worker_once <- function(con, settings) {
   j <- web_claim(con)
   if (is.null(j)) return(invisible(NULL))
@@ -43,15 +91,25 @@ web_worker_once <- function(con, settings) {
     sources <- web_query(con,"SELECT source_job_id FROM job_sources WHERE job_id=?j AND project_id=?p AND version_id=?v",j=j$id,p=j$project_id,v=j$version_id)
     owner <- web_query(con,"SELECT user_id FROM workspace_members WHERE workspace_id=?w LIMIT 1",w=p$workspace_id)$user_id
     for(source in sources$source_job_id) web_overlay_job(con,settings,owner,j$project_id,j$version_id,source,work)
+    resumed <- web_seed_prior_screening_checkpoint(con,settings,j,work)
+    if(resumed>0L) {
+      web_exec(con,"UPDATE jobs SET message=?m,updated_at=?now WHERE id=?id AND state='RUNNING' AND worker_token=?token",
+        m=paste0("Resuming AI screening from ",resumed," preserved checkpoint decisions…"),now=web_now(),id=j$id,token=j$worker_token)
+      web_audit(con,p,"JOB_CHECKPOINT_RESUMED",j$id,detail=list(completed=resumed))
+    }
     web_b2_guard(con,settings,owner,j$project_id,j$version_id,j$operation)
     web_c1_guard(con,settings,owner,j$project_id,j$version_id,j$operation)
   web_c2_guard(con,settings,owner,j$project_id,j$version_id,j$operation)
   web_c3_guard(con,settings,owner,j$project_id,j$version_id,j$operation)
     if(j$operation=="run_final_qc") {proof<-web_c3_collect(con,settings,owner,j$project_id,j$version_id,work);jsonlite::write_json(proof,file.path(work,"config/generated/final_qc_input.json"),auto_unbox=TRUE,null="null",digits=NA)}
     web_require_activated(con,j$project_id,j$version_id,j$operation)
-    web_exec(con, "UPDATE jobs SET progress=30,message=?message,heartbeat=?time,updated_at=?now WHERE id=?id AND state='RUNNING' AND worker_token=?token",
-      message = web_registry()[[j$operation]]$progress, time = as.numeric(Sys.time()), now = web_now(), id = j$id, token = j$worker_token)
-    web_audit(con, p, "JOB_PROGRESS", j$id, detail = list(progress = 30))
+    starting_progress <- if(identical(j$operation,"recommend_screening")) 0L else 30L
+    starting_message <- if(identical(j$operation,"recommend_screening"))
+      "AI title/abstract screening is running. Large reviews may take several hours; checkpointed decisions are preserved." else
+      web_registry()[[j$operation]]$progress
+    web_exec(con, "UPDATE jobs SET progress=?progress,message=?message,heartbeat=?time,updated_at=?now WHERE id=?id AND state='RUNNING' AND worker_token=?token",
+      progress=starting_progress,message=starting_message,time=as.numeric(Sys.time()),now=web_now(),id=j$id,token=j$worker_token)
+    web_audit(con,p,"JOB_PROGRESS",j$id,detail=list(progress=starting_progress))
     srma_run(settings, p$canonical_id, j$operation, list(), j$id, work, j$engine_id, file.path(attempt, "engine"),version_id=j$version_id)
   }, error = function(e) web_result(j$operation, p$canonical_id, j$id, "FAILED",
        if (inherits(e, "srma_web_error")) conditionMessage(e) else "Processing could not finish. The operator can inspect the diagnostic record.",
@@ -94,16 +152,26 @@ web_worker_once <- function(con, settings) {
   invisible(j$id)
 }
 web_recover_stale <- function(con, settings) {
-  # Checks are replay-safe and isolated. Recovery marks FAILED; explicit retry remains bounded.
+  # Long-running screening uses a longer lease; ordinary jobs retain the
+  # standard timeout. Recovery remains fenced by the current worker token.
   web_tx(con, function() {
-    jobs <- web_query(con, "SELECT * FROM jobs WHERE state='RUNNING' AND heartbeat<?before", before = as.numeric(Sys.time()) - settings$timeout - 60)
+    jobs <- web_query(con, "SELECT * FROM jobs WHERE state='RUNNING'")
+    if (!nrow(jobs)) return(0L)
+    recovered <- 0L
+    now_num <- as.numeric(Sys.time())
     for (i in seq_len(nrow(jobs))) {
       j <- jobs[i, , drop = FALSE]
+      cutoff <- now_num - web_operation_stale_seconds(j$operation, settings)
+      hb <- suppressWarnings(as.numeric(j$heartbeat))
+      if (!is.finite(hb) || hb >= cutoff) next
       r <- web_result(j$operation, j$project_id, j$id, "FAILED", "Processing was interrupted. The operator can retry this check.", j$engine_id, "SYSTEM_FAILED", "Worker lease expired; late completion is fenced.")
       n <- web_exec(con, "UPDATE jobs SET state='FAILED',message=?m,result_json=?r,worker_token=NULL,updated_at=?now WHERE id=?id AND state='RUNNING' AND worker_token=?token AND heartbeat<?before",
-        before = as.numeric(Sys.time()) - settings$timeout - 60, m = r$user_message, r = as.character(web_json(r)), now = web_now(), id = j$id, token = j$worker_token)
-      if (n) web_audit(con, web_query(con, "SELECT * FROM projects WHERE id=?p", p = j$project_id), "WORKER_LEASE_EXPIRED", j$id)
+        before=cutoff,m=r$user_message,r=as.character(web_json(r)),now=web_now(),id=j$id,token=j$worker_token)
+      if (n) {
+        recovered <- recovered + 1L
+        web_audit(con, web_query(con, "SELECT * FROM projects WHERE id=?p", p=j$project_id), "WORKER_LEASE_EXPIRED", j$id)
+      }
     }
-    nrow(jobs)
+    recovered
   })
 }

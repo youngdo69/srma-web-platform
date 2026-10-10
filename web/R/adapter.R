@@ -40,8 +40,22 @@ srma_run <- function(settings, project_id, operation, payload, job_id, project_d
     settings <- scientific
   }
   if(operation %in% names(web_b2_operations())) {
-    if(operation %in% names(web_b2_ai_operations()) && !nzchar(Sys.getenv(web_b2_credential_name(settings$engine_root,operation),"")))return(web_result(operation,project_id,job_id,"USER_ACTION_REQUIRED","AI assistance requires operator credentials; use manual Human review.",engine_version,"USER_ACTION_REQUIRED"))
+    if(operation %in% names(web_b2_ai_operations())) {
+      # Load operator-controlled .env using the same provider path as the rest
+      # of the Web application before checking the B2 AI credential.
+      web_provider_ready(settings)
+      if(!nzchar(Sys.getenv(web_b2_credential_name(settings$engine_root,operation),"")))
+        return(web_result(operation,project_id,job_id,"USER_ACTION_REQUIRED","AI assistance requires operator credentials; use manual Human review.",engine_version,"USER_ACTION_REQUIRED"))
+    }
     settings<-web_science_settings(settings)
+    # Title/abstract AI screening is intentionally long-running.  The canonical
+    # R/19 process checkpoints frequently and may legitimately run for hours on
+    # large reviews, so it must not inherit the ordinary short Web job timeout.
+    if(identical(operation,"recommend_screening")) {
+      ai_timeout<-suppressWarnings(as.integer(Sys.getenv("SRMA_WEB_AI_SCREENING_TIMEOUT","43200")))
+      if(is.na(ai_timeout)||ai_timeout<3600L)ai_timeout<-43200L
+      settings$timeout<-max(as.integer(settings$timeout),ai_timeout)
+    }
   }
   if(operation %in% c(names(web_c1_operations()),names(web_c2_operations())))settings<-web_science_settings(settings)
   web_engine_call(settings, list(action = operation, project_id = project_id, job_id = job_id,

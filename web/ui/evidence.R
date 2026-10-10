@@ -1,10 +1,20 @@
 # Human review UI; labels describe decisions, never engine script numbers.
-web_b2_ui <- function() shiny::tabPanel("Screening / Evidence",shiny::p("Review the selected saved version. Each edit creates a new version; approval is never copied."),
+web_b2_ui <- function() shiny::tabPanel("Screening / Evidence",
+ shiny::tags$script(shiny::HTML("
+Shiny.addCustomMessageHandler('srmaEvidenceRunButton', function(x) {
+  var el = document.getElementById('evidence_run');
+  if (!el) return;
+  el.disabled = !!x.disabled;
+  el.innerText = x.label || 'Queue processing';
+});
+")),
+ shiny::p("Review the selected saved version. Each edit creates a new version; approval is never copied."),
  shiny::actionButton("evidence_start","Start screening from checked database inputs"),
  shiny::actionButton("evidence_refresh","Load selected evidence version"),shiny::textOutput("evidence_stage"),
  shiny::uiOutput("evidence_gate_ui"),
  shiny::tableOutput("evidence_progress"),
- shiny::selectInput("evidence_operation","Next processing step",character()),shiny::actionButton("evidence_run","Queue processing"),
+ shiny::selectInput("evidence_operation","Next processing step",character()),shiny::actionButton("evidence_run","Queue processing",onclick="this.disabled=true;this.innerText='Submitting…';"),
+ shiny::uiOutput("evidence_job_status"),
  shiny::selectInput("evidence_job","Completed processing result",character()),shiny::actionButton("evidence_accept","Save result as new evidence version"),
  shiny::p("Before finalizing a stage, explicitly approve its pending gate under Human Review Required. Automated outputs and AI recommendations are not human approvals."),
  shiny::selectInput("evidence_table","Review section",character()),shiny::textInput("evidence_filter","Find title, ID or review status"),
@@ -18,7 +28,31 @@ web_b2_ui <- function() shiny::tabPanel("Screening / Evidence",shiny::p("Review 
  shiny::fileInput("evidence_pdf","Full-text PDF for selected report",accept=".pdf"),shiny::actionButton("evidence_upload","Save PDF in a new version"))
 web_b2_server <- function(input,output,session,request,safe,notice,refresh) {
  packet<-shiny::reactiveVal(NULL)
+ set_run_button<-function(disabled=FALSE,label="Queue processing") {
+  session$sendCustomMessage("srmaEvidenceRunButton",list(disabled=isTRUE(disabled),label=label))
+ }
  labels<-c(recommend_screening="Request AI screening recommendations",recommend_eligibility="Request AI full-text recommendations",recommend_extraction="Request AI extraction proposals",recommend_risk_of_bias="Request AI bias-assessment proposals",prepare_screening="Prepare deduplicated screening set",finalize_screening="Finalize title/abstract review and prepare full text",register_fulltext="Register uploaded full-text PDFs",finalize_included_studies="Finalize Human inclusion decisions",prepare_extraction="Prepare structured human extraction",finalize_extraction="Validate Human-verified extraction",prepare_risk_of_bias="Prepare design-specific bias review",finalize_evidence="Finalize Human-approved evidence package")
+ screening_checkpoint_progress<-function(j){
+  if(is.null(j)||!nrow(j))return(NULL)
+  loc<-as.character(j$diagnostic_locator[[1L]] %||b2% "")
+  root<-Sys.getenv("SRMA_WEB_DATA","")
+  if(!nzchar(root)||!nzchar(loc))return(NULL)
+  project_root<-file.path(root,loc,"project")
+  if(!dir.exists(project_root))return(NULL)
+  hits<-list.files(project_root,pattern="^agent_screening_checkpoint[.]csv$",recursive=TRUE,full.names=TRUE)
+  if(!length(hits))return(NULL)
+  f<-hits[[1L]]
+  d<-tryCatch(utils::read.csv(f,stringsAsFactors=FALSE,check.names=FALSE),error=function(e)NULL)
+  if(is.null(d))return(NULL)
+  completed<-if(all(c("screening_id","validation_status") %in% names(d))) {
+   ok<-!is.na(d$screening_id)&nzchar(trimws(as.character(d$screening_id)))&as.character(d$validation_status)=="valid"
+   length(unique(as.character(d$screening_id[ok])))
+  } else nrow(d)
+  x<-packet();total<-if(!is.null(x)&&!is.null(x$tables$Reviewer_1))length(x$tables$Reviewer_1) else NA_integer_
+  pct<-if(is.finite(total)&&total>0)round(100*completed/total,1) else NA_real_
+  mtime<-tryCatch(file.info(f)$mtime[[1L]],error=function(e)NA)
+  list(completed=completed,total=total,pct=pct,mtime=mtime)
+ }
  names_table<-c(Reviewer_1="Independent reviewer 1",Reviewer_2="Independent reviewer 2",Conflict_Resolution="Conflict resolution",Author_Final_Review="Full-text eligibility and study mapping",Target_Study_Verification="Study characteristics",Target_Outcome_Verification="Outcome values",Signalling_Questions="RoB signalling questions",Domain_Review="RoB domain judgments",Overall_Review="Overall RoB judgments")
  output$evidence_gate_ui<-shiny::renderUI({
   refresh()
@@ -134,6 +168,59 @@ web_b2_server <- function(input,output,session,request,safe,notice,refresh) {
     choices=if(length(ops))stats::setNames(ops,op_labs) else character())
  })
  shiny::observe({shiny::invalidateLater(2000,session);shiny::req(packet(),input$project,input$version);x<-safe(request("view",list(project_id=input$project)));shiny::req(x);j<-x$jobs[x$jobs$version_id==input$version&x$jobs$operation %in% names(web_b2_operations())&x$jobs$state=="COMPLETE",,drop=FALSE];shiny::updateSelectInput(session,"evidence_job",choices=if(nrow(j))stats::setNames(j$id,paste(unname(labels[j$operation]),j$created_at)) else character(),selected=shiny::isolate(input$evidence_job))})
+ latest_evidence_job<-shiny::reactive({
+  shiny::invalidateLater(1000,session)
+  shiny::req(input$project,input$version,input$evidence_operation)
+  if(!nzchar(input$evidence_operation))return(NULL)
+  x<-safe(request("view",list(project_id=input$project)))
+  if(is.null(x)||is.null(x$jobs)||!nrow(x$jobs))return(NULL)
+  j<-x$jobs[x$jobs$version_id==input$version&x$jobs$operation==input$evidence_operation,,drop=FALSE]
+  if(!nrow(j))return(NULL)
+  j[1,,drop=FALSE]
+ })
+ output$evidence_job_status<-shiny::renderUI({
+  j<-latest_evidence_job()
+  if(is.null(j))return(shiny::div(
+    style="border-left:4px solid #6b7280;background:#f9fafb;padding:9px 12px;margin:8px 0 12px;border-radius:6px;",
+    shiny::strong("Not started"),shiny::span(" — Queue the selected processing step when ready.")
+  ))
+  state<-as.character(j$state[[1L]])
+  msg<-as.character(j$message[[1L]] %||b2% "")
+  progress<-as.integer(j$progress[[1L]] %||b2% 0L)
+  is_screening<-identical(as.character(j$operation[[1L]]),"recommend_screening")
+  cp<-if(is_screening)screening_checkpoint_progress(j) else NULL
+  long_note<-if(is_screening)shiny::p(style="margin-top:8px;","AI title/abstract screening is usually the longest processing step. Large reviews may take several hours. You may leave this page; completed decisions are checkpointed and preserved.") else NULL
+  if(state=="QUEUED")return(shiny::div(style="border-left:4px solid #2563eb;background:#eff6ff;padding:9px 12px;margin:8px 0 12px;border-radius:6px;",shiny::strong("Queued — waiting for worker"),shiny::p(msg),long_note))
+  if(state=="RUNNING") {
+   headline<-"Processing…"
+   detail<-msg
+   if(!is.null(cp)&&is.finite(cp$total)&&cp$total>0){
+    headline<-paste0("AI screening in progress — ",cp$completed," / ",cp$total," records (",format(cp$pct,nsmall=1),"%)")
+    if(!is.na(cp$mtime))detail<-paste0("Last checkpoint: ",format(cp$mtime,"%H:%M:%S"))
+   }
+   return(shiny::div(style="border-left:4px solid #2563eb;background:#eff6ff;padding:9px 12px;margin:8px 0 12px;border-radius:6px;",shiny::strong(headline),shiny::p(detail),long_note))
+  }
+  if(state=="COMPLETE")return(shiny::div(style="border-left:4px solid #15803d;background:#f0fdf4;padding:9px 12px;margin:8px 0 12px;border-radius:6px;",shiny::strong("✓ Processing completed"),shiny::p("Select the completed result below and save it as a new evidence version to continue.")))
+  if(state=="USER_ACTION_REQUIRED")return(shiny::div(style="border-left:4px solid #d97706;background:#fff7ed;padding:9px 12px;margin:8px 0 12px;border-radius:6px;",shiny::strong("! Action required"),shiny::p(msg)))
+  if(state=="FAILED") {
+   preserved<-if(!is.null(cp)&&cp$completed>0)shiny::p(paste0("Preserved checkpoint: ",cp$completed,if(is.finite(cp$total))paste0(" / ",cp$total) else ""," records. The next retry will resume from these valid decisions.")) else NULL
+   return(shiny::div(style="border-left:4px solid #b91c1c;background:#fef2f2;padding:9px 12px;margin:8px 0 12px;border-radius:6px;",shiny::strong("✕ Processing failed"),shiny::p(msg),preserved,shiny::p("Correct the reported problem, then queue this step again.")))
+  }
+  shiny::div(style="border-left:4px solid #6b7280;background:#f9fafb;padding:9px 12px;margin:8px 0 12px;border-radius:6px;",shiny::strong(state),shiny::p(msg))
+ })
+ shiny::observe({
+  j<-latest_evidence_job()
+  if(is.null(j)){set_run_button(FALSE,"Queue processing");return()}
+  state<-as.character(j$state[[1L]])
+  if(state=="QUEUED")set_run_button(TRUE,"Queued…")
+  else if(state=="RUNNING")set_run_button(TRUE,"Processing…")
+  else if(state=="COMPLETE"){
+   set_run_button(TRUE,"Completed — save result")
+   shiny::updateSelectInput(session,"evidence_job",selected=as.character(j$id[[1L]]))
+  } else if(state=="FAILED")set_run_button(FALSE,"Retry processing")
+  else if(state=="USER_ACTION_REQUIRED")set_run_button(FALSE,"Queue processing")
+  else set_run_button(FALSE,"Queue processing")
+ })
  shiny::observe({x<-packet();shiny::req(x,input$evidence_table);rows<-x$tables[[input$evidence_table]];queue<-input$evidence_queue %||b2% "all"
   if(queue=="pending")rows<-Filter(function(a)is.null(a$.actor),rows)
   if(queue=="uncertain")rows<-Filter(function(a){i<-which(vapply(x$tables$Reviewer_1,function(r)identical(r$screening_id,a$screening_id),logical(1)));disagree<-FALSE
@@ -160,6 +247,12 @@ web_b2_server <- function(input,output,session,request,safe,notice,refresh) {
  shiny::observeEvent(input$evidence_save,{f<-field_names();values<-stats::setNames(lapply(seq_along(f),function(i)input[[paste0("evf_",i)]] %||b2% ""),f);saved(safe(request("evidence_edit",list(project_id=input$project,version_id=input$version,table=input$evidence_table,row_id=input$evidence_row,values=values))))})
  shiny::observeEvent(input$evidence_verify,saved(safe(request("evidence_verify",list(project_id=input$project,version_id=input$version,table=input$evidence_table,row_id=input$evidence_row,approved=isTRUE(input$evidence_confirm),rationale=input$evidence_rationale)))))
  shiny::observeEvent(input$evidence_upload,saved(safe(request("evidence_upload",list(project_id=input$project,version_id=input$version,row_id=input$evidence_row,upload=input$evidence_pdf)))))
- shiny::observeEvent(input$evidence_run,{id<-safe(request("submit",list(project_id=input$project,version_id=input$version,operation=input$evidence_operation)));if(!is.null(id))notice("Processing queued. You may leave this page; save the completed result as a new evidence version when it finishes.")})
+ shiny::observeEvent(input$evidence_run,{
+  shiny::req(input$project,input$version,input$evidence_operation)
+  id<-safe(request("submit",list(project_id=input$project,version_id=input$version,operation=input$evidence_operation)))
+  if(is.null(id))set_run_button(FALSE,"Queue processing")
+  else if(identical(input$evidence_operation,"recommend_screening")) notice("AI title/abstract screening queued. This is usually the longest processing step and may take several hours for large reviews. You may leave this page; checkpointed decisions are preserved automatically.")
+  else notice("Processing queued. You may leave this page; save the completed result as a new evidence version when it finishes.")
+ })
  shiny::observeEvent(input$evidence_accept,saved(safe(request("evidence_accept",list(project_id=input$project,version_id=input$version,job_id=input$evidence_job)))))
 }
