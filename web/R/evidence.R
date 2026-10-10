@@ -45,7 +45,12 @@ web_b2_guard <- function(con,settings,actor,project_id,version_id,operation) {
  if(!operation %in% names(web_b2_operations()))return(invisible(TRUE))
  c<-web_b2_context(con,settings,actor,project_id,version_id)
  if(operation %in% names(web_b2_ai_operations())) {
-  web_assert(nzchar(Sys.getenv(web_b2_credential_name(settings$engine_root,operation),"")),"AI assistance requires an operator credential. Manual Human review remains available.","USER_ACTION_REQUIRED")
+  web_provider_ready(settings)
+  web_assert(
+   nzchar(Sys.getenv(web_b2_credential_name(settings$engine_root,operation),"")),
+   "AI assistance requires an operator credential. Manual Human review remains available.",
+   "USER_ACTION_REQUIRED"
+  )
  }
  web_science_settings(settings)
  web_assert(identical(c$row$stage,unname(web_b2_operations()[[operation]])),"This operation does not match the selected evidence stage.")
