@@ -1,3 +1,15 @@
+# RC28.25.9BCD.6.3.12 — Scientific QC Evidence Recovery
+
+Current phase: scoped Web follow-up on `feature/rc28-25-9bcd-6-3-12` from `srma-web-rc28.25.9bcd.6.3.11-stable`. Status: local implementation verified, PM review pending. Version 47 scientific submission remains blocked.
+
+Last completed: reconnected the exact-configuration screening approval, scoped PubMed execution proof, frozen database imports, and hash-verified PROSPERO draft. The search execution authorization is separate from artifact review. A draft supplies no registration approval. The bound primary outcome inventory contains two candidate rows pending review and zero matching human-verified rows.
+
+Outputs: `web/qc/runtime.R` and `web/tests/qc_primary_inventory.R`. Targeted offline tests and read-only Version 47 recovery passed, including mismatched search hash and wrong project/version rejection. Existing 20 QC findings, BLOCKED, DOCX, evidence snapshots and SQLite remain protected. No AI calls, pipeline execution, commit, push or tag.
+
+Next: PM review. Research decisions pending include mixed comparator applicability, primary outcome source review and RoB adjudication. Verify the remaining search documentation, registration, applicable GRADE, exact-version R/40, and actual PRISMA/reference approval before submission. Production release and broader testing remain deferred.
+
+Last updated: 2026-11-21.
+
 # RC28.25.9BCD.6.3.11 — Canonical Evidence Auto-Linker and Final QC review
 
 Current phase: scoped Web Final QC follow-up on `feature/rc28-25-9bcd-6-3-11`, based on the verified `srma-web-rc28.25.9bcd.6.3.10-stable` tag.

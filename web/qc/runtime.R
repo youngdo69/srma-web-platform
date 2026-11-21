@@ -850,7 +850,7 @@ srma_qc_recon_cached <- function(settings,key,qc,x,policy,pid,vid,number) {
 # Canonical evidence reuse for the selected immutable manuscript.
 # Bounded, authenticated, read-only retrieval from the SAME review. No AI,
 # scientific reruns, manuscript edits, SQLite writes, or automatic QC approval.
-srma_qc_link_schema <- "SRMA_QC_CANONICAL_AUTOLINK_V3"
+srma_qc_link_schema <- "SRMA_QC_CANONICAL_AUTOLINK_V4"
 srma_qc_link_one <- function(x, default="") srma_qc_one(x, default)
 srma_qc_link_status <- function(x) toupper(srma_qc_link_one(x$status))
 srma_qc_link_list <- function(x) if(is.list(x)) x else list()
@@ -999,9 +999,10 @@ srma_qc_link_collect <- function(request,con,settings,pid,vid,x) {
       "AND g.gate_type='b2_rob' AND g.status='APPROVED'"),p=pid,v=evidence_version)
     if(nrow(proof)==1L)as.list(proof[1L,])
   })
-  protocol_available<-NULL
+  protocol_available<-configuration<-NULL
   protocol<-read_source({
     cfg<-request("configuration",list(project_id=pid,version_id=source_version))
+    configuration<-cfg
     protocol_available<-length(cfg$protocol)>0L || length(cfg$registration)>0L
     config<-web_query(con,"SELECT manifest_json,config_hash,version FROM project_versions WHERE project_id=?p AND id=?v",
       p=pid,v=source_version)
@@ -1040,11 +1041,125 @@ srma_qc_link_collect <- function(request,con,settings,pid,vid,x) {
     row<-rows[match(a$id,rows$id),,drop=FALSE]
     web_store(settings)$get(row$storage_locator[[1L]],a$checksum)
   }
+  upstream<-if(is.list(ev))read_source(srma_qc_link_upstream(
+    con,settings,pid,evidence_version,ev$version$manifest))
   list(evidence=ev,ready=ready,protocol=protocol,artifacts=artifacts,
+    upstream=upstream,configuration=configuration,
     reference_approval=read_source(srma_qc_link_reference_approval(request,con,pid,vid,x)),
     protocol_material_available=protocol_available,
     read_artifact=read_artifact,registry_available=is.data.frame(rows),
     registry_limited=is.data.frame(rows) && nrow(rows)>1000L)
+}
+
+srma_qc_link_upstream <- function(con,settings,pid,version,manifest) {
+  cfg_path<-"config/project_config.yml"
+  sha<-manifest[[cfg_path]]
+  if(!srma_qc_link_sha(sha))return(NULL)
+  # Only ancestor screening approvals can approve the review definition.
+  # The same approved configuration also binds completed canonical search jobs.
+  gates<-web_query(con,paste(
+    "WITH RECURSIVE lineage(id,depth) AS (SELECT id,0 FROM project_versions WHERE project_id=?p AND id=?v",
+    "UNION ALL SELECT e.parent_version_id,l.depth+1 FROM lineage l JOIN evidence_versions e",
+    "ON e.version_id=l.id AND e.project_id=?p WHERE l.depth<127 AND e.parent_version_id<>l.id)",
+    "SELECT g.id,g.version_id,g.status,l.depth FROM lineage l JOIN project_versions v ON v.id=l.id AND v.project_id=?p",
+    "JOIN gates g ON g.project_id=v.project_id AND g.version_id=v.id",
+    "WHERE v.config_hash=?h AND g.gate_type='b2_protocol' AND g.required_operation='prepare_screening'",
+    "AND g.status IN ('APPROVED','REJECTED') AND g.decision=g.status",
+    "AND g.reviewer_id IS NOT NULL AND g.decided_at IS NOT NULL ORDER BY l.depth,g.id LIMIT 2"),
+    p=pid,v=version,h=sha)
+  definition<-if(nrow(gates) && sum(gates$depth==gates$depth[[1L]])==1L &&
+    identical(gates$status[[1L]],"APPROVED"))
+    list(version=version,approval_version=gates$version_id[[1L]],gate_id=gates$id[[1L]],sha256=sha)
+  jobs<-web_query(con,paste(
+    "SELECT j.id,j.version_id,j.operation,j.result_json,j.engine_id,p.canonical_id FROM jobs j",
+    "JOIN projects p ON p.id=j.project_id",
+    "JOIN project_versions v ON v.id=j.version_id AND v.project_id=j.project_id",
+    "JOIN project_versions target ON target.id=?v AND target.project_id=j.project_id",
+    "WHERE j.project_id=?p AND v.version<=target.version AND v.config_hash=?h AND j.state='COMPLETE'",
+    "AND (j.version_id=?v OR EXISTS (SELECT 1 FROM version_origins o",
+    "WHERE o.project_id=j.project_id AND o.version_id=j.version_id AND o.kind='ACTIVATED'))",
+    "AND j.operation IN ('retrieve_pubmed','prepare_prospero') ORDER BY v.version DESC,j.id LIMIT 33"),
+    p=pid,v=version,h=sha)
+  search<-draft<-list()
+  for(i in seq_len(min(nrow(jobs),32L))) {
+    j<-as.list(jobs[i,])
+    z<-tryCatch(web_parse(j$result_json),error=function(e)NULL)
+    p<-z$provenance
+    if(!nzchar(srma_qc_one(j$canonical_id)) || !identical(z$project_id,j$canonical_id) ||
+       !identical(z$job_id,j$id) || !identical(z$engine_version,j$engine_id) ||
+       !identical(z$operation,j$operation) || !identical(z$status,"COMPLETE") ||
+       !identical(p$project_version_id,j$version_id) ||
+       !identical(p$input_hashes[[cfg_path]],sha))next
+    rows<-web_query(con,paste(
+      "SELECT id,logical_name,checksum,approval_state,storage_locator FROM artifacts",
+      "WHERE project_id=?p AND version_id=?v AND job_id=?j AND status='AVAILABLE' ORDER BY id LIMIT 17"),
+      p=pid,v=j$version_id,j=j$id)
+    if(nrow(rows)!=length(z$artifacts) || nrow(rows)>16L || !nrow(rows))next
+    if(!setequal(rows$id,vapply(z$artifacts,function(a)srma_qc_one(a$artifact_id),character(1))) ||
+       !all(vapply(z$artifacts,function(a) {
+      k<-match(a$artifact_id,rows$id)
+      !is.na(k) && identical(a$checksum,rows$checksum[[k]]) &&
+        identical(a$logical_name,rows$logical_name[[k]])
+    },logical(1))) || !all(vapply(rows$checksum,srma_qc_link_sha,logical(1))))next
+    rel<-vapply(z$artifacts,function(a)
+      gsub("\\\\","/",srma_qc_one(a$relative_path)),character(1))
+    if(anyDuplicated(rel) || !all(basename(rel)==vapply(z$artifacts,function(a)
+      srma_qc_one(a$logical_name),character(1))))next
+    if(j$operation=="retrieve_pubmed") {
+      if(!identical(p$search_quality,"PASS") || !srma_qc_link_sha(p$query_sha256) ||
+         !identical(p$query_sha256,manifest[["search_strategies/pubmed_search.txt"]]) ||
+         !any(grepl("^data/raw/search/pubmed/.+[.]xml$",rel)) ||
+         !any(grepl("^data/raw/search/pubmed/.+[.]csv$",rel)) ||
+         !any(grepl("^results/logs/.+_download_report[.]txt$",rel)) ||
+         !all(vapply(seq_along(rel),function(k)
+           identical(manifest[[rel[[k]]]],z$artifacts[[k]]$checksum),logical(1))))next
+      approval<-web_query(con,paste(
+        "SELECT id,gate_type,status FROM gates WHERE project_id=?p AND version_id=?v",
+        "AND required_operation='retrieve_pubmed' AND gate_type IN ('protocol_registration','configuration_human_review')",
+        "AND decision=status AND reviewer_id IS NOT NULL AND decided_at IS NOT NULL"),
+        p=pid,v=j$version_id)
+      authorized<-nrow(approval)==2L && all(approval$status=="APPROVED") &&
+        setequal(approval$gate_type,c("protocol_registration","configuration_human_review"))
+      search[[length(search)+1L]]<-list(version=j$version_id,job=j$id,query_sha256=p$query_sha256,
+        execution_approval=if(authorized)"APPROVED" else "UNCONFIRMED",
+        approval_ids=if(authorized)as.list(approval$id),outputs=as.list(rows$checksum),
+        artifact_approvals=as.list(rows$approval_state))
+    } else if(dir.exists(file.path(settings$data_root,"objects")) &&
+      setequal(rel,paste0("results/registration/prospero/",
+      c("prospero_autofilled.xlsx","prospero_drafting_provenance.yml"))) &&
+      all(vapply(seq_len(nrow(rows)),function(k)tryCatch({
+      web_store(settings)$get(rows$storage_locator[[k]],rows$checksum[[k]])
+      TRUE
+    },error=function(e)FALSE),logical(1)))) {
+      # prepare_prospero produces a draft and technical provenance only.
+      draft[[length(draft)+1L]]<-list(version=j$version_id,job=j$id,
+        outputs=as.list(rows$checksum),artifact_approvals=as.list(rows$approval_state))
+    }
+  }
+  list(definition=definition,search=search,registration_drafts=draft,limited=nrow(jobs)>32L)
+}
+
+srma_qc_link_primary_inventory <- function(x,e,manifest,narrative_final) {
+  labels<-srma_qc_link_ids(x$source$research_question$outcomes$primary)
+  if(!length(labels) || !narrative_final)return(NULL)
+  normalize<-function(s)tolower(gsub("[[:space:]]+"," ",trimws(s)))
+  rows<-srma_qc_link_list(x$source$narrative$rows)
+  stored<-srma_qc_link_list(e$tables$Target_Outcome_Verification)
+  selected<-srma_qc_link_ids(e$final_study_selection$study_ids)
+  lapply(labels,function(label) {
+    hits<-Filter(function(r)srma_qc_one(r$study_id) %in% selected &&
+      normalize(label) %in% normalize(c(srma_qc_one(r$common_variable),srma_qc_one(r$original_outcome))),rows)
+    approved<-Filter(function(r)r$decision %in% c("CONFIRMED","CORRECTED","NOT_REPORTED") &&
+      nzchar(srma_qc_one(r$verified_by)) && nzchar(srma_qc_one(r$verified_at)) &&
+      srma_qc_link_sha(r$pdf_sha256) && nzchar(srma_qc_one(r$pdf_relative)) &&
+      identical(manifest[[r$pdf_relative]],r$pdf_sha256),hits)
+    candidates<-Filter(function(r)srma_qc_one(r$study_id) %in% selected &&
+      identical(normalize(srma_qc_one(r$outcome_name)),normalize(label)),stored)
+    list(label=label,state=if(length(approved))"VERIFIED_ROWS" else if(length(hits)||length(candidates))
+      "REVIEW_PENDING" else "NO_MATCH_IN_BOUND_INVENTORY",
+      decisions=as.list(srma_qc_link_ids(lapply(approved,function(r)r$decision))),
+      verified_count=length(approved),candidate_count=length(candidates))
+  })
 }
 
 srma_qc_link_r35 <- function(payload,x,manifest,selected) {
@@ -1131,6 +1246,29 @@ srma_qc_link_snapshot <- function(payload,x,pid,vid) {
   if(final_selected)verified("selection","human_final_selection",ev_proof)
   if(narrative_final)verified("outcomes","finalized_outcome_inventory",
     c(ev_proof,list(source_digest=source_digest)))
+  primary<-srma_qc_link_primary_inventory(x,e,manifest,narrative_final)
+  upstream<-payload$upstream
+  if(same_manifest && !is.null(upstream$definition) &&
+     length(payload$configuration$research_question)>0L &&
+     identical(srma_qc_link_one(s$project_version),ev_version) &&
+     identical(web_c2_hash(payload$configuration$research_question),web_c2_hash(s$research_question)))
+    verified("protocol_definition","approved_screening_definition",upstream$definition)
+  if(same_manifest && length(upstream$search)) {
+    approved_search<-Filter(function(z)identical(z$execution_approval,"APPROVED"),upstream$search)
+    if(length(approved_search))
+      verified("search_execution","bound_pubmed_execution",approved_search,
+        if(all(unlist(lapply(approved_search,function(z)z$artifact_approvals))=="APPROVED"))
+          "APPROVED" else "UNREVIEWED")
+    else add("search_execution","bound_pubmed_execution","VERIFIED_SOURCE",upstream$search)
+  }
+  if(same_manifest) {
+    ris<-manifest[grepl("^data/raw/search/[^/]+/[^/]+[.]ris$",names(manifest),ignore.case=TRUE)]
+    ris<-Filter(srma_qc_link_sha,ris)
+    if(length(ris))verified("search_imports","frozen_database_imports",
+      list(version=ev_version,output_sha256=ris),"UNREVIEWED")
+  }
+  if(length(upstream$registration_drafts))
+    add("registration_draft","canonical_prospero_draft","VERIFIED_SOURCE",upstream$registration_drafts,"DRAFT_ONLY")
   rob_assessment<-e$.narrative_analysis_assessment
   if(narrative_final && identical(e$narrative_source_finalization$unresolved_rob,FALSE) &&
      isTRUE(rob_assessment$rob_complete) &&
@@ -1217,7 +1355,8 @@ srma_qc_link_snapshot <- function(payload,x,pid,vid) {
     rob_pending=narrative_final && isTRUE(e$narrative_source_finalization$unresolved_rob),
     evidence_available=!is.null(e),registry_available=payload$registry_available,
     protocol_material_available=payload$protocol_material_available,
-    registry_limited=isTRUE(payload$registry_limited) || length(qualified)>12L)
+    primary_outcome_inventory=primary,upstream=upstream,
+    registry_limited=isTRUE(payload$registry_limited) || length(qualified)>12L || isTRUE(upstream$limited))
   list(links=links,meta=state,snapshot_sha256=web_c2_hash(state))
 }
 
@@ -1340,6 +1479,9 @@ srma_qc_link_family_label <- function(fam) {
     certainty="근거의 확실성 평가",protocol="연구계획서·등록정보",
     r40="최종 통계 검증",prisma="논문 선정 과정",search="문헌 검색 기록",
     outcomes="주요 결과지표",analysis="통계 분석 결과",references="참고문헌",
+    protocol_definition="승인된 연구 질문·선정 기준",search_execution="PubMed 검색 실행 기록",
+    search_imports="저장된 문헌 검색 반입 자료",
+    registration_draft="등록 신청서 초안",
     artifacts="표와 그림",selection="최종 연구 선정",other="기타 검증 항목",fam)
 }
 srma_qc_link_build <- function(rec,qc,x,policy,pid,vid,num,snapshot) {
@@ -1359,12 +1501,15 @@ srma_qc_link_build <- function(rec,qc,x,policy,pid,vid,num,snapshot) {
     stage<-if(not_applicable)"NOT_APPLICABLE" else if(!is.null(link))link$stage else
       if(isTRUE(snapshot$meta$registry_available) && isTRUE(snapshot$meta$evidence_available) &&
          !isTRUE(snapshot$meta$registry_limited))"NO_BOUND_SOURCE" else "SOURCE_ACCESS_INCOMPLETE"
+    evidence_state<-if(identical(stage,"VERIFIED_SOURCE") && !identical(link$approval,"APPROVED"))
+      "VERIFIED_REVIEW_PENDING" else stage
     list(family=fam,status=stage,label=srma_qc_link_family_label(fam),
-      present=!is.null(link),approval=if(is.null(link))"UNCONFIRMED" else link$approval,
+      present=!is.null(link),evidence_state=evidence_state,
+      approval=if(is.null(link))"UNCONFIRMED" else link$approval,
       question=if(count>0L && !not_applicable)srma_qc_link_question(fam,qc,snapshot),
       finding_count=count,source_kind=if(is.null(link))"none" else srma_qc_link_one(link$source))
   })
-  list(schema=srma_qc_link_schema,linker_version="RC28.25.9BCD.6.3.11",
+  list(schema=srma_qc_link_schema,linker_version="RC28.25.9BCD.6.3.12",
     project_id=as.character(pid),manuscript_version_id=as.character(vid),
     manuscript_version_number=as.integer(num),policy_sha256=policy$sha256,
     evidence_version_id=srma_qc_link_one(x$evidence_version),
@@ -1384,7 +1529,7 @@ srma_qc_link_path <- function(settings,key,snapshot_sha,finding_sha) {
   # Keep Windows paths short. The key includes project/version/policy, and
   # the derivative still validates the full snapshot and finding digests.
   name<-web_c2_hash(list(key,snapshot_sha,finding_sha))
-  file.path(settings$data_root,"scientific-publication-qc","links-v3",paste0(name,".json"))
+  file.path(settings$data_root,"scientific-publication-qc","links-v4",paste0(name,".json"))
 }
 srma_qc_link_valid <- function(z,rec,qc,x,policy,pid,vid,num,snapshot) {
   is.list(z) && identical(srma_qc_link_one(z$schema),srma_qc_link_schema) &&
@@ -1754,7 +1899,7 @@ srma_qc_attach <- function(input,output,session,request,settings,con) {
     if(!is.null(z$error))return(shiny::p(z$error))
     shiny::tagList(
       shiny::tags$ul(lapply(z$findings,function(t)
-        shiny::tags$li(t$label," / ",t$status," / ",t$approval," / ",t$source_kind))),
+        shiny::tags$li(t$label," / ",t$evidence_state," / ",t$approval," / ",t$source_kind))),
       shiny::tags$pre(as.character(jsonlite::toJSON(z$provenance,
         auto_unbox=TRUE,null="null",pretty=TRUE))))
   })
