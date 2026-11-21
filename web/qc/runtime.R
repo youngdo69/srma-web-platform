@@ -125,18 +125,8 @@ srma_qc_xml2_ready <- function() {
     stop("QC_DOCX_XML2_MISSING_IN_APP",call.=FALSE)
   invisible(TRUE)
 }
-srma_qc_docx_text <- function(request,project_id,x) {
-  # Restrict the supplementary library path to this DOCX read operation only.
-  old_libs <- .libPaths()
-  on.exit(.libPaths(old_libs),add=TRUE)
-  srma_qc_xml2_ready()
+srma_qc_docx_bytes <- function(request,project_id,x) {
   trace_on <- isTRUE(getOption("srma.qc.docx.trace",FALSE))
-  if(trace_on) {
-    message("[SRMA QC TRACE] R_VERSION=",as.character(getRversion()),
-      " XML2_VERSION=",as.character(getNamespaceVersion("xml2")))
-    message("[SRMA QC TRACE] XML2_READY=TRUE")
-    message("[SRMA QC TRACE] R_LIB_PATHS=",paste(.libPaths(),collapse=" ; "))
-  }
   artifact_id <- srma_qc_one(x$docx$artifact_id)
   expected_sha <- tolower(srma_qc_one(x$docx$docx_sha256))
   if(!nzchar(artifact_id) || !grepl("^[a-f0-9]{64}$",expected_sha))
@@ -181,6 +171,14 @@ srma_qc_docx_text <- function(request,project_id,x) {
     stop("QC_DOCX_XML_INCOMPLETE",call.=FALSE)
   if(trace_on)message("[SRMA QC TRACE] XML_BYTES=",length(xml_raw),
     " XML_SHA256=",digest::digest(xml_raw,algo="sha256",serialize=FALSE))
+  xml_raw
+}
+
+srma_qc_docx_parse <- function(xml_raw) {
+  old_libs <- .libPaths()
+  on.exit(.libPaths(old_libs),add=TRUE)
+  srma_qc_xml2_ready()
+  trace_on <- isTRUE(getOption("srma.qc.docx.trace",FALSE))
   # Preserve strict XML validation; reveal the original failure only for opt-in
   # diagnostics. Never log XML payload, manuscript paragraphs, or credentials.
   doc <- tryCatch(xml2::read_xml(xml_raw,options=c("NOBLANKS","NONET")),
@@ -203,6 +201,9 @@ srma_qc_docx_text <- function(request,project_id,x) {
   text <- paste(lines[nzchar(trimws(lines))],collapse="\n")
   if(!nzchar(trimws(text)))stop("QC_DOCX_TEXT_EMPTY",call.=FALSE)
   text
+}
+srma_qc_docx_text <- function(request,project_id,x) {
+  srma_qc_docx_parse(srma_qc_docx_bytes(request,project_id,x))
 }
 
 # RC28.25.9BCD.6.3.5: redact non-scientific private metadata in QC request ONLY.
@@ -533,7 +534,15 @@ srma_qc_safe_error <- function(e) {
     return(msg)
   "QC_RUN_UNEXPECTED_ERROR: Inspect safe child diagnostics; no acceptance."
 }
-srma_qc_restore_selected <- function(request,settings,con,project_id,version_id) {
+srma_qc_request_error_hint <- function(e) {
+  if(!inherits(e,"srma_web_error"))return("UNCLASSIFIED")
+  if(identical(e$code,"VALIDATION_FAILED") &&
+     identical(conditionMessage(e),"A project path is outside its permitted location."))
+    return("DATA_ROOT_PATH_OUTSIDE")
+  code<-srma_qc_one(e$code)
+  if(grepl("^[A-Z_]+$",code))paste0("WEB_REQUEST_",code) else "WEB_REQUEST_ERROR"
+}
+srma_qc_restore_selected <- function(request,settings,con,project_id,version_id,on_error=function(e)NULL) {
   if(!nzchar(srma_qc_one(project_id)) || !nzchar(srma_qc_one(version_id)))return(NULL)
   tryCatch({
     policy<-srma_qc_policy_load(settings$engine_root)
@@ -557,7 +566,7 @@ srma_qc_restore_selected <- function(request,settings,con,project_id,version_id)
       evidence_version=x$evidence_version,checks=checks,ai=cached$ai,
       notice="Previously verified AI QC result restored; no new AI call.",
       publication_ready_release_allowed=FALSE)
-  },error=function(e)NULL)
+  },error=on_error)
 }
 
 
@@ -1372,8 +1381,10 @@ srma_qc_link_build <- function(rec,qc,x,policy,pid,vid,num,snapshot) {
 srma_qc_link_path <- function(settings,key,snapshot_sha,finding_sha) {
   if(!all(grepl("^[a-f0-9]{64}$",c(key,snapshot_sha,finding_sha))))
     stop("QC_AUTOLINK_KEY_INVALID",call.=FALSE)
-  file.path(settings$data_root,"scientific-publication-qc",
-    paste0(key,"-canonical-links"),paste0("links-v3-",snapshot_sha,"-",finding_sha,".json"))
+  # Keep Windows paths short. The key includes project/version/policy, and
+  # the derivative still validates the full snapshot and finding digests.
+  name<-web_c2_hash(list(key,snapshot_sha,finding_sha))
+  file.path(settings$data_root,"scientific-publication-qc","links-v3",paste0(name,".json"))
 }
 srma_qc_link_valid <- function(z,rec,qc,x,policy,pid,vid,num,snapshot) {
   is.list(z) && identical(srma_qc_link_one(z$schema),srma_qc_link_schema) &&
@@ -1433,22 +1444,28 @@ srma_qc_simple_ui <- function() {
       shiny::actionButton("srma_qc_run","Run / Load Scientific QC",class="btn-primary"),
       shiny::uiOutput("srma_qc_retry_ui"),
       shiny::tags$div(id="srma-qc-live",class="srma-qc-live",role="status",`aria-live`="polite"),
-      do.call(shiny::tagList,previous)))
+      shiny::tags$details(class="srma-qc-detail",
+        shiny::tags$summary("제출 승인 및 이력 관리"),
+        do.call(shiny::tagList,previous))))
   old
 }
 srma_qc_researcher_review <- function(q,z) {
   if(is.null(q))return(htmltools::tags$p("이 원고에 저장된 검토 결과가 없습니다."))
-  if(is.null(z))return(htmltools::tags$p("기존 자료를 자동으로 확인하고 있습니다."))
-  if(!is.null(z$error))return(htmltools::tags$p("자료 확인에 문제가 있습니다. 제출 전 운영자 진단을 확인해 주세요."))
+  if(!is.null(q$error))return(htmltools::tags$p("저장된 검토 결과에 접근할 수 없습니다. 운영자 진단을 확인해 주세요."))
+  issues<-c(srma_qc_link_list(q$checks),srma_qc_link_list(q$ai$checks))
+  remaining<-sum(vapply(issues,function(t)
+    srma_qc_one(t$status) %in% c("BLOCKED","WARNING","NOT_ASSESSED"),logical(1)))
+  saved<-if(identical(q$status,"BLOCKED"))
+    htmltools::tags$p(sprintf("저장된 검토 사항 %d건 · 최종 제출 차단",remaining))
+  if(is.null(z))return(htmltools::tagList(saved,htmltools::tags$p("기존 자료를 자동으로 확인하고 있습니다.")))
+  if(!is.null(z$error))return(htmltools::tagList(saved,
+    htmltools::tags$p("추가 자료 확인에 문제가 있습니다. 운영자 진단을 확인해 주세요.")))
   questions<-unique(Filter(nzchar,vapply(z$findings,function(t)
     srma_qc_one(t$question),character(1))))
-  issues<-c(srma_qc_link_list(q$checks),srma_qc_link_list(q$ai$checks))
-  pending<-any(vapply(issues,function(t)
-    srma_qc_one(t$status) %in% c("BLOCKED","WARNING","NOT_ASSESSED"),logical(1)))
   message<-if(length(questions))"연구자 판단 필요. 기존 검토 결과에 제출 전 확인 사항이 남아 있습니다." else
-    if(pending || !identical(q$status,"PASS"))"제출 전 확인할 사항이 남아 있습니다. 운영자 진단에서 확인할 수 있습니다." else
+    if(remaining>0L || !identical(q$status,"PASS"))"제출 전 확인할 사항이 남아 있습니다. 운영자 진단에서 확인할 수 있습니다." else
       "기존 자료 자동 확인 완료. 최종 제출에는 별도 승인이 필요합니다."
-  htmltools::tagList(htmltools::tags$p(message),
+  htmltools::tagList(saved,htmltools::tags$p(message),
     if(length(questions))htmltools::tags$ul(lapply(questions,htmltools::tags$li)))
 }
 srma_qc_attach <- function(input,output,session,request,settings,con) {
@@ -1474,18 +1491,26 @@ srma_qc_attach <- function(input,output,session,request,settings,con) {
         phase$current <- "MANUSCRIPT_VIEW_SHAPE"
         if(!is.list(x)||is.null(x$stage))stop("MANUSCRIPT_VERSION_NOT_AVAILABLE",call.=FALSE)
         phase$current <- "DOCX_READ"
-        txt <- srma_qc_docx_text(request,input$project,x)
+        xml <- srma_qc_docx_bytes(request,input$project,x)
+        phase$current <- "DOCX_XML_PARSE"
+        txt <- tryCatch(srma_qc_docx_parse(xml),error=function(e) {
+          if(identical(conditionMessage(e),"QC_DOCX_XML2_MISSING_IN_APP"))return(NULL)
+          stop(e)
+        })
         phase$current <- "COMPLETE"
-        list(status="PASS",code="QC_DOCX_XML_PARSE_PASS",characters=nchar(txt,type="chars"),
-          phase=phase$current,error_class="NONE",error_hint="NONE")
+        list(status=if(is.null(txt))"NOT_ASSESSED" else "PASS",bytes_status="PASS",
+          code=if(is.null(txt))"QC_DOCX_BYTES_VERIFIED" else "QC_DOCX_XML_PARSE_PASS",
+          characters=if(is.null(txt))0L else nchar(txt,type="chars"),
+          phase=phase$current,error_class="NONE",
+          error_hint=if(is.null(txt))"XML_PARSE_NOT_ASSESSED_XML2_MISSING" else "NONE")
       },error=function(e){
         code <- conditionMessage(e)
         # Never show raw exception text, paths, manuscript text or credentials.
-        if(!grepl("^(QC_DOCX_[A-Z_]+|SELECT_SAVED_VERSION_FIRST|MANUSCRIPT_VERSION_NOT_AVAILABLE)$",code))
+        if(!grepl("^(QC_DOCX_[A-Z0-9_]+|SELECT_SAVED_VERSION_FIRST|MANUSCRIPT_VERSION_NOT_AVAILABLE)$",code))
           code <- "QC_DOCX_DIAGNOSTIC_ERROR"
         hint <- if(identical(code,"QC_DOCX_XML2_MISSING_IN_APP") ||
           inherits(e,"packageNotFoundError")) "R_PACKAGE_MISSING" else if(
-          inherits(e,"srma_web_error")) "WEB_REQUEST_ERROR" else if(
+          inherits(e,"srma_web_error")) srma_qc_request_error_hint(e) else if(
           grepl("unused argument",conditionMessage(e),ignore.case=TRUE)) "CALL_SIGNATURE_MISMATCH" else if(
           grepl("not found|could not find",conditionMessage(e),ignore.case=TRUE)) "NOT_FOUND_OR_MISSING_SYMBOL" else if(
           grepl("subscript out of bounds",conditionMessage(e),ignore.case=TRUE)) "UNEXPECTED_RESULT_SHAPE" else if(
@@ -1502,6 +1527,7 @@ srma_qc_attach <- function(input,output,session,request,settings,con) {
     paste0("DOCX_DIAGNOSTIC: ",d$status,
       "\nPHASE: ",d$phase,
       "\nCODE: ",d$code,
+      if(!is.null(d$bytes_status))paste0("\nDOWNLOAD_INTEGRITY: ",d$bytes_status),
       "\nERROR_CLASS: ",d$error_class,
       "\nERROR_HINT: ",d$error_hint,
       "\nEXTRACTED_CHARACTERS: ",d$characters,
@@ -1519,7 +1545,8 @@ srma_qc_attach <- function(input,output,session,request,settings,con) {
   })
   shiny::observeEvent(list(input$project,input$version),{
     # Read-only restore. Never launches AI and never changes source artifacts.
-    restored<-srma_qc_restore_selected(request,settings,con,input$project,input$version)
+    restored<-srma_qc_restore_selected(request,settings,con,input$project,input$version,
+      on_error=function(e)list(status="NOT_ASSESSED",error=srma_qc_request_error_hint(e)))
     report(restored)
   },ignoreInit=FALSE)
   # Reconcile an existing, version-bound QC report automatically. No AI call,
@@ -1619,7 +1646,7 @@ srma_qc_attach <- function(input,output,session,request,settings,con) {
       qc_docx_error<-NULL
       text<-tryCatch(srma_qc_docx_text(request,pid,x),error=function(e){
         qc_docx_error <<- conditionMessage(e)
-        if(!grepl("^QC_DOCX_[A-Z_]+$",qc_docx_error))
+        if(!grepl("^QC_DOCX_[A-Z0-9_]+$",qc_docx_error))
           qc_docx_error <<- "QC_DOCX_ACCESS_FAILED"
         message("[SRMA QC DOCX] ",qc_docx_error)
         ""
@@ -1691,7 +1718,7 @@ srma_qc_attach <- function(input,output,session,request,settings,con) {
   output$srma_qc_summary<-shiny::renderUI({
     x<-report()
     if(is.null(x))return(shiny::p("선택한 원고의 검토 결과가 없습니다."))
-    if(!is.null(x$error))return(shiny::p("검토 결과를 불러올 수 없습니다. 상세 기록을 확인해 주세요."))
+    if(!is.null(x$error))return(shiny::p("검토 결과를 불러올 수 없습니다. ",x$error))
     items<-c(if(is.list(x$checks))x$checks else list(),
       if(is.list(x$ai)&&is.list(x$ai$checks))x$ai$checks else list())
     issues<-Filter(is.list,items)
