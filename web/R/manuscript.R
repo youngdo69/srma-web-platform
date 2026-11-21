@@ -352,7 +352,29 @@ web_c2_accept <- function(con,settings,actor,project_id,version_id,job_id) {
 web_c2_approve <- function(con,settings,actor,project_id,version_id,confirmed,rationale) {
  c<-web_c2_context(con,settings,actor,project_id,version_id,TRUE,TRUE);x<-c$packet
  web_assert(isTRUE(confirmed)&&nzchar(trimws(web_c2_text(rationale,settings$engine_root))),"Explicitly confirm text, analyses, references, warnings and matching Word document.")
- web_assert(x$stage=="REVIEW_REQUIRED"&&!is.null(x$docx)&&web_c2_check(x,settings$engine_root)$status=="PASS","Complete section review, pre-check and Word generation before approval.")
+ web_assert(x$stage=="REVIEW_REQUIRED"&&!is.null(x$docx),"Complete Word generation before author review.")
+ if(identical(x$source$route,"NARRATIVE") && is.list(x$production)) {
+  # Automatic production drafts contain a completed Word artifact instead of
+  # editable section packets. This remains the existing draft author decision.
+  j<-web_scoped_job(con,actor,project_id,x$docx$version_id,x$docx$job_id,"generate_final_manuscript")
+  result_path<-"results/web_manuscript/result.json"
+  refs_path<-"results/web_manuscript/verified_reference_expansion.json"
+  web_assert(identical(j$state,"COMPLETE") && identical(j$id,c$row$source_job_id[[1L]]) &&
+    all(c(result_path,refs_path) %in% names(c$version$manifest)),
+    "The completed narrative production job and its reference evidence are required.")
+  result<-jsonlite::read_json(web_inside(file.path(c$version$root,result_path),c$version$root),simplifyVector=FALSE)
+  web_assert(identical(result$job_id,j$id) && identical(result$version_id,j$version_id) &&
+    identical(result$evidence_version,x$evidence_version) &&
+    identical(result$source_sha256,x$source_sha256) &&
+    identical(result$reference_sha256,x$reference_sha256) &&
+    identical(result$content_sha256,x$docx$content_sha256) &&
+    identical(result$docx_sha256,x$docx$docx_sha256) &&
+    identical(result$verified_literature_sha256,c$version$manifest[[refs_path]]) &&
+    identical(result$production_qc$publication_9cd$status,"PUBLICATION_ASSEMBLY_STRUCTURE_PASS"),
+    "The narrative production record does not match this saved Word and reference version.")
+ } else {
+  web_assert(web_c2_check(x,settings$engine_root)$status=="PASS","Complete section review and pre-check before approval.")
+ }
  web_assert(x$docx$content_sha256==web_c2_hash(x$sections),"Word document no longer matches reviewed text.")
  a<-web_query(con,"SELECT * FROM artifacts WHERE id=?a AND project_id=?p AND status='AVAILABLE'",a=x$docx$artifact_id,p=project_id);web_assert(nrow(a)==1&&a$checksum==x$docx$docx_sha256,"Word artifact mismatch.");web_store(settings)$get(a$storage_locator,a$checksum)
  g<-web_query(con,"SELECT id,status FROM gates WHERE project_id=?p AND version_id=?v AND gate_type='manuscript_review'",p=project_id,v=version_id);web_assert(nrow(g)==1&&g$status %in% c("PENDING","APPROVED"),"Review gate unavailable.")

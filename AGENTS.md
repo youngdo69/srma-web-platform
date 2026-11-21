@@ -90,6 +90,10 @@ If a request conflicts with the roadmap, follow the user's latest explicit instr
 - Do not overwrite source datasets.
 - Write generated outputs to the outputs/ directory.
 - Run validation tests before accepting a meta-analysis result.
+- Treat Human Final Study Selection and finalized outcome definitions, labels, and reported timepoints as authoritative. Reconcile by study ID and evidence version, preserve conflicting records, and distinguish review inclusion from synthesis participation.
+- Reuse canonical approvals and saved QC only with verified project, version, source, approval provenance, and available integrity metadata. Preserve original findings and approval history. A source link never regrades QC.
+- Keep review logic protocol-driven and applicable to narrative and quantitative designs. Complete automatic reconciliation before asking for substantive scientific decisions or obligatory information. Group duplicate questions and keep technical provenance in operator diagnostics.
+- Inspect Git status and the verified baseline before editing. Keep authorized work on the feature branch. Protect approved scientific code, policies, dependency locks, schemas, and private runtime data. Keep changes and offline validation scoped to the affected behavior, and report only observed test results. External writes, paid AI calls, and release actions require explicit authorization.
 
 ## Statistical rules
 

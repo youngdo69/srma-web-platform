@@ -1,3 +1,19 @@
+# RC28.25.9BCD.6.3.11 — Canonical Evidence Auto-Linker and Final QC review
+
+Current phase: scoped Web Final QC follow-up on `feature/rc28-25-9bcd-6-3-11`, based on the verified `srma-web-rc28.25.9bcd.6.3.10-stable` tag.
+
+Status: In progress. The audit fixes separate evidence integrity from approval and connect required, exact-version Scientific QC to submission. Acceptance of the live Version 47 manuscript remains blocked on scientific evidence and decisions.
+
+Completed outputs: approval provenance and submission checks in `web/qc/runtime.R`, integration in `web/R/final_qc.R` and `web/R/final_qc_checks.R`, the existing archived narrative author-review entry in `web/R/manuscript.R` with its Web-only overlay checksum, and focused fixtures in `web/tests/qc_autolink.R`. Existing repository policy and the scoped roadmap remain in effect.
+
+Validation: pinned Web R 4.3.3 parse, offline approval inheritance, cross-project/version rejection, applicability and gate regressions PASS. Read-only Version 47 inspection matched the 20 original non-PASS findings and BLOCKED result to the historical digest, verified DOCX and frozen Human Evidence, and observed submission blocking for integrity-verified but unapproved PRISMA and references and the missing mandatory science. The archived narrative author-review input reached the write boundary under a test double. SQLite and WAL hashes matched before and after. No AI calls or pipeline runs.
+
+Research decisions and sources pending: mixed-comparator applicability, approved RoB, verification of the missing primary outcome, protocol/registration and search provenance, applicable certainty assessment, exact-version R/40, and actual PRISMA/reference approval. Existing DOCX download remains available.
+
+Current next task: resolve the required scientific and approval items, then verify the production submission path on the accepted manuscript. Production acceptance and release are deferred.
+
+Last updated: 2026-11-21.
+
 # WEB-017 Production Release / Final Integration — 2026-09-30
 
 Status: COMPLETE — final integrated Web source ready for transfer.

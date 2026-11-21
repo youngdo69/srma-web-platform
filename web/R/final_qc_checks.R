@@ -60,7 +60,77 @@ web_c3_docx <- function(path,x,rendered,proof,root,engine) {
  visible<-paste(vapply(allxml,function(p){z<-xml2::read_xml(p);paste(xml2::xml_text(xml2::xml_find_all(z,"//*[local-name()='t']")),collapse=" ")},character(1)),collapse="\n")
  list(text=visible,paragraphs=length(paras),tables=length(tables),images=length(media),headings=length(xml2::xml_find_all(xml,"//w:pStyle",ns)))
 }
+web_c3_narrative_checks <- function(x,proof,root,engine) {
+ checks<-list()
+ findings<-list()
+ add<-function(code,message,mode="MACHINE") {
+  findings[[length(findings)+1L]]<<-list(id=paste0("narrative-",code),check=code,
+    severity=if(mode=="HUMAN")"MAJOR" else "BLOCKER",affected=code,
+    source=proof$source_sha256,machine_result=if(mode=="HUMAN")"REVIEW_REQUIRED" else "FAIL",
+    message=message,mode=mode,action="Review against the exact frozen manuscript and sources.")
+ }
+ run<-function(code,check) {
+  ok<-tryCatch({force(check);TRUE},error=function(err) {
+    add(code,if(inherits(err,"srma_web_error"))conditionMessage(err) else "Canonical source is missing or unreadable.")
+    FALSE
+  })
+  checks[[code]]<<-if(ok)"PASS" else "FAIL"
+  ok
+ }
+ output<-function(name)web_inside(file.path(root,proof$outputs[[name]]$path),root)
+ docx<-file.path(root,"config/generated/final_qc_assets/manuscript.docx")
+ run("lineage",{
+  web_c3_require_submission(proof$publication_qc)
+  web_assert(identical(x$stage,"APPROVED") &&
+    identical(web_c2_hash(x$source),proof$source_sha256) &&
+    identical(web_c2_hash(x$sections),proof$content_sha256) &&
+    identical(web_c2_hash(x$source$references),proof$reference_sha256) &&
+    identical(x$evidence_version,proof$evidence_version),"Narrative manuscript lineage mismatch.")
+  for(a in c(proof$artifacts,proof$outputs))
+    web_assert(identical(web_sha(web_inside(file.path(root,a$path),root)),a$sha256),"Narrative output checksum mismatch.")
+  result<-jsonlite::read_json(output("result.json"),simplifyVector=FALSE)
+  web_assert(identical(result$job_id,proof$docx_job$id) &&
+    identical(result$version_id,proof$docx_job$version) &&
+    identical(result$evidence_version,proof$evidence_version) &&
+    identical(result$source_sha256,proof$source_sha256) &&
+    identical(result$reference_sha256,proof$reference_sha256) &&
+    identical(result$content_sha256,proof$content_sha256) &&
+    identical(result$docx_sha256,web_sha(docx)) &&
+    identical(result$verified_literature_sha256,web_sha(output("verified_reference_expansion.json"))),
+    "Archived production result is not bound to the inspected version and outputs.")
+ })
+ run("canonical_r40",{
+  evidence<-proof$publication_qc$r40
+  web_assert(length(evidence)>0L && all(vapply(evidence,function(a)
+    identical(a$version,proof$manuscript_version) && identical(a$status,"PASS") &&
+    identical(a$docx_sha256,proof$docx$docx_sha256),logical(1))),
+    "An approved exact-version R/40 result is required for this production narrative manuscript.")
+ })
+ run("citations",{
+  references<-jsonlite::read_json(output("verified_reference_expansion.json"),simplifyVector=FALSE)
+  web_assert(identical(references$base_library_sha256,proof$reference_sha256) &&
+    length(references$all_records)>0L &&
+    all(vapply(references$all_records,web_c2_ref_valid,logical(1))),"Archived reference library is incomplete.")
+  text<-paste(readLines(output("manuscript.md"),warn=FALSE,encoding="UTF-8"),collapse="\n")
+  mapping<-jsonlite::read_json(output("citation_map.json"),simplifyVector=TRUE)
+  e<-web_c3_r40(engine)
+  citations<-web_c3_citation_audit(e,text,mapping,references$all_records)
+  web_assert(nrow(citations)>0 && all(citations$status=="PASS"),"Canonical narrative citation audit failed.")
+  web_assert(!web_c3_leaks(text,e,engine),"Archived narrative manuscript contains internal or private markers.")
+ })
+ run("docx",web_c2_9cd_docx_integrity(docx))
+ for(code in c("methods_and_applicability","study_counts_and_bias","visual_and_claim_support"))
+   add(code,"Compare the completed narrative manuscript with frozen source evidence and record scientific disposition.","HUMAN")
+ lock<-jsonlite::read_json(file.path(engine,"renv.lock"))
+ runtime<-paste0("R version ",lock$R$Version)
+ list(machine_pass=all(unlist(checks)=="PASS"),checks=checks,findings=findings,
+   canonical_sources=startsWith(R.version.string,runtime) &&
+     startsWith(proof$docx_job$R %||b2% "",runtime),
+   ruleset=web_c3_ruleset(),proof_sha256=web_c2_hash(proof),R=R.version.string,
+   lock_sha256=proof$lock_sha256,semantic_route="Approved exact-version R/40 and explicit Human review")
+}
 web_c3_checks <- function(x,proof,root,engine) {
+ if(identical(x$source$route,"NARRATIVE"))return(web_c3_narrative_checks(x,proof,root,engine))
  e<-web_c3_r40(engine);findings<-list();checks<-list()
  add<-function(code,severity,affected,source,message,mode="MACHINE",status="FAIL") {
   id<-paste0(code,"-",substr(web_c2_hash(list(affected,source,message)),1,12))

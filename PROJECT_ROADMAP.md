@@ -1,3 +1,7 @@
+# RC28.25.9BCD.6.3.11 authorization — 2026-11-21
+
+The feature-branch follow-up to the verified RC28.25.9BCD.6.3.10 stable checkpoint is limited to approved canonical evidence reuse and the Final QC review interface. Preserve the scientific engine, existing approvals and release gates. This task does not advance reference-review or deployment phases.
+
 # PM WEB-015/016/017 authorization — 2026-09-30
 
 WEB-015 through WEB-017 are authorized as the final Web-platform hardening, beta-integration and production-release sequence. Optimize for a user-friendly Web service and minimal repeat validation. The canonical scientific engine is treated as the established source of truth and is not broadly retested; only Web changes receive targeted validation. Final delivery will be a complete integrated source archive plus Git bundle.

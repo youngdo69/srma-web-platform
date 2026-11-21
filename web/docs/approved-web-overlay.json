@@ -17,7 +17,7 @@
     "web/R/narrative_batch_review.R": "1ba7586f7d6c142bf249d4b49e40fc460cbc169fea6f8e467f3048a351efdf84",
     "web/ui/narrative_batch_review.R": "47c545bd3f78d5007d4e2a08d239d67d934e41a217bf2a81237eaac3fa835a64",
     "web/R/narrative_pdf_numbers.R": "4dcce8c5946759cf7bf9181d616a89e2e02177e9242d1c26e22071d5d1857d6e",
-    "web/R/manuscript.R": "e9aa188afd40ac98a2d3a9f3d49a24f3fcf11ddf7caa10adb91b407905dde357",
+    "web/R/manuscript.R": "92fe3691fc2c1136d3d41fd9a85df64481f1b7b8dc069069c67c4b99d334be76",
     "web/R/manuscript_render.R": "592f2939f7f869c079a46003eb2fc9005b9812d950083e51883d61b5674dcec3",
     "web/adapter/manuscript.R": "b185ab9ffc72b9474f4e06ec53b45191b0354906dd6c7ed1d772c928628b6806",
     "web/ui/manuscript.R": "bb78080fe23c2e9a771d941a3edfcb7abf30b13cc5a3964d515a8541231053fc"
