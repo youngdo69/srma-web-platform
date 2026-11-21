@@ -1,0 +1,27 @@
+{
+  "schema_version": "SRMA_WEB_DEV_OVERLAY_V1",
+  "release_label": "RC28.19_PDF_DISCOVERY_SIMPLE_UI",
+  "base_manifest_sha256": "2f3dc7b38040606fb4ef476930d9ee3e32774f7bcd0ad4cf153cee9b77110ec5",
+  "files": {
+    "web/adapter/evidence.R": "aed83b386838c812dd6dffdcc0fc93b51398a246f50905f8148b765c1dd6a5ce",
+    "web/adapter/pdf_results.R": "814122d2a82a29c83862959501645dcff3c85aa9ff2e4469175ff2c15aff8431",
+    "web/R/evidence.R": "f132e4d01a621715b379d9cc4181a51c1cec158cdefb72d8f305bcee3fb70008",
+    "web/ui/evidence.R": "7c53fbf7cb34d56203c23b31b1e4ede44ad181c403e6969cd98f1014e03e1526",
+    "web/R/service.R": "b59cf649ec27c1784908781417d36e47a8a93df48b13e1b8d69879549adcbb13",
+    "web/R/adapter.R": "330d475a291353b2816e85899a5327caabbcafbecf66b9c98dad31cd75d10a4c",
+    "web/ui/app.R": "ce03148b5bcad80bf7c5a6dbcc6a3ff1ea4961b13eefebdc2a119f6a42d1f784",
+    "web/ui/synthesis_nav.R": "6372a8927dfb151d3807f39bd6519632ca5e9c82e34af214fb03a1edb8f4e0d0",
+    "web/R/narrative_analysis.R": "03265f0c7a422307223cd4ac1c6afa9316254644308e6195deb40d105acc3c6c",
+    "web/R/narrative_source_review.R": "698db041412e45f5994dff8643be73d4362681b9784e6d91dbae35f7d8312b13",
+    "web/ui/narrative_source_review.R": "4ccfc7a1e1fa0148e368782693f62eaa9d937dc6bd5e6f868d4b17259b89cd5d",
+    "web/R/narrative_batch_review.R": "1ba7586f7d6c142bf249d4b49e40fc460cbc169fea6f8e467f3048a351efdf84",
+    "web/ui/narrative_batch_review.R": "47c545bd3f78d5007d4e2a08d239d67d934e41a217bf2a81237eaac3fa835a64",
+    "web/R/narrative_pdf_numbers.R": "4dcce8c5946759cf7bf9181d616a89e2e02177e9242d1c26e22071d5d1857d6e",
+    "web/R/manuscript.R": "e9aa188afd40ac98a2d3a9f3d49a24f3fcf11ddf7caa10adb91b407905dde357",
+    "web/R/manuscript_render.R": "592f2939f7f869c079a46003eb2fc9005b9812d950083e51883d61b5674dcec3",
+    "web/adapter/manuscript.R": "b185ab9ffc72b9474f4e06ec53b45191b0354906dd6c7ed1d772c928628b6806",
+    "web/ui/manuscript.R": "bb78080fe23c2e9a771d941a3edfcb7abf30b13cc5a3964d515a8541231053fc"
+  },
+  "patch_label": "RC28.25.9BCD.6_UNIVERSAL_SCIENTIFIC_QC",
+  "description": "9BCD.6: policy-locked, source-bound Scientific QC with simple Final QC and clickable Results artifacts."
+}

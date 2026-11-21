@@ -135,7 +135,7 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     evidence_accept=c("project_id","version_id","job_id"),
     evidence_edit=c("project_id","version_id","table","row_id","values"),
     evidence_verify=c("project_id","version_id","table","row_id","approved","rationale"),
-    evidence_upload=c("project_id","version_id","row_id","upload"),
+    evidence_upload=c("project_id","version_id","row_id","upload","comparative_option","comparative_rationale","comparative_approved"),
     projects = character(), workspaces = character(), logout = character(),
     create_seed_review = c("workspace_id", "topic", "title", "canonical_id"),
     delete_project = c("project_id", "confirmation"),

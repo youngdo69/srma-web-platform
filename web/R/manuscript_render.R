@@ -1,6 +1,32 @@
 # Deterministic presentation of approved values; no statistics or event aggregation.
 web_c2_facts <- function(source,engine) {
- e<-web_c2_defs(engine,38);facts<-list()
+  if (identical(source$route,"NARRATIVE")) {
+    # No generic numeric-looking AI/evidence table values enter narrative facts.
+    rows <- source$narrative$rows
+    facts <- list()
+    for(r in rows) {
+      if(identical(r$decision,"NOT_REPORTED")) {
+        web_assert(!nzchar(r$fact_id) && !nzchar(r$numeric_summary),
+          "Not-reported narrative result must never create a numeric fact.")
+        next
+      }
+      web_assert(r$decision %in% c("CONFIRMED","CORRECTED") &&
+        nzchar(r$fact_id) && nzchar(r$numeric_summary) &&
+        nzchar(r$verified_by) && nzchar(r$pdf_sha256) &&
+        nzchar(r$source_location),
+        "Unverified numerical narrative data reached the manuscript fact registry.")
+      web_assert(is.null(facts[[r$fact_id]]),"Duplicate narrative numeric fact key.")
+      facts[[r$fact_id]] <- list(value=r$numeric_summary,
+        rendered=r$numeric_summary,version=source$evidence_version,
+        field=paste0("narrative_numeric_reviews.",r$result_id),
+        provenance=list(result_id=r$result_id,study_id=r$study_id,
+          screening_id=r$screening_id,pdf_sha256=r$pdf_sha256,
+          source_digest=r$source_digest,source_location=r$source_location,
+          verified_by=r$verified_by,decision=r$decision))
+    }
+    return(facts)
+  }
+  e<-web_c2_defs(engine,38);facts<-list()
  add<-function(key,value,version,field){if(length(value)==1&&!is.null(value)&&!is.na(value))facts[[key]]<<-list(value=value,rendered=if(is.numeric(value))e$format_num(value) else as.character(value),version=version,field=field)}
  for(v in names(source$analyses)) {
   a<-source$analyses[[v]]
@@ -31,7 +57,30 @@ web_c2_expand <- function(text,x) {
  text
 }
 web_c2_system_blocks <- function(x,engine) {
- e<-web_c2_defs(engine,38);results<-character();methods<-character()
+  if(identical(x$source$route,"NARRATIVE")) {
+    web_assert(identical(x$source$narrative$finalization_scope,
+      "NARRATIVE_ANALYSIS_LOCKED; NOT_CANONICAL_R26"),
+      "Narrative source has not been finalized.")
+    rows <- x$source$narrative$rows
+    lines <- vapply(rows,function(r)paste0(
+      "- ",r$study_label,"; original PDF endpoint: ",r$original_outcome,
+      "; original PDF timepoint: ",
+      if(nzchar(r$reported_timepoint))r$reported_timepoint else "not specified in source",
+      "; Human-approved analysis variable: ",r$common_variable,
+      "; analysis timepoint: ",r$analysis_timepoint,
+      "; PDF location: ",r$source_location,"; result: ",
+      if(identical(r$decision,"NOT_REPORTED"))
+        "not reported (Human PDF check)" else
+        paste0("{{FACT:",r$fact_id,"}}")),character(1))
+    methods <- c("Structured narrative synthesis of Human-confirmed study/outcome/timepoint sets.",
+      "Results originate from saved registered PDFs and exact source-bound Human verification.",
+      "No pooled effect or canonical R/26 statistical inference was performed.")
+    if(isTRUE(x$source$narrative$unresolved_rob))methods <- c(methods,
+      "Risk of bias remains unresolved; this is not an approved publication result.")
+    return(list(Results=paste(lines,collapse="\n\n"),
+      Methods=paste(methods,collapse="\n\n")))
+  }
+  e<-web_c2_defs(engine,38);results<-character();methods<-character()
  for(v in names(x$source$analyses)) {
   a<-x$source$analyses[[v]];row<-as.data.frame(Filter(function(v)length(v)==1,a$result$summary),stringsAsFactors=FALSE)
   # Human-approved role/outcome label replaces only an internal engine group identifier.
@@ -48,7 +97,31 @@ web_c2_system_blocks <- function(x,engine) {
  list(Results=paste(results[nzchar(results)],collapse="\n\n"),Methods=paste(unique(methods),collapse="\n\n"))
 }
 web_c2_check <- function(x,engine) {
- issues<-character();add<-function(m)issues<<-c(issues,m);e<-web_c2_defs(engine,39);n<-web_c2_defs(engine,40)
+  issues<-character();add<-function(m)issues<<-c(issues,m);e<-web_c2_defs(engine,39);n<-web_c2_defs(engine,40)
+  if(identical(x$source$route,"NARRATIVE")) {
+    nr <- x$source$narrative
+    if(!identical(nr$finalization_scope,"NARRATIVE_ANALYSIS_LOCKED; NOT_CANONICAL_R26") ||
+        !identical(nr$source_version,x$evidence_version))
+      add("Narrative approval/version binding is invalid")
+    if(isTRUE(nr$unresolved_rob)) add("Human-reviewed risk of bias remains pending")
+    rr <- nr$rows
+    if(!length(rr) || anyDuplicated(vapply(rr,function(r)r$result_id,character(1))))
+      add("Narrative result inventory missing or duplicated")
+    for(r in rr) {
+      if(grepl("AUTHOR REQUIRED",r$study_label,fixed=TRUE))
+        add("Study citation/identification needs author completion")
+      if(identical(r$decision,"NOT_REPORTED")) {
+        if(nzchar(r$numeric_summary)||nzchar(r$fact_id))
+          add("Unreported result contains a numeric fact")
+      } else {
+        f <- x$source$facts[[r$fact_id]]
+        if(is.null(f) || !identical(f$rendered,r$numeric_summary) ||
+            !identical(f$provenance$pdf_sha256,r$pdf_sha256) ||
+            !identical(f$provenance$result_id,r$result_id))
+          add("Narrative fact token lacks exact Human/PDF provenance")
+      }
+    }
+  }
  if(!setequal(names(x$sections),web_c2_sections()))add("Required manuscript sections are missing")
  if(!length(x$source$references$records))add("Verified references required")
  refs<-vapply(x$source$references$records,`[[`,character(1),"pmid");allcite<-character()
@@ -92,7 +165,9 @@ web_c2_check <- function(x,engine) {
 web_c2_render <- function(x,engine,strict=TRUE) {
  if(strict)web_assert(web_c2_check(x,engine)$status=="PASS","Resolve manuscript pre-check issues.","INPUT_VALIDATION_FAILED")
  e<-web_c2_defs(engine,39);blocks<-web_c2_system_blocks(x,engine);parts<-c(paste0("# ",x$spec$title))
- for(k in web_c2_sections())parts<-c(parts,paste0("## ",k),blocks[[k]],web_c2_expand(x$sections[[k]]$text %||b2% "[AUTHOR REQUIRED]",x))
+ for(k in web_c2_sections())parts<-c(parts,paste0("## ",k),
+    if(!is.null(blocks[[k]]))web_c2_expand(blocks[[k]],x) else NULL,
+    web_c2_expand(x$sections[[k]]$text %||b2% "[AUTHOR REQUIRED]",x))
  text<-paste(parts,collapse="\n\n");order<-e$extract_pmids(text)
  refs<-setNames(x$source$references$records,vapply(x$source$references$records,`[[`,character(1),"pmid"))
  web_assert(all(order %in% names(refs)),"Unverified reference in manuscript.","CITATION_VALIDATION_FAILED")

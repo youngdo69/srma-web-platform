@@ -92,6 +92,9 @@ result <- tryCatch({
   inputs <- if (identical(request$action, "prepare_prospero")) "config/project_config.yml" else c("config/project_config.yml", paths$search_terms_file)
   if (!configuration_only) inputs <- c(inputs,
     unlist(paths[paste0(e$get_enabled_databases(config, validate = FALSE), "_search")], use.names = FALSE))
+  # Versioned screening config is a hashed scientific input, not engine runtime state.
+  if (file.exists("config/agent_screening.yml"))
+    inputs <- unique(c(inputs, "config/agent_screening.yml"))
   if (configuration_only) {
     # Preserve verified uploaded/generated inputs when editing a saved version.
     extra <- list.files(root, recursive = TRUE, full.names = TRUE)
@@ -164,13 +167,17 @@ result <- tryCatch({
   }
   }
 }, error = function(e) {
-  code <- if (inherits(e, "srma_web_error")) e$code else if (request$action == "inspect") "VALIDATION_FAILED" else "ENGINE_FAILED"
+  quota_exhausted <- identical(request$action, "recommend_screening") &&
+    inherits(e, "srma_ai_quota_exhausted")
+  code <- if (quota_exhausted) "USER_ACTION_REQUIRED" else if (inherits(e, "srma_web_error")) e$code else if (request$action == "inspect") "VALIDATION_FAILED" else "ENGINE_FAILED"
   if(grepl("requires packages recorded in renv.lock but currently unavailable",conditionMessage(e),fixed=TRUE))code<-"DEPENDENCY_FAILED"
   # The known validator intentionally raises on structural validation failures.
   if (grepl("canonical-path validation failed", conditionMessage(e), fixed = TRUE)) code <- "VALIDATION_FAILED"
   web_result(request$action, request$project_id, request$job_id,
     if (code == "USER_ACTION_REQUIRED") "USER_ACTION_REQUIRED" else "FAILED",
-    switch(code, USER_ACTION_REQUIRED = if (inherits(e,"srma_web_error")) conditionMessage(e) else "Add the configured search inputs before continuing.",
+    switch(code, USER_ACTION_REQUIRED = if (quota_exhausted)
+      "OpenAI API credits are exhausted. Valid AI-screening decisions were checkpointed. Add API credits, then queue screening again to resume."
+      else if (inherits(e,"srma_web_error")) conditionMessage(e) else "Add the configured search inputs before continuing.",
       VALIDATION_FAILED = "Check the project configuration and search inputs, then submit a corrected version.",
       DEPENDENCY_FAILED = "The processing environment needs maintenance.", "Processing could not finish. The diagnostic record is available to the operator."),
     request$engine_version, code, paste(conditionMessage(e), if (!is.null(e$diagnostic)) e$diagnostic else ""), started = started)

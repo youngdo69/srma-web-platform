@@ -52,9 +52,10 @@ web_copy_version <- function(con,settings,actor,project_id,version_id,root,core_
     seed_file <- file.path(v$root, "config/project_seed.yml")
     if (file.exists(config_file)) {
       cfg <- yaml::read_yaml(config_file)
-      names <- intersect(names, c("config/project_config.yml", cfg$paths$search_terms_file))
+      names <- intersect(names, c("config/project_config.yml",
+        cfg$paths$search_terms_file, "config/agent_screening.yml"))
     } else if (file.exists(seed_file)) {
-      names <- intersect(names, "config/project_seed.yml")
+      names <- intersect(names, c("config/project_seed.yml", "config/agent_screening.yml"))
     } else {
       web_error("VALIDATION_FAILED", "This saved version has neither a canonical configuration nor a project seed.")
     }
@@ -464,7 +465,15 @@ web_activate_draft <- function(con,settings,actor,project_id,version_id,selectio
   }
 
   # Copy only approved canonical inputs and explicit review record into activation snapshot.
-  keep<-c("config/project_config.yml",active_terms_path,"config/generated/web_human_review.yml")
+  # Canonical approval preserves the prior policy, or supplies the default once.
+  policy <- file.path(root, "config/agent_screening.yml")
+  if (!file.exists(policy)) {
+    template <- file.path(settings$engine_root, "config/agent_screening.yml")
+    web_assert(file.exists(template) && isTRUE(file.copy(template, policy, overwrite=FALSE)),
+      "The screening policy is unavailable.", "SYSTEM_FAILED")
+  }
+  keep<-c("config/project_config.yml", active_terms_path,
+          "config/agent_screening.yml", "config/generated/web_human_review.yml")
   clean<-tempfile("approved-",settings$data_root);dir.create(clean);on.exit(unlink(clean,recursive=TRUE),add=TRUE)
   for(f in keep){dir.create(dirname(file.path(clean,f)),recursive=TRUE,showWarnings=FALSE);file.copy(file.path(root,f),file.path(clean,f))}
 

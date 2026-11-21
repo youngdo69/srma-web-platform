@@ -18,7 +18,17 @@ web_engine_call <- function(settings, request, diagnostic_dir = tempfile("engine
       "Processing could not finish. The operator can safely retry this check.", request$engine_version,
       "SYSTEM_FAILED", if (inherits(run, "error")) conditionMessage(run) else paste("Subprocess exit", run)))
   }
-  jsonlite::read_json(output, simplifyVector = FALSE)
+  result <- jsonlite::read_json(output, simplifyVector = FALSE)
+  # Web-only overlay is a separate execution provenance dimension; it does
+  # NOT change the original scientific engine ID or Human reviewer verdicts.
+  overlay_path <- file.path(settings$engine_root, "web/docs/approved-web-overlay.json")
+  if (is.list(result) && identical(as.character(settings$mode), "development") &&
+      file.exists(overlay_path)) {
+    if (!is.list(result$provenance)) result$provenance <- list()
+    result$provenance$web_overlay_sha256 <- web_sha(overlay_path)
+    result$provenance$web_overlay_release <- "RC28.19_PDF_DISCOVERY_SIMPLE_UI"
+  }
+  result
 }
 web_engine_inspect <- function(settings, root, configuration_only = FALSE) {
   result <- web_engine_call(settings, list(action = if (configuration_only) "inspect_configuration" else "inspect", project_dir = root))
@@ -54,6 +64,12 @@ srma_run <- function(settings, project_id, operation, payload, job_id, project_d
     if(identical(operation,"recommend_screening")) {
       ai_timeout<-suppressWarnings(as.integer(Sys.getenv("SRMA_WEB_AI_SCREENING_TIMEOUT","43200")))
       if(is.na(ai_timeout)||ai_timeout<3600L)ai_timeout<-43200L
+      settings$timeout<-max(as.integer(settings$timeout),ai_timeout)
+    }
+    if(identical(operation,"recommend_study_design")) {
+      # Up to 23 separately checkpointed AI batches for a 182-record Include set.
+      ai_timeout<-suppressWarnings(as.integer(Sys.getenv("SRMA_WEB_AI_DESIGN_TIMEOUT","7200")))
+      if(is.na(ai_timeout)||ai_timeout<3600L)ai_timeout<-7200L
       settings$timeout<-max(as.integer(settings$timeout),ai_timeout)
     }
   }

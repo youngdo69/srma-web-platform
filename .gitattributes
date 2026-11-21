@@ -1,1 +1,6 @@
 web/db/*.sql text eol=lf
+R/19_run_agent_title_abstract_screening.R text eol=lf
+config/agent_screening.yml text eol=lf
+web/docs/engine-baseline.json text eol=lf
+web/docs/engine-source-manifest.json text eol=lf
+.gitattributes text eol=lf

@@ -1,8 +1,71 @@
+# Development-only Web source overlay for a previously hash-pinned scientific engine.
+# The canonical engine-source-manifest.json remains IDENTICAL and defines the
+# registered scientific engine identity. Approved Web-only replacements have
+# their own immutable SHA-256 declarations and NEVER exempt R/, config/, renv
+# or other scientific files from baseline verification.
+web_approved_dev_overlay <- function(settings, manifest_file, manifest) {
+  path <- file.path(settings$engine_root, "web/docs/approved-web-overlay.json")
+  if (!file.exists(path)) return(list())
+  web_assert(identical(as.character(settings$mode), "development"),
+    "A development Web overlay cannot be used in release/production mode.", "SYSTEM_FAILED")
+  overlay <- tryCatch(jsonlite::read_json(path, simplifyVector = FALSE),
+    error = function(e) NULL)
+  web_assert(is.list(overlay) &&
+    identical(overlay$schema_version, "SRMA_WEB_DEV_OVERLAY_V1") &&
+    identical(overlay$release_label, "RC28.19_PDF_DISCOVERY_SIMPLE_UI") &&
+    identical(overlay$base_manifest_sha256,
+      digest::digest(file = manifest_file, algo = "sha256")),
+    "The approved development Web overlay does not match the frozen baseline.",
+    "SYSTEM_FAILED")
+  baseline_allowed <- c("web/adapter/evidence.R", "web/R/evidence.R", "web/ui/evidence.R", "web/R/service.R")
+  # Approved, hash-pinned Web-only Analysis modules. No R/, renv or
+  # scientific configuration entries are allowed by this extension.
+  analysis_allowed <- c("web/ui/app.R", "web/ui/synthesis_nav.R",
+    "web/R/narrative_analysis.R", "web/R/narrative_source_review.R",
+    "web/ui/narrative_source_review.R", "web/R/narrative_batch_review.R",
+    "web/ui/narrative_batch_review.R", "web/R/narrative_pdf_numbers.R",
+    "web/R/manuscript.R", "web/R/manuscript_render.R",
+    "web/ui/manuscript.R", "web/adapter/manuscript.R")
+  allowed <- c(baseline_allowed, "web/R/adapter.R", "web/adapter/pdf_results.R",
+    analysis_allowed)
+  files <- overlay$files
+  web_assert(is.list(files) && !is.null(names(files)) &&
+    identical(sort(names(files)), sort(allowed)) &&
+    all(baseline_allowed %in% names(manifest)) &&
+    !("web/R/adapter.R" %in% names(manifest)) &&
+    !("web/adapter/pdf_results.R" %in% names(manifest)),
+    "The Web overlay has unapproved or missing source entries.", "SYSTEM_FAILED")
+  for (p in allowed) {
+    sha <- files[[p]]
+    web_assert(is.character(sha) && length(sha) == 1L &&
+      !is.na(sha) && grepl("^[0-9a-f]{64}$", sha) &&
+      (is.null(manifest[[p]]) || !identical(sha, manifest[[p]])),
+      "The Web overlay contains an invalid or non-replacement hash.", "SYSTEM_FAILED")
+  }
+  files
+}
+
 web_register_engine <- function(con, settings) {
   baseline <- jsonlite::read_json(file.path(settings$engine_root, "web/docs/engine-baseline.json"))
-  manifest <- jsonlite::read_json(file.path(settings$engine_root, "web/docs/engine-source-manifest.json"))
-  for (p in names(manifest)) web_assert(identical(web_sha(file.path(settings$engine_root, p)), manifest[[p]]),
-      "The scientific source differs from the registered baseline.", "SYSTEM_FAILED")
+  manifest_file <- file.path(settings$engine_root, "web/docs/engine-source-manifest.json")
+  manifest <- jsonlite::read_json(manifest_file, simplifyVector = FALSE)
+  overlay <- web_approved_dev_overlay(settings, manifest_file, manifest)
+  for (p in names(manifest)) {
+    expected <- if (p %in% names(overlay)) overlay[[p]] else manifest[[p]]
+    web_assert(file.exists(file.path(settings$engine_root, p)) &&
+      identical(web_sha(file.path(settings$engine_root, p)), expected),
+      "The scientific source or approved Web overlay differs from its hash-pinned baseline.",
+      "SYSTEM_FAILED")
+  }
+  # Also pin Web adapter modules absent from the historical manifest.
+  for (p in setdiff(names(overlay), names(manifest))) {
+    web_assert(file.exists(file.path(settings$engine_root, p)) &&
+      identical(web_sha(file.path(settings$engine_root, p)), overlay[[p]]),
+      "The supplemental approved Web source failed hash verification.",
+      "SYSTEM_FAILED")
+  }
+  # Preserve the original, already-registered scientific engine ID and its
+  # original manifest_json. Do NOT rewrite historical engine or job records.
   hash <- digest::digest(as.character(web_json(manifest)), algo = "sha256", serialize = FALSE)
   id <- paste0("snapshot-", substr(hash, 1, 16))
   if (!nrow(web_query(con, "SELECT id FROM engine_releases WHERE id=?id", id = id)))
@@ -169,6 +232,8 @@ web_import_project <- function(con, settings, actor, workspace_id, source_root, 
 web_submit <- function(con, settings, actor, project_id, version_id, operation = "validate_search", idempotency_key = web_id(), payload = list()) {
   project <- web_authorize(con, actor, project_id)
   reg <- web_registry()[[operation]]
+  if (identical(operation,"recommend_screening"))
+    version_id <- web_b2_auto_policy_version(con,settings,actor,project_id,version_id)
   web_b2_guard(con,settings,actor,project_id,version_id,operation)
   web_c1_guard(con,settings,actor,project_id,version_id,operation)
   web_c2_guard(con,settings,actor,project_id,version_id,operation)
@@ -247,6 +312,18 @@ web_decide_gate <- function(con, actor, project_id, gate_id, decision, rationale
 }
 web_retry <- function(con, settings, actor, project_id, job_id) {
   project <- web_authorize(con, actor, project_id)
+  prior <- web_query(con,"SELECT id,version_id,operation,state FROM jobs WHERE id=?id AND project_id=?p",id=job_id,p=project_id)
+  if (nrow(prior)==1L && identical(as.character(prior$operation),"recommend_screening") &&
+      prior$state %in% c("FAILED","USER_ACTION_REQUIRED")) {
+    current <- web_version_root(con,settings,actor,project_id,as.character(prior$version_id))
+    if (!("config/agent_screening.yml" %in% names(current$manifest))) {
+      # Route legacy retry through ordinary policy revision and job creation.
+      # No historical job state is overwritten or concealed.
+      return(web_submit(con,settings,actor,project_id,
+        as.character(prior$version_id),"recommend_screening",
+        idempotency_key=paste0("legacy-resume-",job_id)))
+    }
+  }
   web_tx(con, function() {
     web_exec(con, "UPDATE projects SET title=title WHERE id=?p", p = project_id)
     j <- web_query(con, "SELECT * FROM jobs WHERE id=?id AND project_id=?p", id = job_id, p = project_id)

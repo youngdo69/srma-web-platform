@@ -2,9 +2,11 @@ source(file.path(web_root,"web/ui/evidence.R"))
 source(file.path(web_root,"web/ui/analysis.R"))
 source(file.path(web_root,"web/ui/manuscript.R"))
 source(file.path(web_root,"web/ui/final_qc.R"))
+source(file.path(web_root,"web/qc/runtime.R"))
 source(file.path(web_root,"web/ui/download_center.R"))
 source(file.path(web_root,"web/ui/security_audit.R"))
 source(file.path(web_root,"web/ui/deployment.R"))
+source(file.path(web_root,"web/ui/synthesis_nav.R"))
 srma_has_text <- function(x) {
   !is.null(x) && length(x) > 0L && nzchar(trimws(as.character(x[[1L]])))
 }
@@ -748,13 +750,17 @@ web_app <- function(settings) {
               shiny::uiOutput("search_import"),
               shiny::uiOutput("canonical_review_launcher")
             ),
-            web_b2_ui(), web_c1_ui(), web_c2_ui(), web_c3_ui(), web_c4_ui(), web_c5_ui(), web_c6_ui(),
+            web_b2_ui(),
+            shiny::tabPanel("Synthesis Overview", shiny::uiOutput("srma_analysis_overview")),
+            web_c1_ui(),
+            shiny::tabPanel("Narrative Manuscript Draft", shiny::uiOutput("srma_narrative_manuscript_ui")),
+            web_c2_ui(), srma_qc_simple_ui(), web_c4_ui(), web_c5_ui(), web_c6_ui(),
             shiny::tabPanel(
               "Results / Artifacts",
               shiny::div(
                 class = "srma-results-library",
                 shiny::uiOutput("results_library_header"),
-                shiny::tableOutput("results_library_table"),
+                shiny::tagList(shiny::tableOutput("results_library_table"),srma_qc_artifact_click_ui()),
                 shiny::div(
                   class = "srma-results-actions",
                   shiny::selectInput("artifact", "Result file to download", character()),
@@ -783,8 +789,8 @@ web_app <- function(settings) {
       dashboard = c("my_projects"),
       review_setup = c("new_review", "Human Review Required"),
       studies = c("Search / Study Import", "Screening / Evidence"),
-      analysis = c("Meta-analysis"),
-      manuscript = c("Manuscript"),
+      analysis = c("Synthesis Overview", "Meta-analysis"),
+      manuscript = c("Narrative Manuscript Draft", "Manuscript"),
       review_export = c("Final QC", "Download Center", "Results / Artifacts"),
       settings = c("Security & Audit", "Service Status")
     )
@@ -793,7 +799,7 @@ web_app <- function(settings) {
       dashboard = "my_projects",
       review_setup = "new_review",
       studies = "Search / Study Import",
-      analysis = "Meta-analysis",
+      analysis = "Synthesis Overview",
       manuscript = "Manuscript",
       review_export = "Final QC",
       settings = "Security & Audit"
@@ -803,8 +809,8 @@ web_app <- function(settings) {
       dashboard = character(),
       review_setup = c("new_review" = "New Review", "Human Review Required" = "Human Decisions"),
       studies = c("Search / Study Import" = "Search & Import", "Screening / Evidence" = "Screening & Evidence"),
-      analysis = c("Meta-analysis" = "Meta-analysis"),
-      manuscript = c("Manuscript" = "Manuscript"),
+      analysis = c("Synthesis Overview" = "Synthesis Overview", "Meta-analysis" = "Meta-analysis"),
+      manuscript = c("Narrative Manuscript Draft" = "Narrative Draft", "Manuscript" = "Manuscript Builder"),
       review_export = c("Final QC" = "Final QC", "Download Center" = "Downloads", "Results / Artifacts" = "Results & Artifacts"),
       settings = c("Security & Audit" = "Security & Audit", "Service Status" = "Service Status")
     )
@@ -1441,8 +1447,415 @@ web_app <- function(settings) {
     })
 
     web_b2_server(input,output,session,request,safe,notice,refresh)
+    # RC28.21: read-only, version-bound Studies -> Analysis handoff.
+    # Does not mutate Evidence, create a Job, or bypass Scientific Human gates.
+    srma_analysis_packet <- shiny::reactive({
+      shiny::req(input$project,input$version)
+      tryCatch(request("evidence_view",list(
+        project_id=input$project,version_id=input$version)),error=function(e)NULL)
+    })
+    output$srma_analysis_overview <- shiny::renderUI({
+      x <- srma_analysis_packet()
+      srma_ui_analysis_overview(x)
+    })
+    shiny::observeEvent(input$evidence_go_analysis, {
+      x <- srma_analysis_packet()
+      status <- srma_ui_analysis_status(x)
+      if(!isTRUE(status$ready)) {
+        notice(status$message)
+        shiny::showNotification(status$message,type="warning",duration=7)
+        return()
+      }
+      nav_section("analysis")
+      shiny::updateTabsetPanel(session,"page",selected="Synthesis Overview")
+    },ignoreInit=TRUE)
+    output$srma_analysis_matrix_csv <- shiny::downloadHandler(
+      filename=function(){paste0("srma-analysis-evidence-matrix-",Sys.Date(),".csv")},
+      content=function(file){
+        x <- srma_analysis_packet()
+        z <- srma_ui_analysis_status(x)
+        if(!isTRUE(z$ready))stop("The selected synthesis output is not current.")
+        utils::write.csv(web_b2_synthesis_execution_table(x$synthesis_execution),
+          file,row.names=FALSE,na="",fileEncoding="UTF-8")
+      })
+    output$srma_analysis_draft_md <- shiny::downloadHandler(
+      filename=function(){paste0("srma-analysis-narrative-draft-",Sys.Date(),".md")},
+      content=function(file){
+        x <- srma_analysis_packet()
+        z <- srma_ui_analysis_status(x)
+        if(!isTRUE(z$ready))stop("The selected synthesis output is not current.")
+        writeLines(web_b2_synthesis_execution_markdown(x$synthesis_execution),
+          con=file,useBytes=TRUE)
+      })
+
+    # RC28.22 Narrative-only analysis: source-indexed read-only review,
+    # optional immutable draft-route handoff. No AI, R/26 or R/27 runs here.
+    srma_narrative_message <- shiny::reactiveVal("")
+    output$srma_narrative_feedback <- shiny::renderText(srma_narrative_message())
+    output$srma_narrative_analysis_panel <- shiny::renderUI({
+      srma_ui_narrative_analysis_panel(srma_analysis_packet())
+    })
+    output$srma_narrative_results <- shiny::renderTable({
+      x <- srma_analysis_packet()
+      a <- if(is.list(x)) x$.narrative_analysis_assessment else NULL
+      if(!is.list(a) || !length(a$rows)) return(NULL)
+      do.call(rbind,lapply(a$rows,function(r)data.frame(
+        Study=r$study_id,Outcome=r$common_variable,Timepoint=r$timepoint,
+        PDF_endpoint=r$outcome,Source=r$source_location,
+        Numerical_result=if(r$numeric_status %in% c("HUMAN_VERIFIED",
+          "NARRATIVE_SOURCE_CONFIRMED","NARRATIVE_SOURCE_CORRECTED"))
+          r$numerical_result else if(identical(r$numeric_status,"NOT_REPORTED"))
+            "Not reported (PDF checked)" else "SOURCE QA REQUIRED",stringsAsFactors=FALSE)))
+    },bordered=FALSE,striped=TRUE,spacing="s")
+    output$srma_narrative_issues <- shiny::renderTable({
+      x <- srma_analysis_packet()
+      a <- if(is.list(x)) x$.narrative_analysis_assessment else NULL
+      if(!is.list(a) || identical(a$status,"PENDING")) return(NULL)
+      t <- web_b2_narrative_issue_table(a)
+      if(!nrow(t)) return(NULL)
+      names(t) <- c("Severity","Issue","Study","Source result","Required check")
+      t
+    },bordered=FALSE,striped=TRUE,spacing="s")
+    # RC28.22.1 — direct PDF ↔ AI numeric extraction ↔ Human source verification.
+    srma_nr_feedback <- shiny::reactiveVal("")
+    output$srma_narrative_source_feedback <- shiny::renderText(srma_nr_feedback())
+    # RC28.22.2: the selectInput's options are already bound at render time in
+    # srma_ui_narrative_analysis_panel(). Do not dispatch a premature updateSelectInput.
+    # If no input value has arrived yet, display the first matching source result
+    # rather than suspending the entire PDF / AI / Human workspace silently.
+    output$srma_narrative_source_editor <- shiny::renderUI({
+      x <- srma_analysis_packet()
+      a <- if(is.list(x)) x$.narrative_analysis_assessment else NULL
+      rows <- if(is.list(a) && is.list(a$rows)) a$rows else list()
+      ids <- if(length(rows)) vapply(rows,function(r)
+        web_b2_nr_one(r$result_id),character(1)) else character()
+      ids <- ids[nzchar(ids)]
+      if(!length(ids)) return(shiny::p(
+        "No source-specific results are available for this Evidence Version."))
+      selected <- as.character(input$srma_narrative_result %||b2% "")
+      result_id <- if(length(selected)==1L && selected %in% ids) selected else ids[[1L]]
+      srma_ui_nr_editor(x,result_id)
+    })
+    output$srma_narrative_candidate_values <- shiny::renderTable({
+      x <- srma_analysis_packet(); shiny::req(x,input$srma_narrative_result)
+      d <- web_b2_nr_detail(x,as.character(input$srma_narrative_result))
+      if(is.null(d))return(NULL)
+      choice <- as.character(input$srma_narrative_candidate %||b2% "")
+      r <- Filter(function(a)identical(web_b2_nr_one(a$.row_id),choice),d$ai)
+      if(length(r)!=1L)return(data.frame(Item="AI extraction",Value="Select a saved AI row to display its exact original numbers."))
+      r <- r[[1L]]
+      fields <- unique(c("outcome_name","outcome_definition","timepoint",
+        names(srma_ui_nr_labels),"source_location","source_evidence","extraction_notes"))
+      data.frame(Item=fields,AI_original_value=vapply(fields,function(k)web_b2_nr_one(r[[k]]),character(1)),
+        stringsAsFactors=FALSE)
+    },striped=TRUE,spacing="s")
+    shiny::observeEvent(input$srma_narrative_load_ai,{
+      x <- srma_analysis_packet();shiny::req(x,input$srma_narrative_result)
+      d <- web_b2_nr_detail(x,as.character(input$srma_narrative_result))
+      if(is.null(d))return()
+      choice <- as.character(input$srma_narrative_candidate %||b2% "")
+      r <- Filter(function(a)identical(web_b2_nr_one(a$.row_id),choice),d$ai)
+      if(length(r)!=1L){
+        srma_nr_feedback("Choose one AI source row before copying its unverified values.")
+        return()
+      }
+      for(k in web_b2_nr_fields()) shiny::updateTextInput(session,paste0("srma_nr_",k),
+        value=web_b2_nr_one(r[[1L]][[k]]))
+      srma_nr_feedback("AI values copied into unsaved Human fields. Check the PDF before confirming or correcting.")
+    },ignoreInit=TRUE)
+    output$srma_narrative_original_pdf <- shiny::downloadHandler(
+      filename=function(){
+        x <- srma_analysis_packet()
+        d <- web_b2_nr_detail(x,as.character(input$srma_narrative_result %||b2% ""))
+        if(is.null(d))"registered-study.pdf" else
+          paste0("study-",gsub("[^A-Za-z0-9_-]","_",web_b2_nr_one(d$row$screening_id)),".pdf")
+      },
+      content=function(file){
+        shiny::req(token(),input$project,input$version,input$srma_narrative_result)
+        actor <- web_session(con,token())$user_id
+        ctx <- web_b2_context(con,settings,actor,input$project,input$version)
+        d <- web_b2_nr_detail(ctx$packet,as.character(input$srma_narrative_result))
+        web_assert(!is.null(d),"Source result is not bound to a registered PDF.")
+        rows <- Filter(function(r)identical(web_b2_nr_one(r$screening_id),web_b2_nr_one(d$row$screening_id)),
+          ctx$packet$tables$Author_Final_Review)
+        web_assert(length(rows)==1L && identical(web_b2_nr_one(rows[[1L]]$.pdf_sha256),d$checksum),
+          "PDF registration or SHA-256 mismatch.")
+        path <- web_inside(file.path(ctx$version$root,web_b2_nr_one(rows[[1L]]$.pdf_relative)),ctx$version$root)
+        web_assert(identical(web_sha(path),d$checksum),"Source PDF checksum verification failed.")
+        web_assert(isTRUE(file.copy(path,file,overwrite=TRUE)),"Cannot copy the authorized PDF.")
+      },contentType="application/pdf")
+    shiny::observeEvent(input$srma_narrative_save_source,{
+      shiny::req(input$project,input$version,input$srma_narrative_result)
+      x <- srma_analysis_packet()
+      d <- web_b2_nr_detail(x,as.character(input$srma_narrative_result))
+      if(is.null(d)){
+        srma_nr_feedback("No current source found. Reload the Evidence Version.")
+        return()
+      }
+      fields <- web_b2_nr_fields()
+      vals <- stats::setNames(lapply(fields,function(k)as.character(input[[paste0("srma_nr_",k)]] %||b2% "")),fields)
+      v <- c(list(source_digest=web_b2_nr_one(x$synthesis_execution$source_digest),
+        decision=as.character(input$srma_narrative_decision %||b2% ""),
+        source_row_id=as.character(input$srma_narrative_candidate %||b2% ""),
+        source_location=as.character(input$srma_nr_location %||b2% ""),
+        source_evidence=as.character(input$srma_nr_evidence %||b2% ""),
+        reported_result=as.character(input$srma_nr_reported_result %||b2% ""),
+        rationale=as.character(input$srma_nr_rationale %||b2% "")),vals)
+      srma_nr_feedback("Saving source verification in a new Evidence Version…")
+      saved <- safe(request("evidence_edit",list(project_id=input$project,version_id=input$version,
+        table="__NARRATIVE_SOURCE_REVIEW__",row_id=as.character(input$srma_narrative_result),values=v)))
+      if(is.null(saved)){
+        srma_nr_feedback("Source check was not saved. Inspect the validation message above; no values were approved.")
+        return()
+      }
+      new_id <- as.character(saved$version_id)
+      if(length(new_id)!=1L || !nzchar(new_id)){
+        srma_nr_feedback("No valid Evidence Version ID was returned. Please inspect the App log.")
+        return()
+      }
+      pending_version_selection(new_id)
+      refresh(refresh()+1L)
+      srma_nr_feedback("Source check saved. Loading the new Evidence Version; canonical R/26 remains unchanged.")
+      notice("Narrative source result reviewed; a new Evidence Version is loading.")
+    },ignoreInit=TRUE)
+
+    # RC28.22.3: single-screen, atomic verification. Per-row editors and
+    # exception queues are not rendered. No provider reprocessing is initiated.
+    srma_batch_feedback <- shiny::reactiveVal("")
+    output$srma_batch_feedback <- shiny::renderText(srma_batch_feedback())
+    output$srma_batch_original_pdf <- shiny::downloadHandler(
+      filename=function(){
+        id<-as.character(input$srma_batch_pdf_source %||b2% "")
+        paste0("source-",gsub("[^A-Za-z0-9_-]","_",id),".pdf")
+      },
+      content=function(file){
+        shiny::req(token(),input$project,input$version,input$srma_batch_pdf_source)
+        actor<-web_session(con,token())$user_id
+        ctx<-web_b2_context(con,settings,actor,input$project,input$version)
+        x<-ctx$packet
+        target<-as.character(input$srma_batch_pdf_source)
+        idx<-web_b2_nr_batch_index(x)
+        ok<-any(vapply(idx,function(z)is.list(z$detail) &&
+          identical(web_b2_nr_one(z$detail$row$screening_id),target),logical(1)))
+        web_assert(ok,"Selected PDF is not attached to a current Analysis result.")
+        r<-Filter(function(z)identical(web_b2_nr_one(z$screening_id),target),
+          x$tables$Author_Final_Review)
+        web_assert(length(r)==1L,"Original PDF mapping is not unique.")
+        expected<-web_b2_nr_one(r[[1L]]$.pdf_sha256)
+        web_assert(nzchar(expected) &&
+          identical(expected,web_b2_nr_one(x$pdf_result_discovery$report_checksums[[target]])),
+          "Registered PDF checksum mismatch.")
+        path<-web_inside(file.path(ctx$version$root,
+          web_b2_nr_one(r[[1L]]$.pdf_relative)),ctx$version$root)
+        web_assert(identical(web_sha(path),expected),"Original PDF content changed.")
+        web_assert(isTRUE(file.copy(path,file,overwrite=TRUE)),"PDF download failed.")
+      },contentType="application/pdf")
+    shiny::observeEvent(input$srma_batch_ai_extract,{
+      shiny::req(input$project,input$version)
+      x<-srma_analysis_packet()
+      if(!identical(x$synthesis_execution$status,"AUTO_PREPARED")){
+        srma_batch_feedback("Please load the saved Analysis synthesis version first.")
+        return()
+      }
+      srma_batch_feedback("AI is reading the selected PDFs and extracting actual numerical results…")
+      saved<-safe(request("evidence_edit",list(project_id=input$project,
+        version_id=input$version,table="__NARRATIVE_PDF_NUMERIC_AI__",
+        row_id="__EXTRACT_ALL__",values=list(
+          source_digest=web_b2_nr_one(x$synthesis_execution$source_digest),
+          decision="EXTRACT_ALL_PDF_RESULTS"))))
+      if(is.null(saved)){
+        srma_batch_feedback("PDF numerical extraction was not saved. Existing Evidence Versions are unchanged; inspect the error and retry if appropriate.")
+        return()
+      }
+      new_id<-as.character(saved$version_id)
+      if(length(new_id)!=1L||!nzchar(new_id)){
+        srma_batch_feedback("The extraction returned no saved Evidence Version ID.")
+        return()
+      }
+      pending_version_selection(new_id)
+      refresh(refresh()+1L)
+      srma_batch_feedback("AI PDF numbers saved in a new Evidence Version. Review the full table and run Final Verification; you may repeat verification.")
+      notice("AI PDF result extraction saved. Loading the evidence table.")
+    },ignoreInit=TRUE)
+    shiny::observeEvent(input$srma_batch_verify_all,{
+      shiny::req(input$project,input$version)
+      x<-srma_analysis_packet()
+      status<-srma_ui_analysis_status(x)
+      if(!identical(status$route,"NARRATIVE_ONLY")){
+        srma_batch_feedback("This screen is for Narrative-only analysis; reload the active synthesis version.")
+        return()
+      }
+      idx<-web_b2_nr_batch_index(x)
+      if(!length(idx)){
+        srma_batch_feedback("No source results were found. Reload the Evidence Version.")
+        return()
+      }
+      entries<-lapply(seq_along(idx),function(i){
+        z<-idx[[i]];d<-z$detail
+        correction<-trimws(as.character(input[[paste0("srma_batch_correction_",i)]] %||b2% ""))
+        not_reported<-isTRUE(input[[paste0("srma_batch_not_reported_",i)]])
+        mode<-if(not_reported)"NOT_REPORTED" else if(nzchar(correction))"CORRECTED" else "AI"
+        location<-as.character(input[[paste0("srma_batch_location_",i)]] %||b2%
+          if(is.list(d))web_b2_nr_one(d$pdf$source_location) else "")
+        evidence<-as.character(input[[paste0("srma_batch_evidence_",i)]] %||b2%
+          if(is.list(d))web_b2_nr_one(d$pdf$source_evidence) else "")
+        list(result_id=z$result_id,mode=mode,
+          source_row_id=if(identical(mode,"AI") && is.list(z$candidate))
+            web_b2_nr_one(z$candidate$.row_id) else "",
+          corrected_result=if(identical(mode,"CORRECTED"))correction else "",
+          source_location=location,source_evidence=evidence)
+      })
+      srma_batch_feedback("Saving final verification for all current results…")
+      saved<-safe(request("evidence_edit",list(project_id=input$project,
+        version_id=input$version,table="__NARRATIVE_BATCH_REVIEW__",
+        row_id="__FINAL_VERIFY_ALL__",values=list(
+          source_digest=web_b2_nr_one(x$synthesis_execution$source_digest),
+          decision="FINAL_VERIFY_ALL",rows=entries))))
+      if(is.null(saved)){
+        srma_batch_feedback("Verification was not saved. Review the validation message; no partial changes were made.")
+        return()
+      }
+      new_id<-as.character(saved$version_id)
+      if(length(new_id)!=1L || !nzchar(new_id)){
+        srma_batch_feedback("Saved result did not include a valid new Evidence Version ID.")
+        return()
+      }
+      pending_version_selection(new_id)
+      refresh(refresh()+1L)
+      srma_batch_feedback("All results verified in one new Evidence Version. Edit and verify again if needed, or finalize and continue.")
+      notice("Batch source verification saved; new Evidence Version loading.")
+    },ignoreInit=TRUE)
+    pending_narrative_final_version <- shiny::reactiveVal(NULL)
+    shiny::observeEvent(input$srma_batch_continue,{
+      shiny::req(input$project,input$version)
+      x<-srma_analysis_packet()
+      a<-x$.narrative_analysis_assessment
+      if(!is.list(a) || as.integer(a$blocking)>0L || as.integer(a$numeric_unverified)>0L ||
+         !identical(x$narrative_batch_verification$status,"HUMAN_VERIFIED_EDITABLE")){
+        srma_batch_feedback("First complete Final Verification for every result in the active Evidence Version.")
+        return()
+      }
+      srma_batch_feedback("Finalizing Analysis and locking this source-review version…")
+      saved<-safe(request("evidence_edit",list(project_id=input$project,
+        version_id=input$version,table="__NARRATIVE_BATCH_FREEZE__",
+        row_id="__FREEZE_AND_CONTINUE__",values=list(
+          source_digest=web_b2_nr_one(x$synthesis_execution$source_digest),
+          decision="FREEZE_AND_CONTINUE"))))
+      if(is.null(saved)){
+        srma_batch_feedback("Analysis was not finalized. The current Evidence Version remains editable.")
+        return()
+      }
+      next_id<-as.character(saved$version_id)
+      if(length(next_id)!=1L || !nzchar(next_id)){
+        srma_batch_feedback("Could not confirm the finalized Evidence Version ID.")
+        return()
+      }
+      pending_narrative_final_version(next_id)
+      pending_version_selection(next_id)
+      refresh(refresh()+1L)
+      notice("Analysis finalized and locked. Loading the Manuscript working draft.")
+    },ignoreInit=TRUE)
+    shiny::observeEvent(input$version,{
+      target<-pending_narrative_final_version()
+      if(!is.null(target) && identical(as.character(input$version),as.character(target))){
+        pending_narrative_final_version(NULL)
+        nav_section("manuscript")
+        shiny::updateTabsetPanel(session,"page",selected="Narrative Manuscript Draft")
+      }
+    },ignoreInit=TRUE)
+
+    output$srma_narrative_issues_csv <- shiny::downloadHandler(
+      filename=function()paste0("srma-narrative-exceptions-",Sys.Date(),".csv"),
+      content=function(file){
+        x <- srma_analysis_packet()
+        a <- if(is.list(x)) x$.narrative_analysis_assessment else NULL
+        if(!is.list(a) || identical(a$status,"PENDING"))
+          stop("The current narrative source checks are not ready.")
+        utils::write.csv(web_b2_narrative_issue_table(a),file,row.names=FALSE,
+          na="",fileEncoding="UTF-8")
+      })
+    output$srma_narrative_draft_md <- shiny::downloadHandler(
+      filename=function()paste0("srma-structured-narrative-draft-",Sys.Date(),".md"),
+      content=function(file){
+        x <- srma_analysis_packet()
+        a <- if(is.list(x)) x$.narrative_analysis_assessment else NULL
+        if(!is.list(a) || identical(a$status,"PENDING"))
+          stop("No current narrative working draft is available.")
+        writeLines(web_b2_narrative_markdown(x,a),file,useBytes=TRUE)
+      })
+    output$srma_narrative_draft_md_2 <- shiny::downloadHandler(
+      filename=function()paste0("srma-manuscript-working-draft-",Sys.Date(),".md"),
+      content=function(file){
+        x <- srma_analysis_packet()
+        a <- if(is.list(x)) x$.narrative_analysis_assessment else NULL
+        if(!is.list(a) || identical(a$status,"PENDING"))stop("Draft is not ready.")
+        writeLines(web_b2_narrative_markdown(x,a),file,useBytes=TRUE)
+      })
+    output$srma_narrative_manuscript_ui <- shiny::renderUI({
+      srma_ui_narrative_manuscript(srma_analysis_packet())
+    })
+    output$srma_narrative_manuscript_preview <- shiny::renderText({
+      x <- srma_analysis_packet()
+      a <- if(is.list(x)) x$.narrative_analysis_assessment else NULL
+      if(!is.list(a) || identical(a$status,"PENDING"))return("")
+      paste(web_b2_narrative_markdown(x,a),collapse="\n")
+    })
+    shiny::observeEvent(input$srma_narrative_to_manuscript,{
+      x <- srma_analysis_packet()
+      z <- srma_ui_analysis_status(x)
+      a <- if(is.list(x)) x$.narrative_analysis_assessment else NULL
+      if(!identical(z$route,"NARRATIVE_ONLY") || !is.list(a) ||
+         identical(a$status,"PENDING") || as.integer(a$blocking)>0L){
+        notice("Correct source-integrity issues before preparing the manuscript draft.")
+        return()
+      }
+      nav_section("manuscript")
+      shiny::updateTabsetPanel(session,"page",selected="Narrative Manuscript Draft")
+      notice("Narrative manuscript working draft ready for source-based review. Unverified values remain withheld.")
+    },ignoreInit=TRUE)
+    shiny::observeEvent(input$srma_narrative_to_studies,{
+      nav_section("studies")
+      shiny::updateTabsetPanel(session,"page",selected="Screening / Evidence")
+      notice("Review Risk of Bias and source evidence in Studies; Analysis results stay version-bound.")
+    },ignoreInit=TRUE)
+    shiny::observeEvent(input$srma_narrative_back_to_analysis,{
+      nav_section("analysis")
+      shiny::updateTabsetPanel(session,"page",selected="Synthesis Overview")
+    },ignoreInit=TRUE)
+    shiny::observeEvent(input$srma_narrative_confirm_route,{
+      shiny::req(input$project,input$version)
+      x <- srma_analysis_packet()
+      a <- if(is.list(x)) x$.narrative_analysis_assessment else NULL
+      z <- srma_ui_analysis_status(x)
+      if(!identical(z$route,"NARRATIVE_ONLY") || !is.list(a) ||
+        !identical(a$status,"READY_FOR_DRAFT_ROUTE_CONFIRMATION") ||
+        as.integer(a$blocking)>0L){
+        srma_narrative_message("Draft-route handoff is not eligible. Reload and inspect source exceptions.")
+        return()
+      }
+      srma_narrative_message("Saving the draft-route handoff as a new Evidence Version…")
+      saved <- safe(request("evidence_edit",list(project_id=input$project,
+        version_id=input$version,table="__NARRATIVE_DRAFT_ROUTE__",
+        row_id="__CONFIRM__",values=list(analysis_digest=a$digest,
+        decision="CONFIRM_DRAFT_ROUTE"))))
+      if(is.null(saved)){
+        srma_narrative_message("Draft handoff could not be saved. Check the App log; no numerical approval was made.")
+        return()
+      }
+      new_id <- as.character(saved$version_id)
+      if(length(new_id)!=1L || !nzchar(new_id)){
+        srma_narrative_message("Save returned without a valid Evidence Version ID. Inspect the result before retrying.")
+        return()
+      }
+      pending_version_selection(new_id)
+      refresh(refresh()+1L)
+      srma_narrative_message("Draft route saved as a new Evidence Version. Loading the saved version; numerical and RoB reviews remain open.")
+      notice("Narrative draft handoff saved; loading the new Evidence Version.")
+    },ignoreInit=TRUE)
+
     web_c1_server(input,output,session,request,safe,notice,refresh)
     web_c2_server(input,output,session,request,safe,notice,refresh)
+    srma_qc_attach(input,output,session,request,settings,con)
     web_c3_server(input,output,session,request,safe,notice,refresh)
     web_c4_server(input,output,session,request,safe,notice,refresh)
     web_c5_server(input,output,session,request,safe,notice,refresh,token)
