@@ -10,7 +10,8 @@ agent_screening:
     name: "openai"
     api_key_env: "OPENAI_API_KEY"
     base_url: "https://api.openai.com/v1"
-    model: "gpt-5"
+    model: "gpt-6-luna"
+    reasoning_effort: "low"
 
   prompt:
     template_file: "prompts/title_abstract_screening_prompt.md"
@@ -25,6 +26,26 @@ agent_screening:
     request_pause_seconds: 0.2
     max_retries: 3
     timeout_seconds: 120
+
+    # Universal bounded parallel scheduling for title/abstract screening.
+    # Each record remains an independent LLM request with its own response ID,
+    # validation, retry history, and checkpoint entry.
+    parallel_enabled: true
+    parallel_workers: 4
+    parallel_max_workers: 6
+
+  # OpenAI official GPT-6 Luna Standard pricing, USD per 1M text tokens.
+  # This metadata is advisory; missing/mismatched pricing never blocks screening.
+  # Batch/Flex cost is 50% of Standard and uses a separate service tier.
+  cost_optimization:
+    rate_card:
+      model: "gpt-6-luna"
+      service_tier: "standard"
+      input_usd_per_million: 0.10
+      cached_input_usd_per_million: 0.01
+      cache_write_usd_per_million: 0.125
+      output_usd_per_million: 0.50
+      source: "https://developers.openai.com/api/docs/models/gpt-6-luna"
 
   decision_policy:
     unclear_when_insufficient_information: true

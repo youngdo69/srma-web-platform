@@ -559,6 +559,7 @@ collapse_nonblank <- function(
 # 2. Project context
 # ============================================================
 
+preflight_only <- "--preflight" %in% commandArgs(trailingOnly = TRUE)
 repo_root <- normalizePath(
   ".",
   winslash = "/",
@@ -589,7 +590,7 @@ if (is.null(config)) {
   )
 }
 
-load_dotenv_simple(
+if (!preflight_only) load_dotenv_simple(
   file.path(
     repo_root,
     ".env"
@@ -706,13 +707,6 @@ openai_api_key <- Sys.getenv(
   unset = ""
 )
 
-if (!nzchar(openai_api_key)) {
-  stop(
-    "OPENAI_API_KEY is required for R/39 manuscript drafting.",
-    call. = FALSE
-  )
-}
-
 ncbi_email <- Sys.getenv(
   "NCBI_EMAIL",
   unset = ""
@@ -794,7 +788,8 @@ if (!all(r38_ok)) {
 }
 
 r38_state <- yaml::read_yaml(
-  r38_state_file
+  r38_state_file,
+  eval.expr = FALSE
 )
 
 readiness_status <- safe_chr(
@@ -816,6 +811,22 @@ if (
   )
 }
 
+input_contract <- r38_state$manuscript_production$input_contract
+if (!is.null(input_contract)) {
+  hashed <- required_r38[names(required_r38) != "state"]
+  expected <- input_contract$r39_input_hashes
+  if (!identical(input_contract$schema, "SRMA_R38_INPUT_BINDING_V1") ||
+      !identical(r38_state$manuscript_production$project_id, project_id) ||
+      !identical(input_contract$project_id, project_id) ||
+      !isTRUE(input_contract$synthesis_mode %in% c("NARRATIVE", "PAIRWISE", "MIXED")) ||
+      !identical(readiness_status, "FINAL_EVIDENCE_READY") ||
+      !identical(input_contract$source_inputs$protocol$sha256, sha256_file(config_file)) ||
+      !is.list(expected) || !setequal(names(expected), names(hashed)) ||
+      !identical(as.list(vapply(hashed, sha256_file, character(1))), expected[names(hashed)])) {
+    stop("R/39 could not verify the version-bound R/38 input contract or the frozen file hashes.", call. = FALSE)
+  }
+}
+
 methods_factual_blocks <- read_text_file(
   r38_methods_file
 )
@@ -828,9 +839,7 @@ manuscript_scaffold <- read_text_file(
   r38_scaffold_file
 )
 
-artifact_registry <- safe_read_csv(
-  r38_artifact_registry_file
-)
+artifact_registry <- readr::read_csv(r38_artifact_registry_file, show_col_types = FALSE, progress = FALSE)
 
 required_artifact_columns <- c(
   "artifact_id",
@@ -874,6 +883,19 @@ artifact_registry$coverage_required <- tolower(
   "yes",
   "y"
 )
+
+if (preflight_only) {
+  cat("R/39 INPUT_PREFLIGHT_PASS\n",
+    "Synthesis: ", if (is.null(input_contract)) "LEGACY" else input_contract$synthesis_mode, "\n",
+    "R/38 state: ", readiness_status, "\n",
+    "Required frozen files: ", paste(names(required_r38), collapse = ", "), "\n",
+    "Drafting, PubMed verification and R/39 dossier production have not run.\n", sep = "")
+  quit(save = "no", status = 0L)
+}
+
+if (!nzchar(openai_api_key)) {
+  stop("OPENAI_API_KEY is required for R/39 manuscript drafting.", call. = FALSE)
+}
 
 required_coverage_artifacts <- artifact_registry |>
   dplyr::filter(
@@ -2775,6 +2797,10 @@ write_text_file(
 # 15. Draft Methods from R/38 only
 # ============================================================
 
+synthesis_guidance <- switch(safe_chr(input_contract$synthesis_mode),
+  NARRATIVE = "The approved review uses narrative synthesis without pooling. Preserve source-reported study effects, definitions and timepoints. Do not report a pooled model, pooled estimate, heterogeneity or quantitative diagnostics.",
+  MIXED = "Keep approved narrative strata separate from groups with executed pooled estimates. Never present a study-specific result as a pooled effect.",
+  "")
 methods_system <- paste(
   "You are drafting the Methods section of a peer-reviewed systematic review and meta-analysis.",
   "Use ONLY the supplied frozen R/38 factual blocks and project information.",
@@ -2793,6 +2819,7 @@ methods_system <- paste(
   "Do not assign Table or Figure numbers; the final publication-export layer owns all display numbering and cross-references.",
   "Use publication-safe plain Unicode for simple statistical notation (for example τ² and I²); do not emit LaTeX delimiters; use plain Unicode statistical notation instead."
 )
+if (nzchar(synthesis_guidance)) methods_system <- paste(methods_system, synthesis_guidance)
 
 methods_user <- paste0(
   "PROJECT TITLE:\n",
@@ -2860,6 +2887,7 @@ results_system <- paste(
   "Use publication-safe plain Unicode for simple statistical notation (for example τ² and I²); do not emit LaTeX delimiters.",
   "Write polished scholarly English with a level of detail comparable to a strong peer-reviewed meta-analysis in the relevant domain."
 )
+if (nzchar(synthesis_guidance)) results_system <- paste(results_system, synthesis_guidance)
 
 results_user <- paste0(
   "PROJECT TITLE:\n",
@@ -3742,6 +3770,10 @@ state <- list(
   )
 )
 
+if (!is.null(input_contract)) {
+  state$manuscript_drafting$r38_input_contract_sha256 <- input_contract$binding_sha256
+  state$manuscript_drafting$evidence_version <- input_contract$evidence_version
+}
 yaml::write_yaml(
   state,
   state_file

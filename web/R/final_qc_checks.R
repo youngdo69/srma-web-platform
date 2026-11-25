@@ -60,7 +60,123 @@ web_c3_docx <- function(path,x,rendered,proof,root,engine) {
  visible<-paste(vapply(allxml,function(p){z<-xml2::read_xml(p);paste(xml2::xml_text(xml2::xml_find_all(z,"//*[local-name()='t']")),collapse=" ")},character(1)),collapse="\n")
  list(text=visible,paragraphs=length(paras),tables=length(tables),images=length(media),headings=length(xml2::xml_find_all(xml,"//w:pStyle",ns)))
 }
-web_c3_checks <- function(x,proof,root,engine) {
+web_c3_narrative_checks <- function(x,proof,root,engine,require_release=TRUE) {
+ checks<-list()
+ findings<-list()
+ add<-function(code,message,mode="MACHINE") {
+  findings[[length(findings)+1L]]<<-list(id=paste0("narrative-",code),check=code,
+    severity=if(mode=="HUMAN")"MAJOR" else "BLOCKER",affected=code,
+    source=proof$source_sha256,machine_result=if(mode=="HUMAN")"REVIEW_REQUIRED" else "FAIL",
+    message=message,mode=mode,action="Review against the exact frozen manuscript and sources.")
+ }
+ run<-function(code,check) {
+  ok<-tryCatch({force(check);TRUE},error=function(err) {
+    add(code,if(inherits(err,"srma_web_error"))conditionMessage(err) else "Canonical source is missing or unreadable.")
+    FALSE
+  })
+  checks[[code]]<<-if(ok)"PASS" else "FAIL"
+  ok
+ }
+ output<-function(name)web_inside(file.path(root,proof$outputs[[name]]$path),root)
+ docx<-file.path(root,"config/generated/final_qc_assets/manuscript.docx")
+ run("lineage",{
+  if(require_release)web_c3_require_submission(proof$publication_qc)
+  web_assert((identical(x$stage,"APPROVED") || (!require_release && identical(x$stage,"REVIEW_REQUIRED"))) &&
+    identical(web_c2_hash(x$source),proof$source_sha256) &&
+    identical(web_c2_hash(x$sections),proof$content_sha256) &&
+    identical(web_c2_hash(x$source$references),proof$reference_sha256) &&
+    identical(x$evidence_version,proof$evidence_version),"Narrative manuscript lineage mismatch.")
+  for(a in c(proof$artifacts,proof$outputs))
+    web_assert(identical(web_sha(web_inside(file.path(root,a$path),root)),a$sha256),"Narrative output checksum mismatch.")
+  result<-jsonlite::read_json(output("result.json"),simplifyVector=FALSE)
+  web_assert(identical(result$job_id,proof$docx_job$id) &&
+    identical(result$version_id,proof$docx_job$version) &&
+    identical(result$evidence_version,proof$evidence_version) &&
+    identical(result$source_sha256,proof$source_sha256) &&
+    identical(result$reference_sha256,proof$reference_sha256) &&
+    identical(result$content_sha256,proof$content_sha256) &&
+    identical(result$docx_sha256,web_sha(docx)) &&
+    identical(result$verified_literature_sha256,web_sha(output("verified_reference_expansion.json"))),
+    "Archived production result is not bound to the inspected version and outputs.")
+ })
+ if(require_release)run("canonical_r40",{
+  evidence<-proof$publication_qc$r40
+  web_assert(length(evidence)>0L && all(vapply(evidence,function(a)
+    identical(a$version,proof$manuscript_version) && identical(a$status,"PASS") &&
+    identical(a$docx_sha256,proof$docx$docx_sha256),logical(1))),
+    "An approved exact-version R/40 result is required for this production narrative manuscript.")
+ })
+ run("citations",{
+  references<-jsonlite::read_json(output("verified_reference_expansion.json"),simplifyVector=FALSE)
+  web_assert(identical(references$base_library_sha256,proof$reference_sha256) &&
+    length(references$all_records)>0L &&
+    all(vapply(references$all_records,web_c2_ref_valid,logical(1))),"Archived reference library is incomplete.")
+  text<-paste(readLines(output("manuscript.md"),warn=FALSE,encoding="UTF-8"),collapse="\n")
+  mapping<-jsonlite::read_json(output("citation_map.json"),simplifyVector=TRUE)
+  e<-web_c3_r40(engine)
+  citations<-web_c3_citation_audit(e,text,mapping,references$all_records)
+  web_assert(nrow(citations)>0 && all(citations$status=="PASS"),"Canonical narrative citation audit failed.")
+  web_assert(!web_c3_leaks(text,e,engine),"Archived narrative manuscript contains internal or private markers.")
+ })
+ run("docx",web_c2_9cd_docx_integrity(docx))
+ if(require_release)for(code in c("methods_and_applicability","study_counts_and_bias","visual_and_claim_support"))
+   add(code,"Compare the completed narrative manuscript with frozen source evidence and record scientific disposition.","HUMAN")
+ lock<-jsonlite::read_json(file.path(engine,"renv.lock"))
+ runtime<-paste0("R version ",lock$R$Version)
+ list(machine_pass=all(unlist(checks)=="PASS"),checks=checks,findings=findings,
+   canonical_sources=startsWith(R.version.string,runtime) &&
+     startsWith(proof$docx_job$R %||b2% "",runtime),
+   ruleset=web_c3_ruleset(),proof_sha256=web_c2_hash(proof),R=R.version.string,
+   lock_sha256=proof$lock_sha256,semantic_route=if(require_release)
+     "Approved exact-version R/40 and explicit Human review" else "Deterministic inspection only")
+}
+web_c3_revised_checks <- function(x,proof,root,engine) {
+  pub<-proof$publication_qc
+  binding<-pub$r40_input_contract$binding$inputs$revision$binding
+  checks<-list()
+  findings<-list()
+  run<-function(id,expr) {
+    ok<-tryCatch({force(expr);TRUE},error=function(e)FALSE)
+    checks[[id]]<<-if(ok)"PASS" else "FAIL"
+    if(!ok)findings[[length(findings)+1L]]<<-list(id=paste0("revision-",id),check=id,severity="BLOCKER",
+      affected="Manuscript revision",source=proof$source_sha256,machine_result="FAIL",mode="MACHINE",
+      message="The revised publication proof is incomplete or inconsistent.",action="Review the bound source and revised Word archive.")
+  }
+  run("lineage",{
+    web_c3_require_submission(pub)
+    web_assert(identical(x$stage,"APPROVED") && identical(x$revision$fingerprint,binding$fingerprint) &&
+      identical(x$sections[[x$revision$section]]$text,binding$section) && identical(web_c2_hash(x$sections),proof$content_sha256) &&
+      identical(web_c2_hash(x$source),proof$source_sha256) && identical(web_c2_hash(x$source$references),proof$reference_sha256),
+      "Revision source differs from the approved version.")
+    for(a in c(proof$artifacts,proof$outputs))
+      web_assert(identical(web_sha(web_inside(file.path(root,a$path),root)),a$sha256),"Required artifact checksum mismatch.")
+  })
+  run("revised_archive",{
+    md<-proof$outputs[["manuscript.md"]]
+    citations<-proof$outputs[["citation_map.json"]]
+    web_assert(identical(md$sha256,binding$revised_archive[["manuscript.md"]]$sha256) &&
+      identical(citations$sha256,binding$origin_archive[["citation_map.json"]]$sha256) &&
+      identical(proof$docx$docx_sha256,binding$revised_archive[["manuscript.docx"]]$sha256),"The revised archive does not match R/40.")
+  })
+  run("selective_r40",{
+    receipt<-pub$r40[[1L]]
+    web_assert(isTRUE(pub$r40_integration$R40_VALIDATION_COMPLETE) && identical(receipt$status,"PASS") &&
+      identical(receipt$version,proof$manuscript_version) && identical(receipt$docx_sha256,proof$docx$docx_sha256) &&
+      identical(pub$r40_rule_matrix$STATISTICAL_METHODS_REPORTING$result,"PASS"),"Required revision verification has not passed.")
+  })
+  if(!length(findings))findings<-list(list(id="revision-word-visual-review",check="human_review",severity="MAJOR",
+    affected="Revised manuscript",source=proof$source_sha256,machine_result="REVIEW_REQUIRED",mode="HUMAN",
+    message="Review the edited manuscript and the revised Word layout.",action="Record the final scientific and visual disposition."))
+  runtime<-paste0("R version ",jsonlite::read_json(file.path(engine,"renv.lock"))$R$Version)
+  list(machine_pass=all(unlist(checks)=="PASS"),checks=checks,findings=findings,
+    canonical_sources=startsWith(R.version.string,runtime) && startsWith(proof$docx_job$R %||b2% "",runtime),
+    ruleset=web_c3_ruleset(),proof_sha256=web_c2_hash(proof),R=R.version.string,
+    lock_sha256=proof$lock_sha256,semantic_route="Exact-version selective R/40 and Human review")
+}
+
+web_c3_checks <- function(x,proof,root,engine,check_docx_xml=TRUE) {
+ if(is.list(x$revision))return(web_c3_revised_checks(x,proof,root,engine))
+ if(identical(x$source$route,"NARRATIVE"))return(web_c3_narrative_checks(x,proof,root,engine))
  e<-web_c3_r40(engine);findings<-list();checks<-list()
  add<-function(code,severity,affected,source,message,mode="MACHINE",status="FAIL") {
   id<-paste0(code,"-",substr(web_c2_hash(list(affected,source,message)),1,12))
@@ -115,13 +231,21 @@ web_c3_checks <- function(x,proof,root,engine) {
    ca<-web_c3_citation_audit(e,rendered$text,map,x$source$references$records);web_assert(nrow(ca)>0&&all(ca$status=="PASS"),"Canonical citation/reference audit failed.")
   })
   run("artifact_coverage",proof$source_sha256,{coverage<-web_c3_coverage(e,x);web_assert(all(coverage$status=="PASS"),"Cite every selected table/figure with substantive Results context using its artifact token.")})
-  run("docx",x$docx$artifact_id,{
-   md<-paste(readLines(file.path(root,proof$outputs[["manuscript.md"]]$path),warn=FALSE),collapse="\n");web_assert(identical(md,rendered$text),"Reviewed Markdown differs from approved content.")
-   doc<-web_c3_docx(file.path(root,"config/generated/final_qc_assets/manuscript.docx"),x,rendered,proof,root,engine)
-   web_assert(doc$headings>=length(web_c2_sections()),"Required Word headings missing.")
-   web_assert(!web_c3_leaks(doc$text,e,engine),"Machine identifiers, paths, secrets or synthetic markers occur in Word.")
-   web_assert(!grepl("AUTHOR[- ]REQUIRED|TODO|FIXME|\\{\\{|\\[\\[PMID|TEMPLATE_PLACEHOLDER",doc$text,ignore.case=TRUE),"Unresolved publication placeholder.")
-  })
+  if(check_docx_xml) {
+   run("docx",x$docx$artifact_id,{
+    md<-paste(readLines(file.path(root,proof$outputs[["manuscript.md"]]$path),warn=FALSE),collapse="\n");web_assert(identical(md,rendered$text),"Reviewed Markdown differs from approved content.")
+    doc<-web_c3_docx(file.path(root,"config/generated/final_qc_assets/manuscript.docx"),x,rendered,proof,root,engine)
+    web_assert(doc$headings>=length(web_c2_sections()),"Required Word headings missing.")
+    web_assert(!web_c3_leaks(doc$text,e,engine),"Machine identifiers, paths, secrets or synthetic markers occur in Word.")
+    web_assert(!grepl("AUTHOR[- ]REQUIRED|TODO|FIXME|\\{\\{|\\[\\[PMID|TEMPLATE_PLACEHOLDER",doc$text,ignore.case=TRUE),"Unresolved publication placeholder.")
+   })
+  } else {
+   run("archived_markdown",proof$content_sha256,{
+    md<-paste(readLines(file.path(root,proof$outputs[["manuscript.md"]]$path),warn=FALSE),collapse="\n")
+    web_assert(identical(md,rendered$text),"Reviewed Markdown differs from approved content.")
+   })
+   checks$docx<-"NOT_ASSESSED"
+  }
   run("leakage_placeholders",proof$content_sha256,{web_assert(!web_c3_leaks(rendered$text,e,engine),"Machine paths/identifiers, credentials or fixture markers in manuscript.");web_assert(!grepl("AUTHOR[- ]REQUIRED|TODO|FIXME|\\{\\{|\\[\\[PMID",rendered$text,ignore.case=TRUE),"Unresolved manuscript placeholder.")})
  }
  # Actual text-based PDF inspection supplements provenance; no OCR or statistical inference.

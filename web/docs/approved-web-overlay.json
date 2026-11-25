@@ -1,0 +1,29 @@
+{
+  "schema_version": "SRMA_WEB_DEV_OVERLAY_V1",
+  "release_label": "RC28.19_PDF_DISCOVERY_SIMPLE_UI",
+  "base_manifest_sha256": "912741aa34e037e2fff450f46cc861c291a3af9558bd2a974c9bbd646d0c7dab",
+  "files": {
+    "web/adapter/evidence.R": "aed83b386838c812dd6dffdcc0fc93b51398a246f50905f8148b765c1dd6a5ce",
+    "web/adapter/pdf_results.R": "814122d2a82a29c83862959501645dcff3c85aa9ff2e4469175ff2c15aff8431",
+    "web/R/evidence.R": "fd1dc6ec52fe99d27bd50d4b239f3fffa90fbc8670ef6aa6e19855fd69084933",
+    "web/ui/evidence.R": "7c53fbf7cb34d56203c23b31b1e4ede44ad181c403e6969cd98f1014e03e1526",
+    "web/R/service.R": "24811780ee79554ba3dbb48fdd167cdc1d9452c7f7321619326e2a5a182a69c0",
+    "web/R/adapter.R": "705172dd10bcf56ad38cbf027145c3e8ca0e850fb6819fd92adc73a6dfa5af92",
+    "web/ui/app.R": "ce03148b5bcad80bf7c5a6dbcc6a3ff1ea4961b13eefebdc2a119f6a42d1f784",
+    "web/ui/synthesis_nav.R": "6372a8927dfb151d3807f39bd6519632ca5e9c82e34af214fb03a1edb8f4e0d0",
+    "web/R/narrative_analysis.R": "03265f0c7a422307223cd4ac1c6afa9316254644308e6195deb40d105acc3c6c",
+    "web/R/narrative_source_review.R": "698db041412e45f5994dff8643be73d4362681b9784e6d91dbae35f7d8312b13",
+    "web/ui/narrative_source_review.R": "4ccfc7a1e1fa0148e368782693f62eaa9d937dc6bd5e6f868d4b17259b89cd5d",
+    "web/R/narrative_batch_review.R": "1ba7586f7d6c142bf249d4b49e40fc460cbc169fea6f8e467f3048a351efdf84",
+    "web/ui/narrative_batch_review.R": "47c545bd3f78d5007d4e2a08d239d67d934e41a217bf2a81237eaac3fa835a64",
+    "web/R/narrative_pdf_numbers.R": "4dcce8c5946759cf7bf9181d616a89e2e02177e9242d1c26e22071d5d1857d6e",
+    "web/R/manuscript.R": "43481a2d71e5137f116479bb02a232ae5724a6624b0aaf87b32b7590210be2d3",
+    "web/R/manuscript_render.R": "79d9258bb0b84f9b8dd31896d389db932931c971eab0bfb1f9b333ceae9c8162",
+    "web/R/manuscript_revision.R": "06baa1dc0886b11222bbd4f0e02e0aacbc205563c100c280af7f761ca6c7ca75",
+    "web/R/statistical_methods.R": "5a6a6f8e548411f7dd2cd80725c4c22670ff7e63b1783bf3499be04cb22e6b53",
+    "web/adapter/manuscript.R": "a6a34233e4ab5751e5c260c672fb35c7f4d0e79b4cc03579e760e2069c0e4098",
+    "web/ui/manuscript.R": "eae68732d8b39f0a2e03bf9a37cfdd204c55f92371bd8646ee8809ef88c64a12"
+  },
+  "patch_label": "RC28.25.9BCD.6_UNIVERSAL_SCIENTIFIC_QC",
+  "description": "9BCD.6: policy-locked, source-bound Scientific QC with simple Final QC and clickable Results artifacts."
+}

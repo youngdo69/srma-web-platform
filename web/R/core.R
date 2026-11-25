@@ -41,10 +41,17 @@ web_settings <- function(engine_root = Sys.getenv("SRMA_ENGINE_ROOT", getwd()),
        public_url = Sys.getenv("SRMA_PUBLIC_URL", ""),
        trusted_auth_proxy = identical(Sys.getenv("SRMA_TRUSTED_AUTH_PROXY"), "1"),
        auth_header = Sys.getenv("SRMA_AUTH_HEADER", "HTTP_X_SRMA_USER"),
-       timeout = 120, max_attempts = 2L)
+       # Background scientific operations such as PubMed EFetch can
+       # legitimately take several minutes. Keep the limit operator-configurable
+       # while providing a 15-minute local-development default.
+       timeout = {
+         value <- suppressWarnings(as.integer(Sys.getenv("SRMA_WEB_JOB_TIMEOUT", "900")))
+         if (length(value) != 1L || is.na(value) || value < 60L) 900L else value
+       },
+       max_attempts = 2L)
 }
 web_registry <- function() {
-  names <- c("initialize_project", "generate_search", "retrieve_pubmed", "validate_database_inputs",
+  names <- c("initialize_project", "prepare_prospero", "generate_search", "retrieve_pubmed", "validate_database_inputs",
     "merge_deduplicate", "prepare_screening", "finalize_screening", "register_fulltext",
     "finalize_included_studies", "extract_data", "assess_risk_of_bias", "run_meta_analysis",
     "generate_figures", "generate_tables", "generate_manuscript", "run_final_qc", "build_release_package",
@@ -53,8 +60,8 @@ web_registry <- function() {
      replay_safe = n %in% c("validate_search", "validate_database_inputs"),
      label = if (n == "validate_search") "Check search strategies" else "Not enabled in this release",
      progress = "Checking search strategies…")), names)
-  labels <- c(initialize_project = "Prepare review configuration", generate_search = "Generate database searches",
-    retrieve_pubmed = "Retrieve PubMed records", validate_database_inputs = "Check database inputs")
+  labels <- c(initialize_project = "Prepare review configuration", prepare_prospero = "Prepare PROSPERO registration",
+    generate_search = "Generate database searches", retrieve_pubmed = "Retrieve PubMed records", validate_database_inputs = "Check database inputs")
   for (name in names(labels)) {
     registry[[name]]$label <- labels[[name]]
     registry[[name]]$blocked_reason <- "This step needs validated scientific runtime and canonical workflow integration before it can be enabled. Your saved inputs are retained."
@@ -67,6 +74,10 @@ web_registry <- function() {
     registry[[op]]$progress <- paste0(registry[[op]]$label,"…")
     registry[[op]]$blocked_reason <- "Configure the validated scientific runtime and provider credential; saved work is retained."
   }
+  registry$prepare_prospero$enabled <- configured
+  registry$prepare_prospero$replay_safe <- FALSE
+  registry$prepare_prospero$progress <- "Preparing the PROSPERO registration draft…"
+  registry$prepare_prospero$blocked_reason <- "Configure the validated scientific runtime; saved review inputs are retained."
   registry$validate_database_inputs$progress <- "Checking database inputs…"
   if(exists("web_b2_operations",mode="function"))for(op in names(web_b2_operations())) {
     label<-gsub("_"," ",op,fixed=TRUE)
@@ -75,6 +86,12 @@ web_registry <- function() {
   if(exists("web_c1_operations",mode="function"))for(op in names(web_c1_operations()))registry[[op]]<-list(enabled=TRUE,replay_safe=FALSE,label="Run approved analysis and generate figures/tables",progress="Running the approved canonical analysis…")
   if(exists("web_c2_operations",mode="function"))for(op in names(web_c2_operations()))registry[[op]]<-list(enabled=TRUE,replay_safe=FALSE,label=gsub("_"," ",op),progress="Preparing author-review manuscript output…")
   registry$run_final_qc<-list(enabled=TRUE,replay_safe=TRUE,label="Inspect final scientific consistency",progress="Checking exact manuscript, sources and artifacts…")
+  if(exists("web_r40_operation",mode="function"))
+    registry[[web_r40_operation()]]<-list(enabled=TRUE,replay_safe=FALSE,
+      label="Inspect deterministic manuscript consistency",progress="Checking frozen numbers and citations…")
+  if(exists("web_r40_full_operation",mode="function"))
+    registry[[web_r40_full_operation()]]<-list(enabled=TRUE,replay_safe=TRUE,
+      label="Inspect bound R/40 inputs",progress="Checking the approved R/40 inputs and available deterministic evidence")
   registry
 }
 web_result <- function(operation, project_id, job_id, status, message, engine_version,
@@ -123,4 +140,8 @@ web_no_file_secrets <- function(path,engine_root) {
     tail<-tail(bytes,max(nchar(secrets,type="bytes")))
   }
   invisible(TRUE)
+}
+
+`%||%` <- function(x, y) {
+  if (is.null(x) || length(x) == 0L) y else x
 }
