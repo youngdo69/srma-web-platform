@@ -43,6 +43,11 @@ web_c1_save <- function(con,settings,actor,project_id,parent_version,root,x,job_
  web_tx(con,function(){
   web_exec(con,"UPDATE projects SET title=title WHERE id=?p",p=project_id)
   web_c1_current(con,project_id,x$evidence_version)
+  if(identical(x$stage,"RESULT") && !is.null(job_id)) {
+   previous<-web_query(con,paste0("SELECT version_id FROM analysis_versions WHERE project_id=?p ",
+     "AND parent_version_id=?v AND source_job_id=?j AND stage='RESULT'"),p=project_id,v=parent_version,j=job_id)
+   if(nrow(previous)==1L)return(list(project_id=project_id,version_id=previous$version_id))
+  }
   v<-web_import_project(con,settings,actor,p$workspace_id,root,configuration_only=TRUE,transaction=function(con,f)f())
   web_assert(v$project_id==project_id,"Analysis project changed.")
   web_exec(con,"INSERT INTO analysis_versions VALUES(?v,?p,?a,?parent,?e,?related,?stage,?hash,?job,?actor,?now)",v=v$version_id,p=project_id,a=x$analysis_id,parent=parent_version,e=x$evidence_version,related=x$plan$parent_version %||b2% NA_character_,stage=x$stage,hash=web_c1_hash(x$plan),job=job_id %||b2% NA_character_,actor=actor,now=web_now())

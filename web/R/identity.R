@@ -6,8 +6,53 @@ web_identity_provider <- function(name, verify) {
   structure(list(name = name, verify = verify), class = "web_identity_provider")
 }
 web_secret <- function() {
-  web_assert(file.exists("/dev/urandom"), "Secure session creation is unavailable.", "SYSTEM_FAILED")
-  con <- file("/dev/urandom", "rb", raw = TRUE); on.exit(close(con))
+  if (.Platform$OS.type == "windows") {
+    powershell <- Sys.which("powershell.exe")
+    web_assert(
+      nzchar(powershell),
+      "Secure session creation is unavailable.",
+      "SYSTEM_FAILED"
+    )
+
+    script <- tempfile(fileext = ".ps1")
+    on.exit(unlink(script), add = TRUE)
+
+    writeLines(c(
+      "$bytes = New-Object byte[] 32",
+      "$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()",
+      "try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }",
+      "($bytes | ForEach-Object { $_.ToString('x2') }) -join ''"
+    ), script, useBytes = TRUE)
+
+    value <- suppressWarnings(system2(
+      powershell,
+      c(
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy", "Bypass",
+        "-File", shQuote(script)
+      ),
+      stdout = TRUE,
+      stderr = TRUE
+    ))
+
+    value <- tolower(trimws(paste(value, collapse = "")))
+    web_assert(
+      length(value) == 1L && grepl("^[0-9a-f]{64}$", value),
+      "Secure session creation is unavailable.",
+      "SYSTEM_FAILED"
+    )
+    return(value)
+  }
+
+  web_assert(
+    file.exists("/dev/urandom"),
+    "Secure session creation is unavailable.",
+    "SYSTEM_FAILED"
+  )
+  con <- file("/dev/urandom", "rb", raw = TRUE)
+  on.exit(close(con), add = TRUE)
   value <- readBin(con, "raw", n = 32L)
   web_assert(length(value) == 32L, "Secure session creation is unavailable.", "SYSTEM_FAILED")
   paste(format(value), collapse = "")
@@ -26,9 +71,18 @@ web_sign_in <- function(con, provider, credential, ttl = 3600) {
   user <- web_query(con, "SELECT user_id FROM external_identities WHERE provider=?p AND subject=?s",
     p = provider$name, s = identity$subject)
   web_assert(nrow(user) == 1L, "Ask your workspace administrator to grant access.", "UNAUTHENTICATED")
+
+  requested_ttl <- suppressWarnings(as.numeric(ttl)[1L])
+  if (!is.finite(requested_ttl)) requested_ttl <- 3600
+  # Production-capable providers remain capped at one hour. The local-test provider
+  # may last up to 12 hours only when the explicit development test IDP is enabled.
+  max_ttl <- if (identical(provider$name, "local-test") &&
+                 identical(Sys.getenv("SRMA_WEB_TEST_IDP"), "1")) 43200 else 3600
+
   token <- web_secret(); now <- as.numeric(Sys.time())
   web_exec(con, "INSERT INTO auth_sessions VALUES(?h,?u,?p,?n,?e,0)",
-    h = web_token_hash(token), u = user$user_id, p = provider$name, n = now, e = now + min(3600, max(1, ttl)))
+    h = web_token_hash(token), u = user$user_id, p = provider$name, n = now,
+    e = now + min(max_ttl, max(1, requested_ttl)))
   if (exists("web_auth_audit", mode = "function")) web_auth_audit(con, user$user_id, provider$name, "SIGN_IN")
   token
 }
@@ -64,12 +118,21 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
   # Upload size limits and other operator policy remain server-owned.
   fields <- list(
     qc_start=c("project_id","version_id"),qc_list=c("project_id"),qc_view=c("project_id","qc_id"),qc_accept=c("project_id","qc_id"),qc_resolve=c("project_id","qc_id","finding_id","decision","rationale"),qc_approve=c("project_id","qc_id","confirmed","rationale"),
+    r40_start=c("project_id","version_id"),r40_status=c("project_id","version_id"),
+    r40_bound_start=c("project_id","version_id"),
+    qc_confirmation=c("project_id","version_id"),
+    qc_confirmation_save=c("project_id","version_id","item_id","mode","expected_event","expected_draft",
+      "decision","text","reason","comment","upload"),
+    qc_confirmation_apply=c("project_id","version_id","item_id","choice_id","expected_event"),
+    qc_review_pdf=c("project_id","version_id","report","sha256"),
+    manuscript_author_ready=c("project_id","version_id"),
     release_qc_list=c("project_id"),release_catalog=c("project_id","qc_id"),release_build=c("project_id","qc_id"),release_package_list=c("project_id"),release_download_item=c("project_id","qc_id","item_id","destination"),release_download_package=c("project_id","package_id","destination"),
     audit_list=c("project_id"),audit_export=c("project_id","destination"),security_summary=character(),logout_all=character(),
     service_status=c("project_id"),
     manuscript_catalog=c("project_id","version_id"),manuscript_view=c("project_id","version_id"),
     manuscript_plan=c("project_id","version_id","spec"),manuscript_begin=c("project_id","version_id"),
     manuscript_edit=c("project_id","version_id","section","text","decision","rationale"),
+    manuscript_revision_save=c("project_id","version_id","section","expected_section_sha256","type","text","rationale"),
     manuscript_prepare_ai=c("project_id","version_id","section"),manuscript_accept=c("project_id","version_id","job_id"),
     manuscript_approve=c("project_id","version_id","confirmed","rationale"),
     analysis_catalog=c("project_id","version_id"),analysis_view=c("project_id","version_id"),
@@ -81,11 +144,13 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     evidence_accept=c("project_id","version_id","job_id"),
     evidence_edit=c("project_id","version_id","table","row_id","values"),
     evidence_verify=c("project_id","version_id","table","row_id","approved","rationale"),
-    evidence_upload=c("project_id","version_id","row_id","upload"),
+    evidence_upload=c("project_id","version_id","row_id","upload","comparative_option","comparative_rationale","comparative_approved"),
     projects = character(), workspaces = character(), logout = character(),
+    create_seed_review = c("workspace_id", "topic", "title", "canonical_id"),
+    delete_project = c("project_id", "confirmation"),
     initialization_review=c("project_id","version_id","job_id"),
     manual_concepts=c("project_id","version_id","terms_yaml"),
-    activate_draft=c("project_id","version_id","job_id","selections","rationale","human_approved"),
+    activate_draft=c("project_id","version_id","job_id","selections","edits","human_approved"),
     decide_gate = c("project_id", "gate_id", "decision", "rationale"),
     view = "project_id", configuration = c("project_id", "version_id"),
     save_configuration = c("workspace_id", "values", "project_id", "version_id"),
@@ -104,9 +169,16 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
   web_assert(is.list(args) && !any(c("actor", "user_id", "identity", "con", "settings", "upload_root", "private") %in% names(args)),
     "The request contains an unsupported identity field.")
   reads <- c("service_status","audit_list","audit_export","security_summary","release_qc_list","release_catalog","release_package_list","release_download_item","release_download_package","qc_list","qc_view","manuscript_catalog","manuscript_view","analysis_catalog","analysis_view","evidence_view", "initialization_review", "view", "projects", "workspaces", "configuration", "download", "database_info", "download_strategy", "database_status")
-  if (!action %in% reads)
+  if (!action %in% c(reads,"qc_confirmation","qc_review_pdf","manuscript_author_ready","r40_status"))
     web_assert(is.character(csrf) && length(csrf) == 1L && !is.null(expected_csrf) && identical(csrf, expected_csrf),
       "Refresh this page before trying again.")
+  if(identical(action,"submit") && is.character(args$idempotency_key))
+    web_assert(!any(startsWith(args$idempotency_key,"qc-followup-")),"This request identifier is reserved.")
+  if(identical(action,"submit"))
+    web_assert(!isTRUE(args$operation %in% c(web_r40_operation(),web_r40_full_operation())),"Use the manuscript-bound inspection action.")
+  if(identical(action,"qc_confirmation_apply"))
+    web_assert(is.character(args$expected_event) && length(args$expected_event)==1L &&
+      grepl("^[a-f0-9]{32}$",args$expected_event),"Reload the submitted correction.","STALE_UPSTREAM_VERSION")
   actor <- identity$user_id
   switch(action,
     service_status=do.call(web_c6_status,c(list(con=con,settings=settings,actor=actor),args)),
@@ -121,16 +193,25 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     release_download_item=do.call(web_c4_download_item,c(list(con=con,settings=settings,actor=actor),args)),
     release_download_package=do.call(web_c4_download_package,c(list(con=con,settings=settings,actor=actor),args)),
     qc_start=do.call(web_c3_start,c(list(con=con,settings=settings,actor=actor),args)),
+    r40_start=do.call(web_r40_start,c(list(con=con,settings=settings,actor=actor),args)),
+    r40_bound_start=do.call(web_r40_full_start,c(list(con=con,settings=settings,actor=actor),args)),
+    r40_status=do.call(web_r40_status,c(list(con=con,settings=settings,actor=actor),args)),
     qc_list=do.call(web_c3_list,c(list(con=con,actor=actor),args)),
     qc_view=do.call(web_c3_view,c(list(con=con,settings=settings,actor=actor),args)),
     qc_accept=do.call(web_c3_accept,c(list(con=con,settings=settings,actor=actor),args)),
     qc_resolve=do.call(web_c3_resolve,c(list(con=con,settings=settings,actor=actor),args)),
     qc_approve=do.call(web_c3_approve,c(list(con=con,settings=settings,actor=actor),args)),
+    qc_confirmation=do.call(web_qc_confirmation_view,c(list(con=con,settings=settings,actor=actor),args)),
+    qc_confirmation_save=do.call(web_qc_review_submit,c(list(con=con,settings=settings,actor=actor,upload_root=upload_root),args)),
+    qc_confirmation_apply=do.call(web_qc_confirmation_apply,c(list(con=con,settings=settings,actor=actor),args)),
+    qc_review_pdf=do.call(web_qc_review_pdf,c(list(con=con,settings=settings,actor=actor),args)),
+    manuscript_author_ready=do.call(web_qc_author_review_ready,c(list(con=con,settings=settings,actor=actor),args)),
     manuscript_catalog=do.call(web_c2_catalog,c(list(con=con,settings=settings,actor=actor),args)),
     manuscript_view=do.call(web_c2_view,c(list(con=con,settings=settings,actor=actor),args)),
     manuscript_plan=do.call(web_c2_plan,c(list(con=con,settings=settings,actor=actor),args)),
     manuscript_begin=do.call(web_c2_begin,c(list(con=con,settings=settings,actor=actor),args)),
-    manuscript_edit=do.call(web_c2_edit,c(list(con=con,settings=settings,actor=actor),args)),
+    manuscript_edit=do.call(web_qc_followup_manuscript_edit,c(list(con=con,settings=settings,actor=actor),args)),
+    manuscript_revision_save=do.call(web_revision_save,c(list(con=con,settings=settings,actor=actor),args)),
     manuscript_prepare_ai=do.call(web_c2_prepare_ai,c(list(con=con,settings=settings,actor=actor),args)),
     manuscript_accept=do.call(web_c2_accept,c(list(con=con,settings=settings,actor=actor),args)),
     manuscript_approve=do.call(web_c2_approve,c(list(con=con,settings=settings,actor=actor),args)),
@@ -148,13 +229,15 @@ web_request <- function(con, token, action, args = list(), csrf = NULL, expected
     evidence_edit=do.call(web_b2_edit,c(list(con=con,settings=settings,actor=actor),args)),
     evidence_verify=do.call(web_b2_verify,c(list(con=con,settings=settings,actor=actor),args)),
     evidence_upload=do.call(web_b2_upload,c(list(con=con,settings=settings,actor=actor,upload_root=upload_root),args)),
-    projects = web_query(con, "SELECT p.id,p.title,p.workspace_id FROM projects p JOIN workspace_members m ON p.workspace_id=m.workspace_id WHERE m.user_id=?u ORDER BY p.created_at DESC", u = actor),
+    projects = web_query(con, "SELECT p.id,p.title,p.workspace_id FROM projects p JOIN workspace_members m ON p.workspace_id=m.workspace_id WHERE m.user_id=?u AND p.deleted_at IS NULL ORDER BY p.created_at DESC", u = actor),
+    create_seed_review = do.call(web_create_seed_review, c(list(con = con, settings = settings, actor = actor), args)),
+    delete_project = do.call(web_delete_project, c(list(con = con, actor = actor), args)),
     workspaces = web_query(con, "SELECT w.id,w.name FROM workspaces w JOIN workspace_members m ON w.id=m.workspace_id WHERE m.user_id=?u", u = actor),
     initialization_review=do.call(web_initialization_review,c(list(con=con,settings=settings,actor=actor),args)),
     manual_concepts=do.call(web_manual_concepts,c(list(con=con,settings=settings,actor=actor),args)),
     activate_draft=do.call(web_activate_draft,c(list(con=con,settings=settings,actor=actor),args)),
     view = do.call(web_view, c(list(con = con, actor = actor), args)),
-    decide_gate = do.call(web_decide_gate, c(list(con = con, actor = actor), args)),
+    decide_gate = do.call(web_qc_followup_decide_gate,c(list(con=con,settings=settings,actor=actor),args)),
     configuration = do.call(web_edit_configuration, c(list(con = con, settings = settings, actor = actor), args)),
     save_configuration = do.call(web_save_configuration, c(list(con = con, settings = settings, actor = actor), args)),
     submit = do.call(web_submit, c(list(con = con, settings = settings, actor = actor), args)),

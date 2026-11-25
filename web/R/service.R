@@ -1,8 +1,71 @@
+# Development-only Web source overlay for a previously hash-pinned scientific engine.
+# The canonical engine-source-manifest.json remains IDENTICAL and defines the
+# registered scientific engine identity. Approved Web-only replacements have
+# their own immutable SHA-256 declarations and NEVER exempt R/, config/, renv
+# or other scientific files from baseline verification.
+web_approved_dev_overlay <- function(settings, manifest_file, manifest) {
+  path <- file.path(settings$engine_root, "web/docs/approved-web-overlay.json")
+  if (!file.exists(path)) return(list())
+  web_assert(identical(as.character(settings$mode), "development"),
+    "A development Web overlay cannot be used in release/production mode.", "SYSTEM_FAILED")
+  overlay <- tryCatch(jsonlite::read_json(path, simplifyVector = FALSE),
+    error = function(e) NULL)
+  web_assert(is.list(overlay) &&
+    identical(overlay$schema_version, "SRMA_WEB_DEV_OVERLAY_V1") &&
+    identical(overlay$release_label, "RC28.19_PDF_DISCOVERY_SIMPLE_UI") &&
+    identical(overlay$base_manifest_sha256,
+      digest::digest(file = manifest_file, algo = "sha256")),
+    "The approved development Web overlay does not match the frozen baseline.",
+    "SYSTEM_FAILED")
+  baseline_allowed <- c("web/adapter/evidence.R", "web/R/evidence.R", "web/ui/evidence.R", "web/R/service.R")
+  # Approved, hash-pinned Web-only Analysis modules. No R/, renv or
+  # scientific configuration entries are allowed by this extension.
+  analysis_allowed <- c("web/ui/app.R", "web/ui/synthesis_nav.R",
+    "web/R/narrative_analysis.R", "web/R/narrative_source_review.R",
+    "web/ui/narrative_source_review.R", "web/R/narrative_batch_review.R",
+    "web/ui/narrative_batch_review.R", "web/R/narrative_pdf_numbers.R",
+    "web/R/manuscript.R", "web/R/manuscript_render.R", "web/R/manuscript_revision.R", "web/R/statistical_methods.R",
+    "web/ui/manuscript.R", "web/adapter/manuscript.R")
+  allowed <- c(baseline_allowed, "web/R/adapter.R", "web/adapter/pdf_results.R",
+    analysis_allowed)
+  files <- overlay$files
+  web_assert(is.list(files) && !is.null(names(files)) &&
+    identical(sort(names(files)), sort(allowed)) &&
+    all(baseline_allowed %in% names(manifest)) &&
+    !("web/R/adapter.R" %in% names(manifest)) &&
+    !("web/adapter/pdf_results.R" %in% names(manifest)),
+    "The Web overlay has unapproved or missing source entries.", "SYSTEM_FAILED")
+  for (p in allowed) {
+    sha <- files[[p]]
+    web_assert(is.character(sha) && length(sha) == 1L &&
+      !is.na(sha) && grepl("^[0-9a-f]{64}$", sha) &&
+      (is.null(manifest[[p]]) || !identical(sha, manifest[[p]])),
+      "The Web overlay contains an invalid or non-replacement hash.", "SYSTEM_FAILED")
+  }
+  files
+}
+
 web_register_engine <- function(con, settings) {
   baseline <- jsonlite::read_json(file.path(settings$engine_root, "web/docs/engine-baseline.json"))
-  manifest <- jsonlite::read_json(file.path(settings$engine_root, "web/docs/engine-source-manifest.json"))
-  for (p in names(manifest)) web_assert(identical(web_sha(file.path(settings$engine_root, p)), manifest[[p]]),
-      "The scientific source differs from the registered baseline.", "SYSTEM_FAILED")
+  manifest_file <- file.path(settings$engine_root, "web/docs/engine-source-manifest.json")
+  manifest <- jsonlite::read_json(manifest_file, simplifyVector = FALSE)
+  overlay <- web_approved_dev_overlay(settings, manifest_file, manifest)
+  for (p in names(manifest)) {
+    expected <- if (p %in% names(overlay)) overlay[[p]] else manifest[[p]]
+    web_assert(file.exists(file.path(settings$engine_root, p)) &&
+      identical(web_sha(file.path(settings$engine_root, p)), expected),
+      "The scientific source or approved Web overlay differs from its hash-pinned baseline.",
+      "SYSTEM_FAILED")
+  }
+  # Also pin Web adapter modules absent from the historical manifest.
+  for (p in setdiff(names(overlay), names(manifest))) {
+    web_assert(file.exists(file.path(settings$engine_root, p)) &&
+      identical(web_sha(file.path(settings$engine_root, p)), overlay[[p]]),
+      "The supplemental approved Web source failed hash verification.",
+      "SYSTEM_FAILED")
+  }
+  # Preserve the original, already-registered scientific engine ID and its
+  # original manifest_json. Do NOT rewrite historical engine or job records.
   hash <- digest::digest(as.character(web_json(manifest)), algo = "sha256", serialize = FALSE)
   id <- paste0("snapshot-", substr(hash, 1, 16))
   if (!nrow(web_query(con, "SELECT id FROM engine_releases WHERE id=?id", id = id)))
@@ -19,6 +82,105 @@ web_local_identity <- function(con) {
       DBI::dbExecute(con, "INSERT INTO workspaces VALUES('local-workspace','Local workspace')")
     if (!nrow(DBI::dbGetQuery(con, "SELECT user_id FROM workspace_members WHERE workspace_id='local-workspace' AND user_id='local-researcher'")))
       DBI::dbExecute(con, "INSERT INTO workspace_members VALUES('local-workspace','local-researcher')")
+  })
+}
+
+web_create_seed_review <- function(con, settings, actor, workspace_id, topic, title = "", canonical_id) {
+  web_assert(
+    nrow(web_query(
+      con,
+      "SELECT user_id FROM workspace_members WHERE workspace_id=?w AND user_id=?u",
+      w = workspace_id,
+      u = actor
+    )) == 1L,
+    "This workspace is not accessible."
+  )
+
+  web_assert(
+    is.character(topic) && length(topic) == 1L && !is.na(topic) &&
+      nzchar(trimws(topic)) && nchar(topic) <= 10000L,
+    "Enter the research topic or question before creating the review."
+  )
+  web_assert(
+    is.character(title) && length(title) == 1L && !is.na(title) &&
+      nchar(title) <= 1000L,
+    "The optional review title is too long."
+  )
+  web_assert(
+    is.character(canonical_id) && length(canonical_id) == 1L &&
+      !is.na(canonical_id) && grepl("^[A-Za-z0-9_-]+$", canonical_id) &&
+      nchar(canonical_id) <= 128L,
+    "Use only letters, numbers, hyphens or underscores for the project identifier."
+  )
+
+  topic <- trimws(topic)
+  title <- trimws(title)
+  canonical_id <- trimws(canonical_id)
+  display_title <- if (nzchar(title)) title else topic
+  engine <- web_register_engine(con, settings)
+
+  existing <- web_query(
+    con,
+    "SELECT id,deleted_at FROM projects WHERE workspace_id=?w AND canonical_id=?c",
+    w = workspace_id,
+    c = canonical_id
+  )
+  web_assert(
+    !nrow(existing),
+    "This project identifier is already in use. Use a different identifier."
+  )
+
+  project_id <- web_id()
+  version_id <- web_id()
+  relative <- file.path("snapshots", version_id)
+  target <- file.path(settings$data_root, relative)
+  seed_file <- file.path(target, "config", "project_seed.yml")
+
+  dir.create(dirname(seed_file), recursive = TRUE, showWarnings = FALSE, mode = "0700")
+  seed_fields <- list(
+    topic = topic,
+    project_id = canonical_id
+  )
+  if (nzchar(title)) seed_fields$title <- title
+  yaml::write_yaml(list(project_seed = seed_fields), seed_file)
+  web_no_file_secrets(seed_file, settings$engine_root)
+  seed_hash <- web_sha(seed_file)
+  manifest <- setNames(list(seed_hash), "config/project_seed.yml")
+
+  web_tx(con, function() {
+    web_exec(
+      con,
+      "INSERT INTO projects(id,workspace_id,canonical_id,title,created_at) VALUES(?id,?w,?c,?t,?now)",
+      id = project_id,
+      w = workspace_id,
+      c = canonical_id,
+      t = display_title,
+      now = web_now()
+    )
+    web_exec(
+      con,
+      "INSERT INTO project_versions VALUES(?id,?p,1,?hash,?locator,?manifest,?now)",
+      id = version_id,
+      p = project_id,
+      hash = seed_hash,
+      locator = relative,
+      manifest = as.character(web_json(manifest)),
+      now = web_now()
+    )
+    project <- web_authorize(con, actor, project_id)
+    web_audit(
+      con,
+      project,
+      "PROJECT_SEED_CREATED",
+      version_id,
+      actor,
+      list(
+        engine_release = engine,
+        source = "CANONICAL_PROJECT_SEED",
+        topic_sha256 = digest::digest(topic, algo = "sha256", serialize = FALSE)
+      )
+    )
+    list(project_id = project_id, version_id = version_id)
   })
 }
 web_import_project <- function(con, settings, actor, workspace_id, source_root, configuration_only = FALSE, draft_gates = FALSE, transaction = web_tx) {
@@ -41,9 +203,12 @@ web_import_project <- function(con, settings, actor, workspace_id, source_root, 
   }
   transaction(con, function() {
     existing <- web_query(con, "SELECT * FROM projects WHERE workspace_id=?w AND canonical_id=?c", w = workspace_id, c = info$project_id)
+    if (nrow(existing) && !is.na(existing$deleted_at[[1L]]) && nzchar(existing$deleted_at[[1L]])) {
+      web_error("VALIDATION_FAILED", "This project identifier belongs to a deleted review. Use a new project identifier for a new review.")
+    }
     if (!nrow(existing)) {
       project_id <- web_id()
-      web_exec(con, "INSERT INTO projects VALUES(?id,?w,?c,?t,?now)", id = project_id,
+      web_exec(con, "INSERT INTO projects(id,workspace_id,canonical_id,title,created_at) VALUES(?id,?w,?c,?t,?now)", id = project_id,
         w = workspace_id, c = info$project_id, t = info$title, now = web_now())
     } else project_id <- existing$id
     # Serialize version allocation on PostgreSQL as well as SQLite BEGIN IMMEDIATE.
@@ -67,23 +232,36 @@ web_import_project <- function(con, settings, actor, workspace_id, source_root, 
 web_submit <- function(con, settings, actor, project_id, version_id, operation = "validate_search", idempotency_key = web_id(), payload = list()) {
   project <- web_authorize(con, actor, project_id)
   reg <- web_registry()[[operation]]
+  if (identical(operation,"recommend_screening"))
+    version_id <- web_b2_auto_policy_version(con,settings,actor,project_id,version_id)
   web_b2_guard(con,settings,actor,project_id,version_id,operation)
   web_c1_guard(con,settings,actor,project_id,version_id,operation)
   web_c2_guard(con,settings,actor,project_id,version_id,operation)
   web_c3_guard(con,settings,actor,project_id,version_id,operation)
   web_pipeline_prerequisites(settings, operation)
+  if (identical(operation, "prepare_prospero")) {
+    pending_config <- web_query(con,
+      "SELECT id FROM gates WHERE project_id=?p AND version_id=?v AND gate_type='configuration_human_review' AND status<>'APPROVED'",
+      p = project_id, v = version_id)
+    web_assert(!nrow(pending_config),
+      "Complete the review-configuration Human Gate before preparing the PROSPERO registration.",
+      "USER_ACTION_REQUIRED")
+  }
   web_require_activated(con,project_id,version_id,operation)
   web_assert(!is.null(reg) && length(payload) == 0L, "This operation is not enabled in this release.")
   web_assert(isTRUE(reg$enabled), if (!is.null(reg$blocked_reason)) reg$blocked_reason else "This operation is not enabled in this release.")
   web_assert(is.character(idempotency_key) && length(idempotency_key) == 1L && nzchar(idempotency_key) && nchar(idempotency_key) <= 128L, "Invalid request identifier.")
   if (operation == "validate_database_inputs") web_science_settings(settings)
   engine <- web_register_engine(con, settings)
+  followup_key<-web_qc_followup_job_key(version_id,operation)
   web_tx(con, function() {
     web_exec(con, "UPDATE projects SET title=title WHERE id=?p", p = project_id)
     web_assert(nrow(web_query(con, "SELECT id FROM project_versions WHERE id=?v AND project_id=?p", v = version_id, p = project_id)) == 1L,
       "This project version is not available.")
-    existing <- web_query(con, "SELECT id FROM jobs WHERE project_id=?p AND version_id=?v AND operation=?o AND (idempotency_key=?k OR state IN ('QUEUED','RUNNING')) ORDER BY created_at LIMIT 1",
-      p = project_id, v = version_id, o = operation, k = idempotency_key)
+    existing <- web_query(con,paste0("SELECT id FROM jobs WHERE project_id=?p AND version_id=?v AND operation=?o ",
+      "AND (idempotency_key=?k OR state IN ('QUEUED','RUNNING') OR ",
+      "(?f<>'' AND state='COMPLETE' AND (idempotency_key=?f OR ?k=?f))) ORDER BY created_at LIMIT 1"),
+      p=project_id,v=version_id,o=operation,k=idempotency_key,f=followup_key)
     if (nrow(existing)) return(existing$id)
     sources <- web_pipeline_sources(con,project_id,version_id,operation)
     blocked <- web_gate_open(con, project_id, version_id, operation)
@@ -137,6 +315,18 @@ web_decide_gate <- function(con, actor, project_id, gate_id, decision, rationale
 }
 web_retry <- function(con, settings, actor, project_id, job_id) {
   project <- web_authorize(con, actor, project_id)
+  prior <- web_query(con,"SELECT id,version_id,operation,state FROM jobs WHERE id=?id AND project_id=?p",id=job_id,p=project_id)
+  if (nrow(prior)==1L && identical(as.character(prior$operation),"recommend_screening") &&
+      prior$state %in% c("FAILED","USER_ACTION_REQUIRED")) {
+    current <- web_version_root(con,settings,actor,project_id,as.character(prior$version_id))
+    if (!("config/agent_screening.yml" %in% names(current$manifest))) {
+      # Route legacy retry through ordinary policy revision and job creation.
+      # No historical job state is overwritten or concealed.
+      return(web_submit(con,settings,actor,project_id,
+        as.character(prior$version_id),"recommend_screening",
+        idempotency_key=paste0("legacy-resume-",job_id)))
+    }
+  }
   web_tx(con, function() {
     web_exec(con, "UPDATE projects SET title=title WHERE id=?p", p = project_id)
     j <- web_query(con, "SELECT * FROM jobs WHERE id=?id AND project_id=?p", id = job_id, p = project_id)
@@ -160,11 +350,81 @@ web_cancel <- function(con, actor, project_id, job_id) {
     web_audit(con, project, "JOB_CANCELLED", job_id, actor)
   })
 }
+web_prospero_status <- function(con, actor, project_id, version_id = NULL) {
+  web_authorize(con, actor, project_id)
+  if (is.null(version_id) || !is.character(version_id) || length(version_id) != 1L || !nzchar(version_id)) {
+    return(list(state = "NOT_STARTED", message = "PROSPERO preparation has not been started for this saved version."))
+  }
+  job <- web_query(con,
+    "SELECT id,state,message,progress,result_json,created_at FROM jobs WHERE project_id=?p AND version_id=?v AND operation='prepare_prospero' ORDER BY created_at DESC LIMIT 1",
+    p = project_id, v = version_id)
+  if (!nrow(job)) return(list(state = "NOT_STARTED", message = "PROSPERO preparation has not been started for this saved version."))
+  result <- if (!is.na(job$result_json[[1]]) && nzchar(job$result_json[[1]])) tryCatch(web_parse(job$result_json[[1]]), error = function(e) NULL) else NULL
+  artifacts <- web_query(con,
+    "SELECT id,logical_name,artifact_type,created_at FROM artifacts WHERE project_id=?p AND version_id=?v AND job_id=?j AND status='AVAILABLE' ORDER BY created_at",
+    p = project_id, v = version_id, j = job$id[[1]])
+  draft <- artifacts[artifacts$artifact_type == "prospero_draft", , drop = FALSE]
+  provenance <- if (is.list(result) && is.list(result$provenance)) result$provenance$prospero else NULL
+  list(
+    job_id = job$id[[1]], state = job$state[[1]], message = job$message[[1]],
+    progress = job$progress[[1]], created_at = job$created_at[[1]],
+    counts = if (is.list(provenance)) provenance$counts else NULL,
+    user_required = if (is.list(provenance)) provenance$user_required else NULL,
+    llm_status = if (is.list(provenance)) provenance$llm_status else NULL,
+    draft_artifact_id = if (nrow(draft)) draft$id[[1]] else NULL,
+    draft_name = if (nrow(draft)) draft$logical_name[[1]] else NULL
+  )
+}
+
+web_delete_project <- function(con, actor, project_id, confirmation) {
+  project <- web_authorize(con, actor, project_id)
+  web_assert(is.character(confirmation) && length(confirmation) == 1L && identical(trimws(confirmation), "DELETE"),
+    "Type DELETE exactly to confirm deletion of this review.")
+  active <- web_query(con,
+    "SELECT id,state FROM jobs WHERE project_id=?p AND state IN ('QUEUED','RUNNING') LIMIT 1",
+    p = project_id)
+  web_assert(!nrow(active),
+    "Wait for the current background task to finish before deleting this review.",
+    "USER_ACTION_REQUIRED")
+  web_tx(con, function() {
+    current <- web_query(con, "SELECT id,title,canonical_id,deleted_at FROM projects WHERE id=?p", p = project_id)
+    web_assert(nrow(current) == 1L && (is.na(current$deleted_at[[1L]]) || !nzchar(current$deleted_at[[1L]])),
+      "This review is already deleted or unavailable.")
+    web_audit(con, project, "PROJECT_DELETED", project_id, actor,
+      list(title = current$title[[1L]], canonical_id = current$canonical_id[[1L]], retention = "audit_preserved"))
+    count <- web_exec(con,
+      "UPDATE projects SET deleted_at=?now,deleted_by=?u WHERE id=?p AND deleted_at IS NULL",
+      now = web_now(), u = actor, p = project_id)
+    web_assert(count == 1L, "This review is already deleted or unavailable.")
+    list(project_id = project_id, title = current$title[[1L]], deleted = TRUE)
+  })
+}
+
 web_view <- function(con, actor, project_id) {
   p <- web_authorize(con, actor, project_id)
+  versions <- web_query(con, paste0(
+    "SELECT pv.id,pv.version,pv.created_at,",
+    "CASE WHEN pv.manifest_json LIKE '%config/project_seed.yml%' ",
+    "AND pv.manifest_json NOT LIKE '%config/project_config.yml%' THEN 'SEED' ELSE 'CANONICAL' END AS kind,",
+    "COALESCE(vo.kind,'') AS origin_kind ",
+    "FROM project_versions pv LEFT JOIN version_origins vo ON vo.version_id=pv.id ",
+    "WHERE pv.project_id=?p ORDER BY pv.version DESC"
+  ), p = project_id)
+  jobs <- web_query(con, "SELECT id,version_id,operation,state,message,progress,created_at FROM jobs WHERE project_id=?p ORDER BY created_at DESC", p = project_id)
+  prep_versions <- unique(jobs$version_id[jobs$operation == "prepare_prospero"])
+  prep_versions <- prep_versions[!is.na(prep_versions) & nzchar(prep_versions)]
+  prospero <- if (length(prep_versions)) setNames(
+    lapply(prep_versions, function(v) web_prospero_status(con, actor, project_id, v)),
+    prep_versions
+  ) else list()
   list(project = p[, c("id", "title"), drop = FALSE],
-    gates = web_query(con, "SELECT id,gate_type,required_operation,status,version_id FROM gates WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
-    versions = web_query(con, "SELECT id,version,created_at FROM project_versions WHERE project_id=?p ORDER BY version DESC", p = project_id),
-    jobs = web_query(con, "SELECT id,version_id,operation,state,message,progress,created_at FROM jobs WHERE project_id=?p ORDER BY created_at DESC", p = project_id),
-    artifacts = web_query(con, "SELECT id,logical_name,version,approval_state,created_at FROM artifacts WHERE project_id=?p AND status='AVAILABLE' ORDER BY created_at DESC", p = project_id))
+    gates = web_query(con, paste0(
+      "SELECT g.id,g.gate_type,g.required_operation,g.status,g.decision,g.version_id,",
+      "g.reviewer_id,u.display_name AS reviewer_name,g.decided_at,g.rationale,g.created_at ",
+      "FROM gates g LEFT JOIN app_users u ON u.id=g.reviewer_id ",
+      "WHERE g.project_id=?p ORDER BY g.created_at DESC"), p = project_id),
+    versions = versions,
+    jobs = jobs,
+    artifacts = web_query(con, "SELECT id,logical_name,version,approval_state,created_at FROM artifacts WHERE project_id=?p AND status='AVAILABLE' ORDER BY created_at DESC", p = project_id),
+    prospero = prospero)
 }

@@ -2,7 +2,7 @@
 # Universal SR-MA Agent Toolkit
 # R/38_prepare_manuscript_evidence_package.R
 #
-# VERSION: 2.1.3
+# VERSION: 2.2.0
 #
 # PURPOSE
 # ------------------------------------------------------------
@@ -62,6 +62,7 @@ required_packages <- c(
   "tibble",
   "stringr",
   "openxlsx",
+  "jsonlite",
   "digest"
 )
 
@@ -1510,6 +1511,174 @@ registered_protocol <- first_config_value(
   default = ""
 )
 
+# Mode-aware inputs are supplied by the custodian of a frozen project version.
+# Each entry records an existing approval and the checksum of the staged source.
+# The standalone CLI does not create approvals or register a Web source version.
+input_binding_path <- "config/generated/r38_input_binding.yml"
+declared_method <- tolower(gsub("[_-]+", " ", safe_chr(first_config_value(config,
+  c("protocol.synthesis_method", "analysis.synthesis_method"), ""))))
+mode <- if (declared_method %in% c("narrative", "narrative only", "narrative synthesis", "swim",
+  "synthesis without meta analysis")) "NARRATIVE" else if (declared_method %in%
+    c("mixed", "mixed synthesis", "mixed methods")) "MIXED" else "PAIRWISE"
+bound_inputs <- NULL
+narrative_rows <- NULL
+certainty_rows <- NULL
+if (mode != "PAIRWISE" || file.exists(file.path(repo_root, input_binding_path))) {
+  require_input <- function(ok, name) {
+    if (!isTRUE(ok)) stop("R/38 input not verified: ", name, call. = FALSE)
+  }
+  nonempty <- function(x) is.character(x) && length(x) == 1L && !is.na(x) && nzchar(trimws(x))
+  within_project <- function(rel) {
+    require_input(nonempty(rel) && grepl("^[^/:\\\\]+(/[^/:\\\\]+)*$", rel) &&
+      !any(strsplit(rel, "/", fixed = TRUE)[[1L]] %in% c(".", "..")), "relative source path")
+    p <- file.path(repo_root, rel)
+    require_input(file_nonempty(p) && !dir.exists(p), rel)
+    p <- normalizePath(p, winslash = "/", mustWork = TRUE)
+    require_input(startsWith(p, paste0(repo_root, "/")), rel)
+    p
+  }
+  input_binding <- yaml::read_yaml(within_project(input_binding_path), eval.expr = FALSE)
+  require_input(identical(input_binding$schema, "SRMA_R38_INPUT_BINDING_V1") &&
+    identical(input_binding$project_id, project_id) && nonempty(input_binding$evidence_version) &&
+    nonempty(input_binding$protocol_version) && is.list(config$protocol) && length(config$protocol)>0L,
+    "approved Protocol and exact project/Evidence version binding")
+  checked <- list()
+  approved_source <- function(name, version = NULL, relative = NULL) {
+    rec <- input_binding$sources[[name]]
+    require_input(is.list(rec) && identical(rec$approval_state, "APPROVED") && nonempty(rec$approval_id) &&
+      nonempty(rec$source_version) && (is.null(version) || identical(rec$source_version, version)) &&
+      (is.null(relative) || identical(rec$path, relative)) && nonempty(rec$sha256), name)
+    path <- within_project(rec$path)
+    require_input(identical(sha256_file(path), rec$sha256), paste(name, "checksum"))
+    checked[[name]] <<- rec[c("path", "sha256", "source_version", "approval_id")]
+    path
+  }
+  approved_source("protocol", input_binding$protocol_version, "config/project_config.yml")
+  evidence_path <- approved_source("evidence", input_binding$evidence_version, "config/generated/web_evidence.json")
+  e <- jsonlite::read_json(evidence_path, simplifyVector = FALSE)
+  include <- as.character(unlist(e$final_study_selection$study_ids, use.names = FALSE))
+  require_input(identical(e$final_study_selection$status, "HUMAN_CONFIRMED") && length(include)>0L &&
+    !anyNA(include) && all(nzchar(include)) && !anyDuplicated(include) &&
+    identical(e$human_outcome_harmonization$status, "HUMAN_CONFIRMED") &&
+    identical(e$synthesis_plan$status, "HUMAN_CONFIRMED"), "final Study Selection, Outcome Harmonization and synthesis plan")
+  selected <- safe_read_csv(approved_source("selection", input_binding$evidence_version,
+    "data/processed/full_text/included_studies.csv"))
+  require_input("study_id" %in% names(selected) && setequal(as.character(selected$study_id), include),
+    "included-study IDs match final Study Selection")
+  approved_source("search")
+  approved_source("prisma_registry", relative = "results/prisma/prisma_source_registry.csv")
+  approved_source("prisma_audit", relative = "results/prisma/prisma_flow_audit.csv")
+  approved_source("prisma_exclusions", relative = "results/prisma/prisma_full_text_exclusion_reasons.csv")
+  approved_source("prisma_figure", relative = "results/prisma/prisma_2020_flow_diagram.pdf")
+  decisions <- e$synthesis_plan$decisions
+  decision_modes <- vapply(decisions, function(d) safe_chr(d$mode), character(1))
+  names(decision_modes) <- vapply(decisions, function(d) safe_chr(d$analysis_group), character(1))
+  required_modes <- switch(mode, NARRATIVE = "NARRATIVE", MIXED = c("NARRATIVE", "QUANTITATIVE_CANDIDATE"),
+    PAIRWISE = "QUANTITATIVE_CANDIDATE")
+  require_input(length(decision_modes)>0L && all(nzchar(names(decision_modes))) && !anyDuplicated(names(decision_modes)) &&
+    setequal(decision_modes, required_modes), "approved Protocol agrees with Human-confirmed synthesis groups")
+  if (mode != "PAIRWISE") {
+    require_input(identical(e$synthesis_execution$status, "AUTO_PREPARED") &&
+      nonempty(e$synthesis_execution$source_digest), "frozen narrative result inventory")
+    narrative_rows <- safe_read_csv(approved_source("narrative_results", input_binding$evidence_version))
+    fields <- c("result_id", "study_id", "analysis_group", "original_outcome", "reported_timepoint", "analysis_timepoint",
+      "decision", "source_location", "source_evidence", "pdf_sha256", "source_digest", "verified_by")
+    nas <- names(decision_modes)[decision_modes == "NARRATIVE"]
+    rows <- Filter(function(a) safe_chr(a$analysis_group) %in% nas, e$synthesis_execution$rows)
+    identifiers <- vapply(rows, function(a) safe_chr(a$result_id), character(1))
+    require_input(all(fields %in% names(narrative_rows)) && nrow(narrative_rows)>0L &&
+      !anyDuplicated(identifiers) && !anyDuplicated(narrative_rows$result_id) &&
+      setequal(narrative_rows$result_id, identifiers) && setequal(narrative_rows$analysis_group, nas) &&
+      all(narrative_rows$study_id %in% include), "complete narrative results for the assigned groups and selected studies")
+    narrative_rows$verified_result <- ""
+    for (i in seq_len(nrow(narrative_rows))) {
+      row <- narrative_rows[i, ]
+      from <- rows[[match(row$result_id, identifiers)]]
+      reviews <- Filter(function(r) identical(safe_chr(r$result_id), safe_chr(row$result_id)), e$narrative_numeric_reviews)
+      compare <- c("study_id", "analysis_group", "original_outcome", "reported_timepoint", "analysis_timepoint")
+      checked_review <- c("study_id", "decision", "source_location", "source_evidence", "pdf_sha256", "source_digest", "verified_by")
+      require_input(all(vapply(compare, function(k) identical(safe_chr(row[[k]]), safe_chr(from[[k]])), logical(1))) &&
+        length(reviews)==1L && all(vapply(checked_review, function(k) identical(safe_chr(row[[k]]),
+          safe_chr(reviews[[1L]][[k]])), logical(1))) &&
+        identical(row$source_digest[[1L]], e$synthesis_execution$source_digest) &&
+        grepl("^[0-9a-f]{64}$", safe_chr(row$pdf_sha256)) && nonempty(row$source_location[[1L]]) &&
+        nonempty(row$source_evidence[[1L]]) && nonempty(row$verified_by[[1L]]) &&
+        row$decision[[1L]] %in% c("NOT_REPORTED", "CONFIRMED", "CORRECTED"),
+        "study result, timepoint and source provenance")
+      review <- reviews[[1L]]
+      values <- Filter(nzchar, vapply(review$values, safe_chr, character(1)))
+      reported <- safe_chr(review$reported_result)
+      if (identical(review$decision, "NOT_REPORTED")) {
+        require_input(!length(values) && !nzchar(reported), "not-reported result carries a value")
+        narrative_rows$verified_result[i] <- "Not reported"
+      } else {
+        require_input(length(values)>0L || nzchar(reported), "verified study result value")
+        narrative_rows$verified_result[i] <- paste(c(if (length(values)) paste(names(values), values, sep = " = "),
+          if (nzchar(reported)) reported), collapse = "; ")
+      }
+    }
+  }
+  if (mode != "NARRATIVE") {
+    groups <- names(decision_modes)[decision_modes == "QUANTITATIVE_CANDIDATE"]
+    require_input(setequal(names(input_binding$analyses), groups) && !anyDuplicated(names(input_binding$analyses)),
+      "executed quantitative groups have exact analysis versions")
+    for (entry in c("results/meta_analysis/meta_analysis_execution_summary.csv",
+      "results/meta_analysis/tables/meta_analysis_summary.csv", "results/meta_analysis/tables/study_level_effects.csv",
+      "results/meta_analysis/tables/meta_analysis_outputs.xlsx", "results/manuscript/tables/manuscript_tables_author_editable.xlsx",
+      "results/meta_analysis_diagnostics/meta_analysis_diagnostics_summary.csv")) {
+      # The aggregate files are part of the same approved evidence inventory.
+      approved_source(entry, relative = entry)
+    }
+    for (g in groups) {
+      require_input(grepl("^[A-Za-z0-9_.-]+$", g), "canonical R/27 group name")
+      for (file in c("meta_analysis_summary.csv", "study_effects_used.csv", "forest_plot.pdf", "model_output.txt"))
+        approved_source(paste(g, file, sep = "/"), input_binding$analyses[[g]],
+          paste("results/meta_analysis", g, file, sep = "/"))
+      summary <- safe_read_csv(file.path(repo_root, checked[[paste(g, "meta_analysis_summary.csv", sep = "/")]]$path))
+      measures <- c("pooled_effect", "lower_ci", "upper_ci", "i2", "tau2")
+      require_input(nrow(summary)>0L && all(measures %in% names(summary)) &&
+        all(summary$status %in% "PASS") && "status" %in% names(summary) &&
+        all(vapply(summary[measures], function(col) is.numeric(col) && all(is.finite(col)), logical(1))),
+        paste("R/27 effect, interval and heterogeneity", g))
+    }
+  } else require_input(!length(input_binding$analyses), "narrative plan cannot carry executed pooled analyses")
+  rob_not_applicable <- is.list(config$protocol$risk_of_bias) && identical(config$protocol$risk_of_bias$applicable, FALSE) &&
+    nonempty(config$protocol$risk_of_bias$rationale)
+  if (!rob_not_applicable) {
+    rob <- safe_read_csv(approved_source("rob", input_binding$evidence_version, "results/risk_of_bias/risk_of_bias_final.csv"))
+    id <- intersect(c("study_id", "screening_id"), intersect(names(selected), names(rob)))
+    require_input(length(id)>0L && all(c("domain_id", "judgement", "rob_tool") %in% names(rob)) &&
+      all(!is.na(rob$judgement) & nzchar(trimws(rob$judgement))) && all(!is.na(rob$rob_tool) & nzchar(trimws(rob$rob_tool))) &&
+      setequal(as.character(rob[[id[[1L]]]]), as.character(selected[[id[[1L]]]])) &&
+      setequal(as.character(rob[[id[[1L]]]][tolower(rob$domain_id) %in% "overall"]), as.character(selected[[id[[1L]]]])),
+      "final RoB judgements cover the selected studies or reports")
+  }
+  grade <- config$protocol$certainty
+  grade_options <- if (is.list(grade)) grade else list()
+  grade_not_applicable <- identical(grade_options$applicable, FALSE) && nonempty(grade_options$rationale)
+  grade_required <- !grade_not_applicable && (isTRUE(grade) || isTRUE(grade_options$required) ||
+    nzchar(safe_chr(grade_options$method)) || nzchar(safe_chr(first_config_value(config,
+      "certainty_of_evidence.framework", ""))))
+  if (grade_required) {
+    certainty_rows <- safe_read_csv(approved_source("certainty", input_binding$evidence_version))
+    outcomes <- unlist(grade_options$outcome_ids, use.names = FALSE)
+    field <- if (length(outcomes)) "outcome_id" else "analysis_group"
+    if (!length(outcomes)) outcomes <- names(decision_modes)
+    require_input(field %in% names(certainty_rows) && all(outcomes %in% as.character(certainty_rows[[field]])),
+      "approved outcome-specific certainty evidence")
+  }
+  bound_inputs <- list(schema = input_binding$schema, project_id = project_id, synthesis_mode = mode,
+    evidence_version = input_binding$evidence_version, protocol_version = input_binding$protocol_version,
+    binding_sha256 = sha256_file(within_project(input_binding_path)), source_inputs = checked,
+    pooled_statistics = if (mode == "NARRATIVE") list(status = "NOT_APPLICABLE",
+      reason = "Approved Protocol and verified synthesis groups specify narrative synthesis without pooling.") else
+      list(status = "REQUIRED"), risk_of_bias = if (rob_not_applicable) list(status = "NOT_APPLICABLE",
+      reason = config$protocol$risk_of_bias$rationale) else list(status = "REQUIRED"),
+    certainty = if (grade_required) list(status = "REQUIRED") else if (grade_not_applicable)
+      list(status = "NOT_APPLICABLE", reason = grade$rationale) else list(status = "NOT_REQUIRED_BY_PROTOCOL"))
+}
+narrative_only <- identical(mode, "NARRATIVE") && !is.null(bound_inputs)
+
 
 # ============================================================
 # 3. Output paths
@@ -1530,6 +1699,11 @@ package_root <- file.path(
   production_root,
   "evidence_package"
 )
+
+if (!is.null(bound_inputs) && dir.exists(production_root) &&
+    length(list.files(production_root, all.files = TRUE, no.. = TRUE))) {
+  stop("R/38 bound inputs require a fresh production directory in a new staged source version.", call. = FALSE)
+}
 
 dir.create(
   production_root,
@@ -1724,6 +1898,27 @@ artifact_specs <- tibble::tribble(
   FALSE
 )
 
+if (narrative_only) {
+  artifact_specs <- dplyr::filter(artifact_specs,
+    !role %in% c("quantitative_result", "diagnostic_result", "exploratory_result"),
+    logical_name != "manuscript_tables_workbook")
+}
+if (!is.null(bound_inputs)) {
+  if (identical(bound_inputs$risk_of_bias$status, "NOT_APPLICABLE"))
+    artifact_specs <- dplyr::filter(artifact_specs, role != "risk_of_bias",
+      !startsWith(logical_name, "rob"))
+  for (name in c("evidence", "search", "narrative_results", "certainty")) {
+    entry <- checked[[name]]
+    if (is.null(entry)) next
+    role <- switch(name, evidence = "study_selection", search = "protocol_methods",
+      narrative_results = "narrative_result", certainty = "certainty_of_evidence")
+    artifact_specs <- tibble::add_row(artifact_specs, logical_name = name, role = role, source_rel = entry$path,
+      required_for_draft = name != "certainty", required_for_final = TRUE)
+  }
+  artifact_specs <- tibble::add_row(artifact_specs, logical_name = "input_binding", role = "protocol_methods",
+    source_rel = input_binding_path, required_for_draft = TRUE, required_for_final = TRUE)
+}
+
 artifact_specs <- artifact_specs |>
   dplyr::mutate(
     source_path = file.path(
@@ -1835,7 +2030,7 @@ r27_root <- file.path(
   "meta_analysis"
 )
 
-r27_summary_files <- if (dir.exists(r27_root)) {
+r27_summary_files <- if (!narrative_only && dir.exists(r27_root)) {
   list.files(
     r27_root,
     pattern = "^meta_analysis_summary\\.csv$",
@@ -1855,6 +2050,8 @@ r27_summary_files <- r27_summary_files[
     fixed = TRUE
   )
 ]
+if (!is.null(bound_inputs) && !narrative_only)
+  r27_summary_files <- r27_summary_files[basename(dirname(r27_summary_files)) %in% groups]
 
 if (length(r27_summary_files) > 0L) {
 
@@ -2029,6 +2226,11 @@ artifact_specs <- artifact_specs |>
     .keep_all = TRUE
   )
 
+if (!is.null(bound_inputs)) {
+  frozen_paths <- vapply(checked, `[[`, character(1), "path")
+  artifact_specs <- dplyr::filter(artifact_specs, source_rel %in% c(input_binding_path, frozen_paths))
+}
+
 
 # ============================================================
 # 6. Determine manuscript readiness
@@ -2066,7 +2268,7 @@ rob_final_available <- file_nonempty(
 if (nrow(draft_missing) > 0L) {
   readiness_status <- "NOT_READY"
 } else if (
-  !rob_final_available ||
+  (!rob_final_available && !identical(bound_inputs$risk_of_bias$status, "NOT_APPLICABLE")) ||
   nrow(final_missing) > 0L
 ) {
   readiness_status <- "DRAFT_READY_PENDING_ROB"
@@ -2647,7 +2849,7 @@ prisma_audit <- load_if_exists(
   )
 )
 
-meta_execution_summary <- load_if_exists(
+meta_execution_summary <- if (!narrative_only) load_if_exists(
   file.path(
     repo_root,
     "results",
@@ -2656,7 +2858,7 @@ meta_execution_summary <- load_if_exists(
   )
 )
 
-meta_reporting_summary <- load_if_exists(
+meta_reporting_summary <- if (!narrative_only) load_if_exists(
   file.path(
     repo_root,
     "results",
@@ -2666,7 +2868,7 @@ meta_reporting_summary <- load_if_exists(
   )
 )
 
-study_level_effects <- load_if_exists(
+study_level_effects <- if (!narrative_only) load_if_exists(
   file.path(
     repo_root,
     "results",
@@ -2676,7 +2878,7 @@ study_level_effects <- load_if_exists(
   )
 )
 
-meta_diagnostics_summary <- load_if_exists(
+meta_diagnostics_summary <- if (!narrative_only) load_if_exists(
   file.path(
     repo_root,
     "results",
@@ -2685,7 +2887,7 @@ meta_diagnostics_summary <- load_if_exists(
   )
 )
 
-exploratory_summary <- load_if_exists(
+exploratory_summary <- if (is.null(bound_inputs)) load_if_exists(
   file.path(
     repo_root,
     "results",
@@ -2694,7 +2896,7 @@ exploratory_summary <- load_if_exists(
   )
 )
 
-rob_final <- load_if_exists(
+rob_final <- if (!identical(bound_inputs$risk_of_bias$status, "NOT_APPLICABLE")) load_if_exists(
   file.path(
     repo_root,
     "results",
@@ -3370,7 +3572,8 @@ methods_lines <- c(
   "## Study selection and extraction",
   "",
   "- Title/abstract screening and full-text eligibility were completed through the toolkit's staged review workflow with preserved human-review gates.",
-  "- Quantitative analysis inputs were finalized only after targeted Human Verification.",
+  if (narrative_only) "- Study-level synthesis uses the Human-verified outcome records and timepoint strata." else
+    "- Quantitative analysis inputs were finalized only after targeted Human Verification.",
   "",
   "## Risk of bias",
   "",
@@ -3543,6 +3746,14 @@ methods_lines <- c(
   ""
 )
 
+if (!is.null(narrative_rows)) {
+  if (narrative_only) methods_lines <- head(methods_lines, match("## Statistical analysis — executed-method inventory", methods_lines) - 1L)
+  methods_lines <- c(methods_lines, "## Narrative synthesis", "",
+    "- Source-reported outcomes are organized by the approved analysis group and timepoint.",
+    if (narrative_only) "- Pooled statistics: NOT_APPLICABLE. The approved synthesis plan specifies no pooling." else
+      "- The narrative groups are reported independently of the executed quantitative groups.", "")
+}
+
 writeLines(
   methods_lines,
   methods_blocks_file,
@@ -3554,7 +3765,7 @@ writeLines(
 # 11. Deterministic Results factual blocks
 # ============================================================
 
-included_n <- if (
+included_n <- if (!is.null(bound_inputs)) length(include) else if (
   !is.null(included_studies)
 ) {
   nrow(included_studies)
@@ -4013,7 +4224,11 @@ results_lines <- c(
   "",
   "_R/39 must describe the substantive patterns in every table artifact marked coverage_required=TRUE, regardless of topic or review type._",
   "",
-  "## Quantitative synthesis",
+  if (!is.null(narrative_rows)) c("## Narrative synthesis — Human-verified study results", "",
+    table_to_markdown(narrative_rows[c("study_id", "analysis_group", "original_outcome", "reported_timepoint",
+      "analysis_timepoint", "verified_result", "source_location")],
+      max_rows = nrow(narrative_rows)), ""),
+  if (!narrative_only) c("## Quantitative synthesis",
   "",
   if (!is.na(quantitative_group_n)) {
     paste0(
@@ -4036,7 +4251,7 @@ results_lines <- c(
   } else {
     "_No canonical R/27 pooled summary was available._"
   },
-  ""
+  "")
 )
 
 # Prefer atomic publication tables (CSV/TSV) as the canonical textual
@@ -4267,7 +4482,7 @@ if (length(r27_study_effect_tables) > 0L) {
 
 results_lines <- c(
   results_lines,
-  "## Statistical diagnostics and sensitivity analyses",
+  if (!narrative_only) c("## Statistical diagnostics and sensitivity analyses",
   "",
   "### R/28 diagnostic summary",
   "",
@@ -4290,7 +4505,7 @@ results_lines <- c(
   } else {
     "_R/28B exploratory diagnostics were not run or not available._"
   },
-  "",
+  ""),
   "## Risk of bias",
   "",
   if (!is.null(rob_final)) {
@@ -4307,19 +4522,23 @@ results_lines <- c(
       )
     )
   } else {
-    "_Final author-approved RoB was not available._"
+    if (identical(bound_inputs$risk_of_bias$status, "NOT_APPLICABLE"))
+      paste("RoB was not applicable under the approved Protocol:", bound_inputs$risk_of_bias$reason) else
+      "_Final author-approved RoB was not available._"
   },
+  if (!is.null(certainty_rows)) c("", "## Certainty of evidence", "", table_to_markdown(certainty_rows, max_rows = nrow(certainty_rows))),
   "",
   figure_manifest_lines,
   "## Results-drafting rules",
   "",
   "- Study selection: report canonical PRISMA counts and refer to the PRISMA figure when available.",
   "- Tables 1–3: describe the study-design mix, sample-size structure, participant characteristics, and intervention/procedural characteristics that are actually visible in the tables. Select the most informative patterns rather than reciting every cell.",
-  "- Quantitative outcomes: for each canonical analysis, report k and total N when available, the effect measure and pooled estimate, 95% CI, and heterogeneity quantities available in the canonical output. State whether the interval excludes the null only when that conclusion follows directly from the measure.",
+  if (!narrative_only) c("- Quantitative outcomes: for each canonical analysis, report k and total N when available, the effect measure and pooled estimate, 95% CI, and heterogeneity quantities available in the canonical output. State whether the interval excludes the null only when that conclusion follows directly from the measure.",
   "- Forest plots: describe the pooled result and the study-level pattern/precision using the backing R/27 data. Do not infer a direction such as 'favored intervention' unless outcome coding and group direction are explicit in the evidence.",
-  "- Sensitivity/diagnostic analyses: report only analyses actually executed. Preserve underpowered/descriptive/not-estimable labels exactly.",
+  "- Sensitivity/diagnostic analyses: report only analyses actually executed. Preserve underpowered/descriptive/not-estimable labels exactly."),
+  if (!is.null(narrative_rows)) "- Keep study-reported findings distinct from pooled estimates. Preserve exact definitions, timepoints and reported missingness.",
   "- Risk of bias: summarize the author-approved distribution/pattern from R/37 and refer to the corresponding figure(s) when available.",
-  "- Results may statistically interpret precision, heterogeneity, robustness, and whether a confidence interval crosses the null. Mechanistic, causal, or clinical explanations belong in Discussion.",
+  if (!narrative_only) "- Results may statistically interpret precision, heterogeneity, robustness, and whether a confidence interval crosses the null. Mechanistic, causal, or clinical explanations belong in Discussion.",
   "- Statistical recalculation in R/38: NO.",
   ""
 )
@@ -4344,7 +4563,7 @@ if (!nzchar(registered_protocol)) {
   )
 }
 
-if (!rob_final_available) {
+if (!rob_final_available && !identical(bound_inputs$risk_of_bias$status, "NOT_APPLICABLE")) {
   author_tasks <- c(
     author_tasks,
     "Complete Author-final risk-of-bias review and run R/37 before final manuscript freeze."
@@ -4462,12 +4681,13 @@ scaffold_lines <- c(
   "### Risk-of-bias assessment",
   "[DRAFT FROM RoB tool config; final judgments from R/37 only]",
   "",
-  "### Statistical analysis",
+  if (!is.null(narrative_rows)) c("### Narrative synthesis", "[USE frozen study-level results and the approved synthesis plan.]", ""),
+  if (!narrative_only) c("### Statistical analysis",
   "[DRAFT FROM R/27 model/config; do not infer settings not present in canonical sources]",
   "",
   "### Additional and exploratory analyses",
   "[REPORT ONLY analyses actually executed. R/28B results must retain their eligibility labels such as DESCRIPTIVE_ONLY or NOT_ESTIMABLE.]",
-  "",
+  ""),
   "## Results",
   "",
   "### Study selection",
@@ -4476,17 +4696,20 @@ scaffold_lines <- c(
   "### Study characteristics",
   "[USE R/34 manuscript tables]",
   "",
-  "### Quantitative synthesis",
+  if (!is.null(narrative_rows)) c("### Narrative synthesis", "[USE study-specific findings in results_factual_blocks.md.]", ""),
+  if (!narrative_only) c("### Quantitative synthesis",
   "[USE R/27 canonical pooled results; R/33 only for presentation-ready figures/tables]",
   "",
   "### Statistical diagnostics and sensitivity analyses",
   "[USE R/28; optionally R/28B with explicit limitations]",
-  "",
+  ""),
   "### Risk of bias",
   if (rob_final_available) {
     "[USE R/37 final author-approved RoB outputs]"
   } else {
-    "[PENDING R/37 — DO NOT WRITE FINAL RoB CONCLUSIONS YET]"
+    if (identical(bound_inputs$risk_of_bias$status, "NOT_APPLICABLE"))
+      "[USE the explicit applicability rationale in the approved Protocol.]" else
+      "[PENDING R/37 — DO NOT WRITE FINAL RoB CONCLUSIONS YET]"
   },
   "",
   "## Discussion",
@@ -4773,9 +4996,20 @@ openxlsx::saveWorkbook(
 # 15. State file
 # ============================================================
 
+if (!is.null(bound_inputs)) {
+  for (source in checked) {
+    require_input(any(evidence_registry$source_relative_path == source$path &
+      evidence_registry$source_sha256 == source$sha256 & evidence_registry$hash_match),
+      paste("frozen source", source$path))
+  }
+  r39_paths <- c(registry = registry_file, artifact_registry = artifact_registry_file,
+    methods = methods_blocks_file, results = results_blocks_file, scaffold = scaffold_file)
+  bound_inputs$r39_input_hashes <- as.list(vapply(r39_paths, sha256_file, character(1)))
+}
+
 state <- list(
   manuscript_production = list(
-    version = "2.1.2",
+    version = if (is.null(bound_inputs)) "2.1.2" else "2.2.0",
     generated_at = now_text(),
     project_id = project_id,
     project_title = project_title,
@@ -4813,6 +5047,7 @@ state <- list(
     )
   )
 )
+if (!is.null(bound_inputs)) state$manuscript_production$input_contract <- bound_inputs
 
 yaml::write_yaml(
   state,

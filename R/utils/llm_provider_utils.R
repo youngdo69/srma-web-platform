@@ -231,6 +231,116 @@ parse_openai_structured_output_json <- function(output_text) {
   reparsed
 }
 
+is_openai_insufficient_quota <- function(status, response_text) {
+  if (!identical(as.integer(status), 429L)) return(FALSE)
+  api_error <- tryCatch(
+    jsonlite::fromJSON(response_text, simplifyVector = FALSE)$error,
+    error = function(e) NULL
+  )
+  if (!is.list(api_error)) return(FALSE)
+  code <- tolower(as.character(api_error$code %||% ""))
+  type <- tolower(as.character(api_error$type %||% ""))
+  message <- as.character(api_error$message %||% "")
+  identical(code, "insufficient_quota") ||
+    identical(type, "insufficient_quota") ||
+    grepl("no credits remaining|exceeded your current quota|billing hard limit",
+          message, ignore.case = TRUE)
+}
+
+
+# Actual API usage counts; cached/reasoning tokens are included within totals.
+extract_openai_screening_usage <- function(body) {
+  u <- body$usage
+  if (!is.list(u)) return(NULL)
+  numeric_field <- function(x) {
+    if (is.null(x) || length(x) != 1L) return(NA_real_)
+    y <- suppressWarnings(as.numeric(x))
+    if (is.na(y) || !is.finite(y) || y < 0) NA_real_ else y
+  }
+  list(
+    input_tokens = numeric_field(u$input_tokens),
+    cached_input_tokens = numeric_field(u$input_tokens_details$cached_tokens),
+    cache_write_tokens = numeric_field(u$input_tokens_details$cache_write_tokens),
+    output_tokens = numeric_field(u$output_tokens),
+    reasoning_tokens = numeric_field(u$output_tokens_details$reasoning_tokens)
+  )
+}
+
+# Missing or mismatched model price metadata produces NA instead of guesses.
+# This excludes charged unsuccessful attempts and cannot replace provider billing.
+estimate_openai_screening_usd <- function(usage, rate_card, model) {
+  if (!is.list(usage) || !is.list(rate_card) ||
+      !identical(as.character(rate_card$model), as.character(model))) return(NA_real_)
+  number <- function(x) {
+    if (is.null(x) || length(x) != 1L) return(NA_real_)
+    y <- suppressWarnings(as.numeric(x))
+    if (is.na(y) || !is.finite(y) || y < 0) NA_real_ else y
+  }
+  ip <- number(rate_card$input_usd_per_million)
+  cp <- number(rate_card$cached_input_usd_per_million)
+  wp <- number(rate_card$cache_write_usd_per_million)
+  outp <- number(rate_card$output_usd_per_million)
+  it <- number(usage$input_tokens)
+  ot <- number(usage$output_tokens)
+  ct <- number(usage$cached_input_tokens)
+  wt <- number(usage$cache_write_tokens)
+  if (anyNA(c(ip, outp, it, ot))) return(NA_real_)
+  if (is.na(ct)) ct <- 0
+  if (is.na(wt)) {
+    # Responses may omit cache-write counts. Assume zero *reported* cache
+    # writes for advisory estimates only; provider billing is authoritative.
+    # Do not block scientific screening when this field is absent.
+    wt <- 0
+  }
+  if ((ct > 0 && is.na(cp)) || (wt > 0 && is.na(wp))) return(NA_real_)
+  ordinary <- it - ct - wt
+  if (ordinary < 0) return(NA_real_)
+  (ordinary * ip + ct * ifelse(is.na(cp), 0, cp) +
+    wt * ifelse(is.na(wp), 0, wp) + ot * outp) / 1e6
+}
+
+# Pure payload builder: can be tested without API credentials or network access.
+# Optional controls are opt-in so an unchanged configuration sends the same
+# payload as the previously approved screening pipeline.
+build_openai_screening_request_body <- function(
+    prompt, model, json_schema, schema_name = "structured_output",
+    reasoning_effort = NULL, max_output_tokens = NULL
+) {
+  if (!is.character(model) || length(model) != 1L ||
+      is.na(model) || !nzchar(trimws(model))) {
+    stop("A nonempty screening model is required.", call. = FALSE)
+  }
+  request_body <- list(
+    model = model,
+    input = list(list(role = "user", content = list(list(
+      type = "input_text", text = prompt
+    )))),
+    text = list(format = list(
+      type = "json_schema", name = schema_name,
+      strict = TRUE, schema = json_schema
+    ))
+  )
+  if (!is.null(reasoning_effort)) {
+    effort <- as.character(reasoning_effort)
+    if (length(effort) != 1L || is.na(effort) ||
+        !effort %in% c("none", "minimal", "low", "medium", "high", "xhigh", "max")) {
+      stop("Unsupported reasoning_effort setting.", call. = FALSE)
+    }
+    request_body$reasoning <- list(effort = effort)
+  }
+  if (!is.null(max_output_tokens)) {
+    n <- suppressWarnings(as.numeric(max_output_tokens))
+    if (length(n) != 1L || is.na(n) || !is.finite(n) ||
+        n != floor(n) || n < 256 || n > 128000) {
+      stop("max_output_tokens must be an integer from 256 to 128000.", call. = FALSE)
+    }
+    # API token budget includes invisible reasoning; too-low values can cause
+    # truncated JSON and costly retries. Not enabled by default.
+    request_body$max_output_tokens <- as.integer(n)
+  }
+  request_body
+}
+
 call_openai_structured_screening <- function(
     prompt,
     model,
@@ -238,7 +348,9 @@ call_openai_structured_screening <- function(
     base_url,
     json_schema,
     timeout_seconds = 120,
-    schema_name = "structured_output"
+    schema_name = "structured_output",
+    reasoning_effort = NULL,
+    max_output_tokens = NULL
 ) {
   required_packages <- c("httr2", "jsonlite")
   missing <- required_packages[
@@ -255,27 +367,11 @@ call_openai_structured_screening <- function(
 
   endpoint <- paste0(sub("/+$", "", base_url), "/responses")
 
-  request_body <- list(
-    model = model,
-    input = list(
-      list(
-        role = "user",
-        content = list(
-          list(
-            type = "input_text",
-            text = prompt
-          )
-        )
-      )
-    ),
-    text = list(
-      format = list(
-        type = "json_schema",
-        name = schema_name,
-        strict = TRUE,
-        schema = json_schema
-      )
-    )
+  request_body <- build_openai_screening_request_body(
+    prompt = prompt, model = model, json_schema = json_schema,
+    schema_name = schema_name,
+    reasoning_effort = reasoning_effort,
+    max_output_tokens = max_output_tokens
   )
 
   response <- httr2::request(endpoint) |>
@@ -292,6 +388,19 @@ call_openai_structured_screening <- function(
   response_text <- httr2::resp_body_string(response)
 
   if (status < 200L || status >= 300L) {
+    # HTTP 429 covers both temporary rate limiting and exhausted API credits.
+    if (is_openai_insufficient_quota(status, response_text)) {
+      stop(structure(
+        list(
+          message = paste0(
+            "OpenAI API credits exhausted (HTTP 429: insufficient_quota). ",
+            "Screening stopped; add API credits before retrying."
+          ),
+          call = NULL
+        ),
+        class = c("srma_ai_quota_exhausted", "error", "condition")
+      ))
+    }
     stop(
       "OpenAI API request failed with HTTP ", status, ".\n",
       substr(response_text, 1L, 2000L)
@@ -315,6 +424,7 @@ call_openai_structured_screening <- function(
     response_id = response_body$id %||% NA_character_,
     model = response_body$model %||% model,
     raw_output_text = output_text,
+    usage = extract_openai_screening_usage(response_body),
     raw_response = response_text
   )
 }
@@ -344,7 +454,9 @@ call_llm_screening_provider <- function(
         base_url = provider_config$base_url %||% "https://api.openai.com/v1",
         json_schema = json_schema,
         timeout_seconds = provider_config$timeout_seconds %||% 120,
-        schema_name = schema_name
+        schema_name = schema_name,
+        reasoning_effort = provider_config$reasoning_effort %||% NULL,
+        max_output_tokens = provider_config$max_output_tokens %||% NULL
       )
     )
   }

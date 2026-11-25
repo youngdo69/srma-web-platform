@@ -74,11 +74,42 @@ Before performing any coding, refactoring, automation, or workflow-design task, 
 * frontend timing
 * human-review policy
 
-Do not skip directly to full universalization or frontend development while the current reference systematic review and meta-analysis remains incomplete.
+Apply the roadmap's software prerequisites to universalization, frontend
+development, Software Acceptance, and Release Candidate approval. Manage the
+reference review's scientific decisions independently.
 
 When proposing or implementing the next task, follow the authoritative development sequence in `PROJECT_ROADMAP.md`.
 
 If a request conflicts with the roadmap, follow the user's latest explicit instruction and document the change in `PROJECT_ROADMAP.md`.
+
+## Universal Software and Project Scientific Validation
+
+Apply this governing rule when determining the scope of every Toolkit development task.
+Route incomplete Protocol, search evidence, Study Selection, Outcome, RoB,
+GRADE, R/40 Scientific QC, and final Manuscript Approval through the affected
+project's existing Web workflow and Human Decision processes. Change Toolkit
+code only for an objectively reproduced shared software defect or a reusable
+feature requirement explicitly approved by the PM.
+
+Each new Toolkit development proposal must specify:
+
+1. The reproducible universal defect or the need for a reusable feature.
+2. Why the existing implementation cannot meet the requirement.
+3. How the change applies across SR-MA projects.
+4. The minimum code changes needed.
+5. The targeted test using a project-neutral fixture.
+6. The expected AI and API costs and the expected validation cost.
+
+Base Software Acceptance and Release Candidate approval on software and
+operational verification. Assess scientific validity and manuscript submission
+readiness within each research project through its existing approvals. Preserve
+the researcher's authority and record their decisions and provenance so the
+Toolkit can generate verifiable research results and manuscripts.
+
+Preserve approved Scientific R calculations, Canonical Data, Versions,
+Provenance, and Human Decisions. Scope verification to the affected behavior.
+Avoid unnecessary repeat tests, full pipeline reruns, and project-specific
+hardcoding. Paid AI calls require explicit approval.
 
 ## General rules
 
@@ -90,6 +121,10 @@ If a request conflicts with the roadmap, follow the user's latest explicit instr
 - Do not overwrite source datasets.
 - Write generated outputs to the outputs/ directory.
 - Run validation tests before accepting a meta-analysis result.
+- Treat Human Final Study Selection and finalized outcome definitions, labels, and reported timepoints as authoritative. Reconcile by study ID and evidence version, preserve conflicting records, and distinguish review inclusion from synthesis participation.
+- Reuse canonical approvals and saved QC only with verified project, version, source, approval provenance, and available integrity metadata. Preserve original findings and approval history. A source link never regrades QC.
+- Keep review logic protocol-driven and applicable to narrative and quantitative designs. Complete automatic reconciliation before asking for substantive scientific decisions or obligatory information. Group duplicate questions and keep technical provenance in operator diagnostics.
+- Inspect Git status and the verified baseline before editing. Keep authorized work on the feature branch. Protect approved scientific code, policies, dependency locks, schemas, and private runtime data. Keep changes and offline validation scoped to the affected behavior, and report only observed test results. External writes, paid AI calls, and release actions require explicit authorization.
 
 ## Statistical rules
 

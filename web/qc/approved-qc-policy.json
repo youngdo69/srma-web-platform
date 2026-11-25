@@ -1,0 +1,7 @@
+{
+  "policy_id": "SRMA_UNIVERSAL_SCIENTIFIC_PUBLICATION_QC",
+  "policy_version": "1.0.0",
+  "path": "web/qc/prompts/SCIENTIFIC_PUBLICATION_QC_MASTER_v1.md",
+  "policy_sha256": "4f50790d03f276c5628eb09143168bf8ede3f04010d3661a30ea9b7f745369f5",
+  "artifact_click_sha256": "3831eb123ab5ed6061ea4a983e49c08d03dd64ec3ef423a2bbdcb66600042c39"
+}

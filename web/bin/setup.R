@@ -1,16 +1,41 @@
-# Run from repository root: Rscript --vanilla web/bin/setup.R
-platform <- normalizePath("web", mustWork = TRUE)
-library <- Sys.getenv("SRMA_WEB_LIBRARY", file.path(platform, ".library"))
+# RC28.7 — explicit operator setup, not part of normal Web/Worker startup.
+# Run at the canonical repository root with the R pinned in web/renv.lock.
+source("web/bin/rc287_runtime.R")
+root <- normalizePath(".", mustWork = TRUE)
+rc287_check_web_r(root)  # Fail BEFORE creating or installing anything.
+platform <- file.path(root, "web")
+library <- rc287_web_library(root)
 dir.create(library, recursive = TRUE, showWarnings = FALSE)
-# Clean restore: only the requested library and R's base/recommended library.
-.libPaths(c(normalizePath(library), .Library), include.site = FALSE)
+library <- normalizePath(library, mustWork = TRUE)
+.libPaths(c(library, .Library), include.site = FALSE)
 options(repos = c(CRAN = "https://cloud.r-project.org"), timeout = 300)
 bootstrap <- Sys.getenv("SRMA_RENV_BOOTSTRAP", "")
-if (!requireNamespace("renv", quietly = TRUE) && nzchar(bootstrap))
-  loadNamespace("renv", lib.loc = bootstrap)
-if (!"renv" %in% loadedNamespaces()) install.packages("renv", lib = library)
-lock <- renv::lockfile_read(file.path(platform, "renv.lock"))
-if (getRversion() != package_version(lock$R$Version))
-  stop("Use R ", lock$R$Version, " for the Web environment. The scientific runtime is restored separately.", call. = FALSE)
-renv::restore(project = platform, lockfile = file.path(platform, "renv.lock"), library = library, prompt = FALSE)
-cat("Web dependency restore completed; canonical lock unchanged.\n")
+if (nzchar(bootstrap)) {
+  if (!dir.exists(bootstrap)) stop("SRMA_RENV_BOOTSTRAP directory is missing", call. = FALSE)
+  .libPaths(c(library, bootstrap, .Library), include.site = FALSE)
+}
+if (!requireNamespace("renv", quietly = TRUE)) {
+  install.packages("renv", lib = library)
+  if (!requireNamespace("renv", quietly = TRUE))
+    stop("renv bootstrap failed; Web packages were not restored", call. = FALSE)
+}
+# Restore the exact active package set from the Web lock; do not attempt
+# RPostgreSQL during local SQLite setup (or RSQLite on PostgreSQL hosts).
+deps <- new.env(parent = baseenv())
+sys.source(file.path(root, "web/config/dependencies.R"), envir = deps)
+backend <- tolower(Sys.getenv("SRMA_WEB_DB", "sqlite"))
+if (!backend %in% c("sqlite", "postgres"))
+  stop("Unsupported SRMA_WEB_DB backend: ", backend, call. = FALSE)
+required <- unique(as.character(deps$web_packages))
+if (backend == "sqlite") required <- setdiff(required, "RPostgreSQL")
+if (backend != "sqlite") required <- setdiff(required, "RSQLite")
+lock_path <- file.path(platform, "renv.lock")
+lock <- renv::lockfile_read(lock_path)
+not_pinned <- setdiff(required, names(lock$Packages))
+if (length(not_pinned)) stop("Not in Web lock: ", paste(not_pinned, collapse=", "), call. = FALSE)
+renv::restore(project = platform, lockfile = lock_path, library = library,
+              packages = required, prompt = FALSE)
+# Restrict all verification to the actual installed Web library.
+.libPaths(c(library, .Library), include.site = FALSE)
+rc287_assert_web_ready(root)
+cat("PASS: RC28.7 Web dependency restore; scientific lock untouched.\n")

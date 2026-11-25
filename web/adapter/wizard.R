@@ -52,6 +52,14 @@ web_write_configuration <- function(engine_root, root, values, previous = NULL) 
   stopifnot(all(names(config$paths) %in% names(schema$properties$paths$properties)))
   config$search$terms_file <- config$paths$search_terms_file
   dir.create(file.path(root, "config"), recursive = TRUE, showWarnings = FALSE)
+  # Versioned AI model policy: write once, preserve on subsequent edits.
+  model_policy <- file.path(root, "config/agent_screening.yml")
+  if (!file.exists(model_policy)) {
+    policy_default <- file.path(engine_root, "config/agent_screening.yml")
+    if (!file.exists(policy_default) ||
+        !isTRUE(file.copy(policy_default, model_policy, overwrite=FALSE)))
+      stop("Cannot create a versioned screening model policy.")
+  }
   yaml::write_yaml(config, file.path(root, "config/project_config.yml"))
   terms <- file.path(root, config$paths$search_terms_file)
   if (!file.exists(terms)) yaml::write_yaml(list(project = list(id = id, title = config$project$title),
