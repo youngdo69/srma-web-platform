@@ -1,0 +1,7 @@
+source("web/load.R")
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) != 1L) stop("Usage: import_acceptance.R <operator-acceptance.json>", call. = FALSE)
+settings <- web_settings(); con <- web_db(settings); on.exit(DBI::dbDisconnect(con)); web_migrate(con, settings)
+web_assert(settings$backend == "postgres", "Import acceptance only into the production PostgreSQL operational database.", "SYSTEM_FAILED")
+web_import_release_acceptance(con, settings, args[[1]])
+cat("Acceptance evidence imported for this exact Web code and dependency lock.\n")

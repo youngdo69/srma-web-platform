@@ -1,0 +1,94 @@
+# Secrets
+.env
+.env.*
+!.env.example
+secrets/
+credentials.json
+*.key
+*.pem
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+renv/library/
+renv/staging/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.vscode/settings.local.json
+
+# Claude local configuration
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
+# Research data that must not be uploaded
+data/private/
+data/patient-level/
+data/raw_confidential/
+
+# Generated large outputs
+outputs/cache/
+
+# BEGIN SRMA UNIVERSAL RUNTIME IGNORE
+# Secrets
+.env
+!.env.example
+
+# Active-project configuration generated during use
+config/project_config.yml
+config/search_terms.yml
+config/generated/
+config/archive/
+config/generated_schema_v2_archive/
+
+# Project/runtime artifacts generated during use
+data/
+results/
+projects/
+search_strategies/
+
+# Generated release/test artifacts
+dist/
+.task017_backups/
+# END SRMA UNIVERSAL RUNTIME IGNORE
+
+Projects/
+
+# >>> SRMA MASTER TOOLKIT LOCAL/RUNTIME ARTIFACTS >>>
+# Master repository protection: actual reviews must run in separate project folders.
+/.env
+/renv/library/
+/data/
+/results/
+/projects/
+/search_strategies/
+/config/generated/
+/config/project_config.yml
+/config/search_terms.yml
+/backup/
+/cleanup_*.txt
+/folder-tree.txt
+R/*.bak
+R/*.backup_*
+R/*.pre_task*
+R/*.pre_TASK*
+/.Rhistory
+/.RData
+/.Rproj.user/
+# <<< SRMA MASTER TOOLKIT LOCAL/RUNTIME ARTIFACTS <<<
+

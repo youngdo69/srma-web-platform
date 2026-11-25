@@ -1,0 +1,115 @@
+migration:
+  target_architecture: "Universal SR-MA Agent Toolkit"
+  numbering:
+    initialization: "00-03"
+    search_and_deduplication: "10-16"
+    title_abstract_screening: "20-23"
+    full_text_screening: "30-31"
+    extraction_and_analysis_preparation: "40-42"
+
+  existing_files:
+    - old: "R/00_setup.R"
+      action: "move"
+      new: "R/bootstrap/00_setup_project.R"
+      hardcoding:
+        - "Add config/generated, prompts, and results/screening directories"
+
+    - old: "R/01_install_packages.R"
+      action: "move_and_edit"
+      new: "R/bootstrap/01_install_core_packages.R"
+      hardcoding:
+        - "Replace Cardiac Surgery SR-MA Toolkit title"
+        - "Add httr2 and dotenv"
+
+    - old: "R/02_verify_environment.R"
+      action: "move_and_edit"
+      new: "R/bootstrap/02_verify_core_environment.R"
+      hardcoding:
+        - "Replace Cardiac Surgery title"
+        - "Verify prompts, config/generated, results/screening"
+
+    - old: "R/03_install_advanced_packages.R"
+      action: "move_and_edit"
+      new: "R/bootstrap/03_install_advanced_packages.R"
+      hardcoding:
+        - "Replace Cardiac Surgery title"
+
+    - old: "R/04_verify_advanced_environment.R"
+      action: "move_and_edit"
+      new: "R/bootstrap/04_verify_advanced_environment.R"
+      hardcoding:
+        - "Replace Cardiac Surgery title"
+
+    - old: "R/05_verify_project_templates.R"
+      action: "rename_and_rewrite"
+      new: "R/03_verify_project_templates.R"
+      hardcoding:
+        - "config/project.yml must become config/project_config.yml"
+        - "Read paths from config utilities"
+
+    - old: "R/06_import_extraction_data.R"
+      action: "defer_and_rewrite"
+      new: "R/40_import_extraction_data.R"
+      hardcoding:
+        - "Remove hypothetical_SGLT2i_data_extraction.csv"
+
+    - old: "R/06a_create_hypothetical_data.R"
+      action: "move"
+      new: "examples/create_hypothetical_sglt2i_data.R"
+      hardcoding:
+        - "Retain only as a clearly labeled example fixture"
+
+    - old: "R/07_validate_extraction_data.R"
+      action: "defer_and_rewrite"
+      new: "R/41_validate_extraction_data.R"
+      hardcoding:
+        - "Remove SGLT2i_data_extraction.csv"
+
+    - old: "R/08_prepare_analysis_data.R"
+      action: "defer_and_rewrite"
+      new: "R/42_prepare_analysis_data.R"
+      hardcoding:
+        - "Remove SGLT2i file names"
+
+    - old: "R/09_verify_search_strategy.R"
+      action: "merge_or_move"
+      new: "R/03_verify_project_templates.R"
+      hardcoding:
+        - "Keep search-template checks topic-neutral"
+
+    - old: "R/10_collect_search_terms.R"
+      action: "move_and_rewrite"
+      new: "R/manual/collect_search_terms_interactively.R"
+      hardcoding:
+        - "Replace intervention/procedure fixed schema with generic concepts"
+
+    - old: "R/11_generate_search_strategies.R"
+      action: "rename_and_rewrite"
+      new: "R/10_generate_search_strategies.R"
+      hardcoding:
+        - "Loop over search.concepts"
+        - "Remove intervention and procedure assumptions"
+
+    - old: "R/12_validate_search_strategies.R"
+      action: "rename_and_edit"
+      new: "R/11_validate_search_strategies.R"
+      hardcoding:
+        - "Replace Cardiac Surgery report title"
+
+    - old: "R/13_test_pubmed_search.R"
+      action: "rename_and_edit"
+      new: "R/12_test_pubmed_search.R"
+      hardcoding:
+        - "Replace cardiac-surgery-srma-toolkit tool name with project slug"
+
+    - old: "R/14_test_embase_search.R"
+      action: "rename_and_edit"
+      new: "R/13_test_embase_search.R"
+      hardcoding:
+        - "Replace Cardiac Surgery report title"
+
+    - old: "R/15_test_central_search.R"
+      action: "rename_and_edit"
+      new: "R/14_test_central_search.R"
+      hardcoding:
+        - "Replace Cardiac Surgery report title"

@@ -1,0 +1,15 @@
+human_decision_policy:
+  version: "3.0.0"
+  safeguards:
+    require_explicit_approval: true
+    archive_before_apply: true
+    block_on_unknown_option: true
+    block_on_unresolved_decision: true
+  paths:
+    generated_decisions: "config/generated/initialization_decisions_required.yml"
+    response_file: "config/generated/human_decision_responses.yml"
+    project_config_draft: "config/generated/project_config_draft.yml"
+    search_terms_draft: "config/generated/search_terms_draft.yml"
+    resolution_log: "config/generated/human_decision_resolution_log.yml"
+    verification_report: "results/logs/human_decision_application_verification.yml"
+    archive_directory: "config/generated/decision_archive"

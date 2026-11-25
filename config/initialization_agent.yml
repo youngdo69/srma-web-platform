@@ -1,0 +1,31 @@
+initialization_agent:
+  enabled: true
+
+  provider:
+    name: "openai"
+    api_key_env: "OPENAI_API_KEY"
+    base_url: "https://api.openai.com/v1"
+    model: "gpt-5"
+    store: false
+
+  prompt:
+    template_file: "prompts/project_initialization_prompt.md"
+    version: "1.0.0"
+
+  processing:
+    max_retries: 3
+    timeout_seconds: 180
+
+  output:
+    generated_directory: "config/generated"
+    project_config_draft: "project_config_draft.yml"
+    search_terms_draft: "search_terms_draft.yml"
+    decisions_required: "initialization_decisions_required.yml"
+    raw_response: "project_initialization_raw_response.json"
+    report: "initialization_report.md"
+
+  activation:
+    require_human_approval: true
+    active_project_config: "config/project_config.yml"
+    active_search_terms: "config/search_terms.yml"
+    archive_directory: "config/archive"

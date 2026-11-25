@@ -1,0 +1,4 @@
+.library/
+.Rprofile
+renv/library/
+renv/staging/

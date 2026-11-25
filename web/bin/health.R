@@ -1,0 +1,6 @@
+source("web/load.R")
+settings <- web_settings()
+con <- web_db(settings); on.exit(DBI::dbDisconnect(con))
+status <- web_deployment_status(con, settings)
+cat(jsonlite::toJSON(status, auto_unbox = TRUE, pretty = TRUE), "\n")
+if (!isTRUE(status$schema_ready)) quit(status = 2L)

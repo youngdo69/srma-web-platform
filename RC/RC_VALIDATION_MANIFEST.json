@@ -1,0 +1,221 @@
+{
+  "schema_version": "SRMA_RC_VALIDATION_MANIFEST_V1",
+  "rc_id": "srma-6.3.16-rc1",
+  "date": "2026-11-24",
+  "source_revision": "51cd58d6c8d15516a4255ac9ec6c059bab93ad8a",
+  "source_branch": "feature/rc28-25-9bcd-6-3-13",
+  "source_kind": "exact_working_tree_bytes",
+  "source_manifest_sha256": "b21036162becbdfc369f5a5ab671f08a71cb8cb5fbe608808a8213d44c72ad01",
+  "source_file_count": 261,
+  "source_bindings": {
+    "web_code_sha256": "5ce70cd2ba528a7c8e86e0c0d249672ff4e77e5e53e21d8386c93f44b792ca27",
+    "engine_release_id": "snapshot-391eb1a7b4d654ff"
+  },
+  "component_versions": {
+    "runtimes": {
+      "web": {
+        "r": "4.3.3",
+        "lockfile": "web/renv.lock",
+        "sha256": "333cfc4508a6d50c40d10dbfbac1449df0d918282c250d1feeda37f0fd76b072"
+      },
+      "scientific": {
+        "r": "4.6.1",
+        "lockfile": "renv.lock",
+        "sha256": "21dd72d3b6a2da0541c2f20fd1632052fba67ef152f949b6386d261e19d2a599"
+      }
+    },
+    "source_sha256": {
+      "web/docs/engine-baseline.json": "5f74959be65271ff88133d71eb8d84794b8a63cb1b264d901113f128d9c24925",
+      "web/docs/engine-source-manifest.json": "912741aa34e037e2fff450f46cc861c291a3af9558bd2a974c9bbd646d0c7dab",
+      "web/docs/approved-web-overlay.json": "e1475eddf5efd6e58b1fb527694c173a5d8bf75c6d9b09a62ae06142443e136a",
+      "web/qc/approved-qc-policy.json": "40a596503d1ae6e23f2cf07a6c039d8f77c146843dac598c6f29bfc36504e27d",
+      "R/27_run_universal_meta_analysis.R": "ebbd34d46706b7537ee3107d97c868c06f105d576199c49cfe12a69f987f8c22",
+      "R/38_prepare_manuscript_evidence_package.R": "a27f47cbd9eea1e7851afc7e452c1809a8d1107e61f172143faf8fe8be8198be",
+      "R/39_generate_manuscript_draft_with_verified_literature.R": "15b25c7e194215ec89e1c13788230a6a83ca844e9d2acd3650d18625b5f2bd31",
+      "R/40_validate_manuscript_numerics_citations_consistency.R": "ece5fd455349ff03fe0b86d917cd40e3b55a974158c975236fb63ed5858f2969",
+      "R/41_generate_journal_neutral_author_editable_docx.R": "11e43ea885f6e25560963ad54a7c0e597873b33087fbe2557e21700ac593b3ef"
+    }
+  },
+  "reused_evidence": [
+    {
+      "id": "B1-B2-C1-C2",
+      "status": "PASS",
+      "kind": "previous_isolated",
+      "source": "PROJECT_STATUS.md; B1 canonical, B2 v1.1, C1 and C2 integrations",
+      "scope": "Manually bound protocol/search, evidence workflow, analysis and artifact reconciliation, manuscript and citations."
+    },
+    {
+      "id": "WEB-015-016-017",
+      "status": "PASS",
+      "kind": "previous_static_and_sqlite",
+      "source": "PROJECT_STATUS.md; WEB-015 through WEB-017",
+      "scope": "Security/deployment static contracts and SQLite audit immutability. No production acceptance carried."
+    },
+    {
+      "id": "6.3.14-phase-c",
+      "status": "PASS",
+      "kind": "previous_isolated_mock_and_native_paths",
+      "source": "web/tests/qc_r40_phase_c.R",
+      "scope": "Frozen-source rules and receipts, Worker results and cost/retry simulation, Mock provider only.",
+      "candidate_test_source_sha256": "1feb6539ca905336dbb08066113435e735652ac3f53ef9c5846f643f4bbe5063"
+    },
+    {
+      "id": "6.3.15-phase-b",
+      "status": "PASS",
+      "kind": "previous_isolated_mock_and_native_paths",
+      "source": "web/tests/manuscript_finalization.R --web",
+      "scope": "Native initial R/40 path, eligible rule execution, Mock semantic route, exact renderer and review download. Mock receipts rejected for submission.",
+      "candidate_test_source_sha256": "e847de2cb8c2c673f409e9f64e78ce2dbd977826d17223b260900bd4c8d7e20a"
+    },
+    {
+      "id": "6.3.15-phase-c",
+      "status": "PASS",
+      "kind": "previous_isolated_shiny_e2e",
+      "source": "web/tests/manuscript_acceptance.R",
+      "scope": "SQLite, Worker, same-session DOCX consistency and download, new version and preserved lineage, selective checks and gate positive/negative. External receipts in positive fixture were synthetic.",
+      "candidate_test_source_sha256": "c5ab99c7d9da4179ba77aec68b88c10e075475bedd44832a187fd83eb68400ad"
+    },
+    {
+      "id": "6.3.15-phase-d-request",
+      "status": "PASS",
+      "kind": "previous_authenticated_isolated",
+      "source": "web/tests/manuscript_revision_request.R",
+      "scope": "Authenticated section binding, CSRF and forged actor/session rejection.",
+      "candidate_test_source_sha256": "7b02d87b92069966e5a191c25c4b9fc362b71eca4885383a0c5de2ff29926569"
+    },
+    {
+      "id": "6.3.15-phase-d-word-narrative",
+      "status": "PASS",
+      "kind": "previous_desktop_word_visual",
+      "source": "PROJECT_STATUS.md; 6.3.15 Phase D",
+      "scope": "Narrative DOCX layout on desktop Microsoft Word at 100 percent."
+    },
+    {
+      "id": "6.3.15-phase-d-live-preflight",
+      "status": "NOT_VERIFIED",
+      "kind": "previous_live_read_only",
+      "source": "PROJECT_STATUS.md; 6.3.15 Phase D",
+      "scope": "Actual candidate preflight lacked approved native dossiers and other required sources. Existing gate recorded as blocked. No full live R/40 receipt."
+    }
+  ],
+  "new_targeted_evidence": [
+    {
+      "id": "candidate-approved-source",
+      "status": "PASS",
+      "kind": "current_read_only",
+      "scope": "107 base entries, 20 overlay entries, 123 distinct effective hashes. Package hashes cover the broader working-tree payload. Scientific algorithms, locked dependencies and stable tags retained."
+    },
+    {
+      "id": "candidate-package-web-r",
+      "status": "PASS",
+      "kind": "current_extracted_candidate_windows",
+      "command": "Web R 4.3.3 --vanilla web/bin/rc287_preflight.R",
+      "scope": "Pinned active Web dependency profile. SQLite profile verified 10 packages; existing libraries used."
+    },
+    {
+      "id": "candidate-package-scientific-r",
+      "status": "PASS",
+      "kind": "current_extracted_candidate_windows",
+      "command": "Web R 4.3.3 --vanilla web/bin/rc287_science_probe.R",
+      "scope": "Exact Scientific R 4.6.1 runtime and canonical lock under the pre-existing library. No analysis executed and no production receipt recorded."
+    },
+    {
+      "id": "candidate-package-registration",
+      "status": "PASS",
+      "kind": "current_extracted_candidate_disposable_sqlite",
+      "scope": "Fresh SQLite migration, runtime engine source registration, PRAGMA quick_check, development overlay rejected in production. No research data opened."
+    },
+    {
+      "id": "candidate-package-worker",
+      "status": "PASS",
+      "kind": "current_extracted_candidate_disposable_sqlite",
+      "command": "Web R 4.3.3 --vanilla web/bin/worker.R --once",
+      "scope": "One idle iteration on the new schema. No registered job or analysis."
+    },
+    {
+      "id": "candidate-package-shiny",
+      "status": "PASS",
+      "kind": "current_extracted_candidate_loopback_http",
+      "scope": "Packaged Shiny on new SQLite data returned HTTP 200. Inherited Windows locale and Sass cache warnings on the restricted host. Isolated listener stopped. Native browser operations, credentials and downloads are outside this check."
+    },
+    {
+      "id": "candidate-word-pairwise",
+      "status": "PASS",
+      "kind": "current_generic_desktop_word_visual",
+      "artifact_sha256": "06e8281586c5bb0da24b0e29429062586f771b53c978939f7d38466f29ada588",
+      "scope": "Generated with shared Statistical Methods and R/41 renderer on Scientific R 4.6.1; structure integrity check and reviewed desktop Word layout."
+    },
+    {
+      "id": "candidate-word-mixed",
+      "status": "PASS",
+      "kind": "current_generic_desktop_word_visual",
+      "artifact_sha256": "ccb50d2c8f7ba65044797a9080a19406f2468b89af1727c0264eb312d31f5031",
+      "scope": "Generated with shared Statistical Methods and R/41 renderer on Scientific R 4.6.1; structure integrity check and reviewed desktop Word layout. Generic prepared sections, not Web Mixed automatic drafting."
+    },
+    {
+      "id": "candidate-package-privacy",
+      "status": "PASS",
+      "kind": "current_exact_payload_review",
+      "scope": "Allowlisted source and generic/public fixtures, plus approved blank registration template. No runtime store, project record, local backup, active credential or research PDF/DOCX in package. Literal credential candidates reviewed as test sentinel values."
+    },
+    {
+      "id": "candidate-package-roundtrip",
+      "status": "PASS",
+      "kind": "current_exact_payload_reproducibility",
+      "scope": "261 source files and 7 RC support files, SHA-256 and CRC checked; a new ZIP rebuilt independently from the extracted input matched byte-for-byte using Python 3.12.6 and zlib 1.3.1. Detached checksum verifies the distributed archive."
+    }
+  ],
+  "acceptance": {
+    "universal_functional": {
+      "status": "CONDITIONAL PASS",
+      "basis": "Accepted scoped isolated workflows and candidate startup. Combined Mixed Web automatic drafting and native Chrome remain outside verified scope."
+    },
+    "scientific_integrity_safeguards": {
+      "status": "PASS",
+      "basis": "Pinned sources and accepted version, gate, audit, approval reuse and scope protection checks."
+    },
+    "manuscript_publication_qc": {
+      "status": "CONDITIONAL PASS",
+      "basis": "Existing frozen-source methods/QC fixtures and three representative Word layout checks. Scientific/provider and broader unsupported format cases remain outside the review."
+    },
+    "release_candidate_readiness": {
+      "status": "PASS",
+      "basis": "Exact source archive, scoped installation controls, checksums, dependency lock checks, package evidence, instructions and recovery guidance for PM review."
+    },
+    "operational_deployment": {
+      "status": "NOT_VERIFIED",
+      "basis": "Chrome user acceptance, PostgreSQL, organization auth, deployment methods and receipt-backed recovery remain unverified. Candidate overlay is development-only."
+    },
+    "individual_manuscript_submission": {
+      "status": "NOT_VERIFIED",
+      "basis": "No individual manuscript was tested in this task; any existing submission block or pending approval is preserved."
+    }
+  },
+  "known_limitations": [
+    {
+      "type": "P1_SCOPE",
+      "item": "Complex inline, equation and citation editing; use supported prose and preserve the approved original."
+    },
+    {
+      "type": "SOFTWARE_SCOPE",
+      "item": "Combined Mixed Web auto-drafting is outside the currently enabled path. Generic Mixed components and renderer passed scoped checks."
+    },
+    {
+      "type": "ENVIRONMENT",
+      "item": "Native/manual Chrome workflow, PostgreSQL operations, production authentication, external receipts and deployment recovery are NOT_VERIFIED."
+    },
+    {
+      "type": "ENVIRONMENT",
+      "item": "Clean machine network dependency restoration and approved PDF extractor availability are installation prerequisites; existing exact libraries were probed."
+    },
+    {
+      "type": "SCIENTIFIC",
+      "item": "Live R/40 and author approval require eligible exact scientific dossiers and authentic Human decisions."
+    }
+  ],
+  "confirmed_p0_defects": [],
+  "paid_ai_calls": 0,
+  "paid_ai_cost": 0,
+  "git_release_actions": [],
+  "recommendation": "RC READY FOR PM APPROVAL"
+}

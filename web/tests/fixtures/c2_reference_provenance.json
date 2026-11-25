@@ -1,0 +1,7 @@
+{
+  "source": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=33782057&retmode=xml",
+  "retrieved": "2026-09-27",
+  "raw_response_sha256": "b322bbc5e8ca00aec7aaff25a20fcf592621c5b6c18fbba4603615bb9685a0ca",
+  "fixture_sha256": "ea8c1fdd9c48cdbd791c952474229d3486c1d4f19acda8e72197a7d3636424b1",
+  "transform": "Removed abstract, references and indexing; retained genuine bibliographic metadata. Not synthetic reference."
+}

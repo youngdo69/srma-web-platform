@@ -1,0 +1,27 @@
+{
+  "label": "Synthetic development-runtime canonical-engine fixture, not canonical scientific acceptance",
+  "R": "R version 4.3.3 (2024-02-29)",
+  "packages": {
+    "metafor": "4.4.0",
+    "openxlsx": "4.2.5.2",
+    "readr": "2.1.5",
+    "dplyr": "1.1.4",
+    "tibble": "3.2.1",
+    "stringr": "1.5.1",
+    "purrr": "1.0.2",
+    "tidyr": "1.3.1"
+  },
+  "canonical_scripts": {
+    "27_run_universal_meta_analysis.R": "ebbd34d46706b7537ee3107d97c868c06f105d576199c49cfe12a69f987f8c22",
+    "28_run_meta_analysis_diagnostics.R": "03e6022d5f29ccf1f785b2d58613ec88a9257905efcb08c9a7b8d4d3b44639ef",
+    "33_generate_forest_plots_and_editable_tables.R": "4664d62d1c47a5543cd33059c58f0bcdd07b4d29ec2f0876487ba3cae2f50e84"
+  },
+  "expected": {
+    "pooled_effect": 0.771738688934384,
+    "lower_ci": 0.338732448068967,
+    "upper_ci": 1.75826262701854,
+    "i2": 0,
+    "tau2": 0,
+    "studies": 3
+  }
+}

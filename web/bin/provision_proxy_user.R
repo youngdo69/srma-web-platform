@@ -1,0 +1,6 @@
+source("web/load.R")
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) < 3L) stop("Usage: provision_proxy_user.R <subject> <display-name> <workspace-id> [workspace-name]", call. = FALSE)
+settings <- web_settings(); con <- web_db(settings); on.exit(DBI::dbDisconnect(con)); web_migrate(con, settings)
+user <- web_provision_proxy_user(con, args[[1]], args[[2]], args[[3]], if (length(args) >= 4L) args[[4]] else "Systematic Reviews")
+cat("Provisioned organization identity for user ", user, "\n", sep = "")

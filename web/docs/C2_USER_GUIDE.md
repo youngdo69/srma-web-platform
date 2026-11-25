@@ -1,0 +1,11 @@
+# Manuscript Builder
+
+Select a Human-approved READY evidence version. In Manuscript, load sources and explicitly select approved analyses and their registered figures/tables. Include the primary parent when selecting sensitivity/subgroup results. Enter a title, language, rationale and real PubMed identifiers. Saving verifies metadata and creates a new immutable plan; failed retrieval retains upstream work.
+
+Load the saved plan. Review its evidence, analysis roles, figures/tables and verified bibliography. Explicitly approve `manuscript_plan` in Human Review Required. Prepare sections. Every section starts with an author-required placeholder. Enter Human text, insert numeric fact tokens using the selector, and cite `[[PMID:identifier]]`. The canonical source blocks for Methods and Results are protected and always rendered with roles and warnings. Changing scientific facts requires upstream correction and a new plan.
+
+Save, reject or explicitly approve each section with a rationale. Each action creates a new immutable version; load that version to continue. AI regeneration is optional and needs operator credentials. It never automatically approves a section. Earlier draft/edit provenance remains in the section history. If text changed while a job ran, its result cannot overwrite the newer version.
+
+Read Manuscript Pre-check findings. Free numeric claims, unknown facts/citations, missing sections, unresolved placeholders, insufficient references and unreviewed sections block Word generation. Reference minima follow canonical project configuration (defaults: total 25, Introduction 8, Discussion 15). Each Introduction/Discussion literature paragraph must cite a verified source; Human reviewers remain responsible for claim relevance. Only cited records enter the bibliography.
+
+Queue Word generation, wait for the worker, then accept the completed job as a new version. Download and inspect the editable Word artifact. Explicitly confirm text, analyses, references, warnings and the matching document before approving the manuscript. APPROVED means author-reviewed draft, not final scientific release. Select prior project versions to inspect historical manuscripts. New evidence/analysis/material reference revisions make old manuscripts non-current without changing their files.
